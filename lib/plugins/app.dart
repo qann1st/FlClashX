@@ -66,6 +66,9 @@ class App {
         }) ??
         false;
 
+  Future<bool> installApk(String path) async =>
+      await methodChannel.invokeMethod<bool>("installApk", {"path": path}) ?? false;
+
   final _iconCache = <String, ImageProvider?>{};
   final _iconFutures = <String, Future<ImageProvider?>>{};
 

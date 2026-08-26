@@ -921,6 +921,8 @@ class BuildCommand extends Command {
         "--dart-define=APP_ENV=$env",
         "--dart-define=CORE_VERSION=$coreVersion",
         "--dart-define=APP_VERSION=${Build.appVersion}",
+        if (Platform.environment["FLCLASHX_UPDATE_MANIFEST_URL"]?.isNotEmpty ?? false)
+          "--dart-define=FLCLASHX_UPDATE_MANIFEST_URL=${Platform.environment["FLCLASHX_UPDATE_MANIFEST_URL"]}",
       ],
     );
 
@@ -944,6 +946,8 @@ class BuildCommand extends Command {
         "--dart-define=APP_ENV=$env",
         "--dart-define=CORE_VERSION=$coreVersion",
         "--dart-define=APP_VERSION=${Build.appVersion}",
+        if (Platform.environment["FLCLASHX_UPDATE_MANIFEST_URL"]?.isNotEmpty ?? false)
+          "--dart-define=FLCLASHX_UPDATE_MANIFEST_URL=${Platform.environment["FLCLASHX_UPDATE_MANIFEST_URL"]}",
       ],
     );
     Build.copyFile(

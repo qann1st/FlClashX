@@ -17,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'controller.dart';
 import 'pages/pages.dart';
+import 'services/app_update.dart';
 
 class Application extends ConsumerStatefulWidget {
   const Application({
@@ -72,7 +73,36 @@ class ApplicationState extends ConsumerState<Application> {
       await globalState.appController.init();
       globalState.appController.initLink();
       app?.initShortcuts();
+      _checkForAppUpdate();
     });
+  }
+
+  Future<void> _checkForAppUpdate() async {
+    final update = await AppUpdateService.check();
+    if (!mounted || update == null) return;
+    final isRussian = Localizations.localeOf(context).languageCode == 'ru';
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isRussian ? 'Доступно обновление' : 'Update available'),
+        content: Text(isRussian
+            ? 'Доступна новая версия ${update.version}. Скачать и установить её?'
+            : 'Version ${update.version} is available. Download and install it?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(isRussian ? 'Позже' : 'Later')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(isRussian ? 'Обновить' : 'Update')),
+        ],
+      ),
+    ) ?? false;
+    if (!accepted || !mounted) return;
+    final installed = await AppUpdateService.downloadAndInstall(update);
+    if (!mounted || installed) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(isRussian ? 'Не удалось запустить установку обновления'
+          : 'Could not start update installation'),
+    ));
   }
 
   void _autoUpdateProfilesTask() {

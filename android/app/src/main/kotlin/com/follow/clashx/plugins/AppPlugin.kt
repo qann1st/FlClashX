@@ -34,6 +34,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.Result
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -255,6 +256,11 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 result.success(true)
             }
 
+            "installApk" -> {
+                val path = call.argument<String>("path")
+                result.success(path != null && installApk(path))
+            }
+
             "isIgnoringBatteryOptimizations" -> {
                 result.success(isIgnoringBatteryOptimizations())
             }
@@ -384,6 +390,43 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         } catch (e: Exception) {
             android.util.Log.w("AppPlugin", "openFile failed", e)
         }
+    }
+
+    private fun installApk(path: String): Boolean {
+        val context = FlClashXApplication.getAppContext()
+        val activity = activityRef?.get()
+        val file = File(path)
+        if (!file.isFile) return false
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !context.packageManager.canRequestPackageInstalls()
+        ) {
+            val settingsIntent = Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                android.net.Uri.parse("package:${context.packageName}"),
+            )
+            runCatching {
+                (activity ?: context).startActivity(
+                    settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+            return false
+        }
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileProvider",
+            file,
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return runCatching {
+            (activity ?: context).startActivity(intent)
+            true
+        }.getOrDefault(false)
     }
 
     private fun updateExcludeFromRecents(value: Boolean?) {
