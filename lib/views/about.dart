@@ -8,6 +8,8 @@ import 'package:flclashx/state.dart';
 import 'package:flclashx/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 
+import '../services/app_update.dart';
+
 @immutable
 class Contributor {
   const Contributor({
@@ -38,6 +40,51 @@ class AboutView extends StatelessWidget {
   Future<void> _checkUpdate(BuildContext context) async {
     final commonScaffoldState = context.commonScaffoldState;
     if (commonScaffoldState?.mounted != true) return;
+
+    if (Platform.isAndroid) {
+      final update = await commonScaffoldState?.loadingRun<AppUpdate?>(
+        AppUpdateService.check,
+        title: appLocalizations.checkUpdate,
+      );
+      if (!context.mounted) return;
+      if (update == null) {
+        await globalState.showMessage(
+          title: appLocalizations.checkUpdate,
+          message: TextSpan(text: appLocalizations.checkUpdateError),
+        );
+        return;
+      }
+
+      final accepted = await globalState.showMessage(
+        title: appLocalizations.discoverNewVersion,
+        message: TextSpan(
+          text: '${update.version}\n',
+          style: context.textTheme.headlineSmall,
+          children: [
+            if (update.notes?.isNotEmpty == true)
+              TextSpan(
+                text: '\n${update.notes}',
+                style: context.textTheme.bodyMedium,
+              ),
+          ],
+        ),
+        confirmText: appLocalizations.update,
+      );
+      if (accepted != true || !context.mounted) return;
+
+      final installed = await commonScaffoldState?.loadingRun<bool>(
+        () => AppUpdateService.downloadAndInstall(update),
+        title: appLocalizations.update,
+      );
+      if (installed != true && context.mounted) {
+        await globalState.showMessage(
+          title: appLocalizations.update,
+          message: TextSpan(text: appLocalizations.checkUpdateError),
+        );
+      }
+      return;
+    }
+
     final data = await commonScaffoldState?.loadingRun<Map<String, dynamic>?>(
       request.checkForUpdate,
       title: appLocalizations.checkUpdate,
