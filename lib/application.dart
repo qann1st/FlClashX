@@ -98,7 +98,43 @@ class ApplicationState extends ConsumerState<Application> {
       ),
     ) ?? false;
     if (!accepted || !mounted) return;
-    final installed = await AppUpdateService.downloadAndInstall(update);
+    var progress = 0.0;
+    final progressNotifier = ValueNotifier<double>(progress);
+    final downloadFuture = AppUpdateService.downloadAndInstall(
+      update,
+      onProgress: (received, total) {
+        if (total > 0) {
+          progress = received / total;
+          progressNotifier.value = progress;
+        }
+      },
+    );
+    final installed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        unawaited(downloadFuture.then((result) {
+          if (dialogContext.mounted) Navigator.pop(dialogContext, result);
+        }));
+        return AlertDialog(
+          title: Text(isRussian ? 'Загрузка обновления' : 'Downloading update'),
+          content: ValueListenableBuilder<double>(
+            valueListenable: progressNotifier,
+            builder: (_, value, __) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: value > 0 ? value : null),
+                const SizedBox(height: 12),
+                Text(value > 0
+                    ? '${(value * 100).clamp(0, 100).toStringAsFixed(0)}%'
+                    : (isRussian ? 'Подготовка…' : 'Preparing…')),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    progressNotifier.dispose();
     if (!mounted || installed) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(isRussian ? 'Не удалось запустить установку обновления'

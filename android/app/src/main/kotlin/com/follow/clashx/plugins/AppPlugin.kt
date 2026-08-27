@@ -53,10 +53,12 @@ private const val PACKAGES_CACHE_TTL_MS = 30_000L
 // Vendor runtime permission (ITGSA standard) gating the installed-app list on
 // vivo/OPPO/Xiaomi ROMs; unknown on AOSP. See withInstalledAppsPermission.
 private const val GET_INSTALLED_APPS_PERMISSION = "com.android.permission.GET_INSTALLED_APPS"
+private const val INSTALL_PERMISSION_REQUEST_CODE = 7301
 
 class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
 
     private var activityRef: WeakReference<Activity>? = null
+    private var pendingInstallPath: String? = null
 
     private lateinit var channel: MethodChannel
 
@@ -401,18 +403,30 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !context.packageManager.canRequestPackageInstalls()
         ) {
+            pendingInstallPath = path
             val settingsIntent = Intent(
                 Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                 android.net.Uri.parse("package:${context.packageName}"),
             )
-            runCatching {
-                (activity ?: context).startActivity(
-                    settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
+            val launched = runCatching {
+                activity?.startActivityForResult(settingsIntent, INSTALL_PERMISSION_REQUEST_CODE)
+                    ?: context.startActivity(settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                true
+            }.getOrElse {
+                pendingInstallPath = null
+                false
             }
-            return false
+            // The installer will be started from onActivityResult after the user
+            // enables "allow installs". Keep the downloaded file intact.
+            return launched
         }
 
+        return launchApkInstaller(path, context)
+    }
+
+    private fun launchApkInstaller(path: String, context: android.content.Context): Boolean {
+        val file = File(path)
+        if (!file.isFile) return false
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileProvider",
@@ -703,6 +717,14 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             val pending = vpnCallBacks.toList()
             vpnCallBacks.clear()
             pending.forEach { it.invoke(granted) }
+        }
+        if (requestCode == INSTALL_PERMISSION_REQUEST_CODE) {
+            val path = pendingInstallPath
+            pendingInstallPath = null
+            if (path != null && (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                    FlClashXApplication.getAppContext().packageManager.canRequestPackageInstalls())) {
+                launchApkInstaller(path, FlClashXApplication.getAppContext())
+            }
         }
         return true
     }
