@@ -108,8 +108,9 @@ class AboutView extends StatelessWidget {
               },
             ),
           );
-        ),
+        },
       );
+      progressNotifier.dispose();
       if (installed != true && context.mounted) {
         await globalState.showMessage(
           title: appLocalizations.update,
@@ -540,7 +541,6 @@ class _CoreVersionWidget extends StatelessWidget {
           );
         },
       );
-      progressNotifier.dispose();
 }
 
 class _CoreUpdateItem extends StatefulWidget {
