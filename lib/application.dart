@@ -79,10 +79,11 @@ class ApplicationState extends ConsumerState<Application> {
 
   Future<void> _checkForAppUpdate() async {
     final update = await AppUpdateService.check();
-    if (!mounted || update == null) return;
-    final isRussian = Localizations.localeOf(context).languageCode == 'ru';
+    final dialogContext = globalState.navigatorKey.currentContext;
+    if (!mounted || update == null || dialogContext == null) return;
+    final isRussian = Localizations.localeOf(dialogContext).languageCode == 'ru';
     final accepted = await showDialog<bool>(
-      context: context,
+      context: dialogContext,
       builder: (dialogContext) => AlertDialog(
         title: Text(isRussian ? 'Доступно обновление' : 'Update available'),
         content: Text(isRussian
