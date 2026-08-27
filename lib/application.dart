@@ -10,6 +10,7 @@ import 'package:flclashx/manager/manager.dart';
 import 'package:flclashx/plugins/app.dart';
 import 'package:flclashx/providers/providers.dart';
 import 'package:flclashx/state.dart';
+import 'package:flclashx/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -73,8 +74,111 @@ class ApplicationState extends ConsumerState<Application> {
       await globalState.appController.init();
       globalState.appController.initLink();
       app?.initShortcuts();
-      _checkForAppUpdate();
+      unawaited(_checkForAppUpdate().then((_) => _checkForCoreUpdate()));
     });
+  }
+
+  Future<void> _checkForCoreUpdate() async {
+    if (!system.isDesktop || !mounted) return;
+    try {
+      final current = await clashCore.getCoreVersion();
+      final release = await request.checkForCoreUpdate(
+        current.isNotEmpty ? current : globalState.coreVersion ?? '',
+      );
+      final dialogContext = globalState.navigatorKey.currentContext;
+      if (!mounted || release == null || dialogContext == null) return;
+      final tag = (release['tag_name'] as String).replaceFirst('core-', '');
+      final isRussian = Localizations.localeOf(dialogContext).languageCode == 'ru';
+      final accepted = await globalState.showMessage(
+            title: appLocalizations.coreUpdateAvailable,
+            message: TextSpan(
+              text: isRussian
+                  ? 'Доступна новая версия ядра mihomo $tag. Скачать и установить её?'
+                  : 'A new mihomo core version $tag is available. Download and install it?',
+            ),
+            confirmText: appLocalizations.update,
+          ) ==
+          true;
+      if (!accepted || !mounted) return;
+
+      final assets = release['assets'] as List<dynamic>? ?? [];
+      final arch = Platform.version.contains('arm64') ||
+              Platform.version.contains('aarch64')
+          ? 'arm64'
+          : 'amd64';
+      final platform = Platform.isWindows
+          ? 'windows'
+          : Platform.isMacOS
+              ? 'macos'
+              : 'linux';
+      final fileName =
+          'FlClashCore-$platform-$arch${Platform.isWindows ? '.exe' : ''}';
+      final asset = assets.cast<Map<String, dynamic>>().where(
+            (item) => item['name'] == fileName,
+          ).firstOrNull;
+      final url = asset?['browser_download_url'] as String?;
+      if (url == null) return;
+
+      var progress = 0.0;
+      final progressNotifier = ValueNotifier<double>(progress);
+      final download = request.downloadCoreUpdate(
+        url,
+        appPath.corePendingPath,
+        onProgress: (received, total) {
+          if (total > 0) {
+            progress = received / total;
+            progressNotifier.value = progress;
+          }
+        },
+      );
+      final downloaded = await showDialog<bool>(
+        context: dialogContext,
+        barrierDismissible: false,
+        builder: (context) {
+          unawaited(download.then((error) {
+            if (context.mounted) Navigator.pop(context, error == null);
+          }));
+          return AlertDialog(
+            title: Text(isRussian ? 'Загрузка ядра' : 'Downloading core'),
+            content: ValueListenableBuilder<double>(
+              valueListenable: progressNotifier,
+              builder: (_, value, __) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(value: value > 0 ? value : null),
+                  const SizedBox(height: 12),
+                  Text(value > 0
+                      ? '${(value * 100).clamp(0, 100).toStringAsFixed(0)}%'
+                      : (isRussian ? 'Подготовка…' : 'Preparing…')),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      progressNotifier.dispose();
+      if (downloaded != true || !mounted) return;
+      final restart = await globalState.showCommonDialog<bool>(
+        dismissible: false,
+        child: CommonDialog(
+          title: appLocalizations.coreUpdateSuccess,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(
+                globalState.navigatorKey.currentContext!,
+                true,
+              ),
+              child: Text(appLocalizations.restart),
+            ),
+          ],
+        ),
+      );
+      if (restart == true && mounted) {
+        await globalState.appController.restartCore();
+      }
+    } catch (e) {
+      commonPrint.log('Startup core update check failed: $e');
+    }
   }
 
   Future<void> _checkForAppUpdate() async {
