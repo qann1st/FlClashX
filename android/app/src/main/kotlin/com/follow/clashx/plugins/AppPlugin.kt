@@ -438,7 +438,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         return runCatching {
-            (activity ?: context).startActivity(intent)
+            (activityRef?.get() ?: context).startActivity(intent)
             true
         }.getOrDefault(false)
     }
