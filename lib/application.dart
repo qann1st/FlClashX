@@ -204,22 +204,33 @@ class ApplicationState extends ConsumerState<Application> {
     if (!accepted || !mounted) return;
     var progress = 0.0;
     final progressNotifier = ValueNotifier<double>(progress);
-    final downloadFuture = AppUpdateService.downloadAndInstall(
-      update,
-      onProgress: (received, total) {
-        if (total > 0) {
-          progress = received / total;
-          progressNotifier.value = progress;
-        }
-      },
-    );
+    final progressContext = globalState.navigatorKey.currentContext;
+    if (progressContext == null) {
+      progressNotifier.dispose();
+      return;
+    }
     final installed = await showDialog<bool>(
-      context: context,
+      context: progressContext,
       barrierDismissible: false,
       builder: (dialogContext) {
-        unawaited(downloadFuture.then((result) {
-          if (dialogContext.mounted) Navigator.pop(dialogContext, result);
-        }));
+        // Start only after the progress dialog has been attached to the
+        // navigator. This is important during startup: otherwise a fast
+        // download/system installer transition can happen before Flutter has
+        // painted any feedback for the user.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!dialogContext.mounted) return;
+          unawaited(AppUpdateService.downloadAndInstall(
+            update,
+            onProgress: (received, total) {
+              if (total > 0) {
+                progress = received / total;
+                progressNotifier.value = progress;
+              }
+            },
+          ).then((result) {
+            if (dialogContext.mounted) Navigator.pop(dialogContext, result);
+          }));
+        });
         return AlertDialog(
           title: Text(isRussian ? 'Загрузка обновления' : 'Downloading update'),
           content: ValueListenableBuilder<double>(
