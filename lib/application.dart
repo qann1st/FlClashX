@@ -135,7 +135,7 @@ class ApplicationState extends ConsumerState<Application> {
       },
     );
     progressNotifier.dispose();
-    if (!mounted || installed) return;
+    if (!mounted || installed != true) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(isRussian ? 'Не удалось запустить установку обновления'
           : 'Could not start update installation'),
