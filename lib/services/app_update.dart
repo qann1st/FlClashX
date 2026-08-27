@@ -51,13 +51,17 @@ class AppUpdateService {
     }
   }
 
-  static Future<bool> downloadAndInstall(AppUpdate update) async {
+  static Future<bool> downloadAndInstall(
+    AppUpdate update, {
+    void Function(int received, int total)? onProgress,
+  }) async {
     final directory = await getApplicationSupportDirectory();
     final file = File('${directory.path}/flclashx-update.apk');
     try {
       await Dio().download(
         update.apkUrl,
         file.path,
+        onReceiveProgress: onProgress,
         options: Options(
           headers: {'Accept': 'application/vnd.android.package-archive'},
         ),

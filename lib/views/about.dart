@@ -72,9 +72,43 @@ class AboutView extends StatelessWidget {
       );
       if (accepted != true || !context.mounted) return;
 
-      final installed = await commonScaffoldState?.loadingRun<bool>(
-        () => AppUpdateService.downloadAndInstall(update),
-        title: appLocalizations.update,
+      var progress = 0.0;
+      final progressNotifier = ValueNotifier<double>(progress);
+      final downloadFuture = AppUpdateService.downloadAndInstall(
+        update,
+        onProgress: (received, total) {
+          if (total > 0) {
+            progress = received / total;
+            progressNotifier.value = progress;
+          }
+        },
+      );
+      if (!context.mounted) return;
+      final installed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          unawaited(downloadFuture.then((result) {
+            if (dialogContext.mounted) Navigator.pop(dialogContext, result);
+          }));
+          return AlertDialog(
+            title: Text(appLocalizations.update),
+            content: ValueListenableBuilder<double>(
+              valueListenable: progressNotifier,
+              builder: (_, value, __) {
+                final percent = (value * 100).clamp(0, 100).toStringAsFixed(0);
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(value: value > 0 ? value : null),
+                    const SizedBox(height: 12),
+                    Text('$percent%'),
+                  ],
+                );
+              },
+            ),
+          );
+        ),
       );
       if (installed != true && context.mounted) {
         await globalState.showMessage(
@@ -506,6 +540,7 @@ class _CoreVersionWidget extends StatelessWidget {
           );
         },
       );
+      progressNotifier.dispose();
 }
 
 class _CoreUpdateItem extends StatefulWidget {

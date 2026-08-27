@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 env:
   IS_STABLE: ${{ !contains(github.ref, '-') }}
-  FLCLASHX_UPDATE_MANIFEST_URL: ${{ vars.FLCLASHX_UPDATE_MANIFEST_URL }}
+  FLCLASHX_UPDATE_MANIFEST_URL: https://elysium.s3.cloud.ru/update.json
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -118,6 +118,10 @@ jobs:
 
       - name: Get Flutter Dependency
         run: flutter pub get
+
+      - name: Verify update manifest URL
+        if: matrix.platform == 'android'
+        run: test -n "$FLCLASHX_UPDATE_MANIFEST_URL"
 
       - name: Setup Xcode Signing Configuration
         if: matrix.platform == 'macos'
