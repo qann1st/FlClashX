@@ -126,8 +126,11 @@ class ApplicationState extends ConsumerState<Application> {
         appPath.corePendingPath,
         onProgress: (received, total) {
           if (total > 0) {
-            progress = received / total;
-            progressNotifier.value = progress;
+            final next = (received / total).clamp(0.0, 1.0);
+            if (next > progress) {
+              progress = next;
+              progressNotifier.value = progress;
+            }
           }
         },
       );
@@ -223,8 +226,11 @@ class ApplicationState extends ConsumerState<Application> {
             update,
             onProgress: (received, total) {
               if (total > 0) {
-                progress = received / total;
-                progressNotifier.value = progress;
+                final next = (received / total).clamp(0.0, 1.0);
+                if (next > progress) {
+                  progress = next;
+                  progressNotifier.value = progress;
+                }
               }
             },
           ).then((result) {

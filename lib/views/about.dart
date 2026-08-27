@@ -78,8 +78,11 @@ class AboutView extends StatelessWidget {
         update,
         onProgress: (received, total) {
           if (total > 0) {
-            progress = received / total;
-            progressNotifier.value = progress;
+            final next = (received / total).clamp(0.0, 1.0);
+            if (next > progress) {
+              progress = next;
+              progressNotifier.value = progress;
+            }
           }
         },
       );
@@ -624,7 +627,10 @@ class _CoreUpdateItemState extends State<_CoreUpdateItem> {
       appPath.corePendingPath,
       onProgress: (received, total) {
         if (!mounted || total <= 0) return;
-        setState(() => _progress = received / total);
+        final next = (received / total).clamp(0.0, 1.0);
+        if (next > _progress) {
+          setState(() => _progress = next);
+        }
       },
     );
     if (!mounted) return;
