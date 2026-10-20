@@ -210,10 +210,28 @@ jobs:
             rm macos/Runner/Configs/Local.xcconfig || true
           fi
 
+  check-signing:
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check Apple signing secrets
+        id: check
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_DEVELOPER_ID" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Apple signing secrets are not configured; skipping notarization."
+          fi
+
   sign-macos:
-    needs: [build]
-    if: startsWith(github.ref, 'refs/tags/v')
-    continue-on-error: true
+    needs: [build, check-signing]
+    if: startsWith(github.ref, 'refs/tags/v') && needs.check-signing.outputs.enabled == 'true'
     strategy:
       matrix:
         include:
