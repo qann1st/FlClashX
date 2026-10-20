@@ -7,7 +7,7 @@ import 'src/changelog/git.dart';
 import 'src/changelog/models.dart';
 import 'src/changelog/render.dart';
 
-const _repository = 'pluralplay/FlClashX';
+const _repository = 'qann1st/FlClashX';
 
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()

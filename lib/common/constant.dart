@@ -115,6 +115,8 @@ const systemDnsRecordKey = 'system_dns_record';
 const bootRecordKey = 'boot_record';
 const defaultSystemDnsFallback = '1.1.1.1';
 const repository = 'pluralplay/FlClashX';
+/// Releases this fork publishes: the update check and the download link use it.
+const updateRepository = 'qann1st/FlClashX';
 const maxMobileWidth = 600;
 const maxLaptopWidth = 840;
 const defaultTestUrl = 'https://www.gstatic.com/generate_204';

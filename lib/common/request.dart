@@ -117,7 +117,7 @@ class Request {
   Future<Map<String, dynamic>> latestRelease() async {
     try {
       final response = await dio.get<Map<String, dynamic>>(
-        'https://api.github.com/repos/$repository/releases/latest',
+        'https://api.github.com/repos/$updateRepository/releases/latest',
         options: Options(responseType: ResponseType.json),
       );
       return response.data!;
@@ -128,7 +128,7 @@ class Request {
       );
     }
     final response = await dio.get<void>(
-      'https://github.com/$repository/releases/latest',
+      'https://github.com/$updateRepository/releases/latest',
       options: Options(
         followRedirects: false,
         validateStatus: (status) => status != null && status < 400,
