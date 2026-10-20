@@ -225,6 +225,7 @@ jobs:
 
       - name: Download signed macOS artifacts
         if: startsWith(github.ref, 'refs/tags/v')
+        continue-on-error: true
         uses: actions/download-artifact@v6
         with:
           path: ./dist/
@@ -233,49 +234,21 @@ jobs:
 
       - name: Generate release.md
         run: |
-          tags=($(git tag --merged $(git rev-parse HEAD) --sort=-creatordate))
-          
-          # Determine previous tag based on release type
-          if [ "${{ env.IS_STABLE }}" == "true" ]; then
-            # For stable: get latest stable release from API
-            preTag=$(curl --silent "https://api.github.com/repos/pluralplay/FlClashX/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")' || echo "")
+          # Only the commits between the previous tag and this release tag.
+          # Using the tag itself (instead of the GitHub API) keeps this correct
+          # for forks and renamed repositories.
+          currentTag="${{ github.ref_name }}"
+          preTag=$(git describe --tags --abbrev=0 "${currentTag}^" 2>/dev/null || echo "")
+
+          if [ -n "$preTag" ]; then
+            echo "Changelog: $preTag..$currentTag"
+            git log --pretty=format:"%B" "$preTag..$currentTag" | awk 'NF {if ($0 ~ /^[[:space:]]*-/) print $0; else print "- " $0} !NF {print ""}' > release.md
           else
-            # For pre-release: get the latest pre-release tag (last tag with '-' in name before current)
-            preTag=""
-            for tag in "${tags[@]}"; do
-              if [ "$tag" != "${tags[0]}" ] && [[ "$tag" == *-* ]]; then
-                preTag="$tag"
-                break
-              fi
-            done
-            # If no previous pre-release found, use latest stable
-            if [ -z "$preTag" ]; then
-              preTag=$(curl --silent "https://api.github.com/repos/pluralplay/FlClashX/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")' || echo "")
-            fi
+            echo "Changelog: $currentTag (no previous tag)"
+            git log --pretty=format:"%B" "$currentTag" | awk 'NF {if ($0 ~ /^[[:space:]]*-/) print $0; else print "- " $0} !NF {print ""}' > release.md
           fi
-          
-          currentTag=""
-          for ((i = 0; i <= ${#tags[@]}; i++)); do
-            if (( i < ${#tags[@]} )); then
-              tag=${tags[$i]}
-            else
-              tag=""
-            fi
-            if [ -n "$currentTag" ]; then
-              if [ "$(echo -e "$currentTag\n$preTag" | sort -V | head -n 1)" == "$currentTag" ]; then
-                break
-              fi
-            fi
-            if [ -n "$currentTag" ]; then
-              if [ -n "$tag" ]; then
-                git log --pretty=format:"%B" "$tag..$currentTag" | awk 'NF {print "- " $0} !NF {print ""}' >> release.md
-              else
-                git log --pretty=format:"%B" "$currentTag" | awk 'NF {print "- " $0} !NF {print ""}' >> release.md
-              fi
-              echo "" >> release.md
-            fi
-            currentTag=$tag
-          done
+
+          echo "" >> release.md
 
       - name: Patch release.md
         run: |
