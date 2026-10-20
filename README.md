@@ -447,6 +447,25 @@ proxies:
 - **Android**: APK скачивается и передаётся системному установщику; один раз нужно разрешить установку
   из этого источника.
 
+Сгенерировать манифест из собранных файлов:
+
+```bash
+dart run tool/update_manifest.dart \
+  --dist dist \
+  --version 0.5.1 \
+  --base-url https://elysium.s3.cloud.ru/releases/0.5.1 \
+  --notes notes.md \
+  --out update.json
+```
+
+Скрипт сам считает `sha256`, включает только те файлы, которые есть в `dist`, и печатает список
+для загрузки. Загружайте сначала файлы, а `update.json` — последним, иначе клиент может прочитать
+манифест, на который ещё нет ассетов. Для `update.json` отключите кэширование
+(`Cache-Control: no-store`), иначе S3/CDN продолжат отдавать старую версию.
+
+Адрес манифеста зашит в сборку (`FLCLASHX_UPDATE_MANIFEST_URL`), поэтому меняйте содержимое по тому же
+пути, а версии раскладывайте подпапками (как в примере выше).
+
 ## Скачать
 
 <a href="https://github.com/pluralplay/FlClashX/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
