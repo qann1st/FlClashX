@@ -187,7 +187,7 @@ class Build {
     String? workingDirectory,
     bool runInShell = true,
   }) async {
-    if (name != null) print("run $name");
+    if (name != null) print("run $name: ${executable.join(" ")}");
     final process = await Process.start(
       executable[0],
       executable.sublist(1),
@@ -202,7 +202,11 @@ class Build {
       print(utf8.decode(data, allowMalformed: true));
     });
     final exitCode = await process.exitCode;
-    if (exitCode != 0 && name != null) throw "$name error";
+    if (exitCode != 0) {
+      final command = executable.join(" ");
+      print("❌ command failed (exit code $exitCode): $command");
+      if (name != null) throw "$name error (exit code $exitCode)";
+    }
   }
 
   static Future<String> calcSha256(String filePath) async {
@@ -550,35 +554,55 @@ class BuildCommand extends Command {
 
     print("Creating DMG with create-dmg...");
 
-    await Build.exec(
-      name: "create-dmg",
-      [
-        "create-dmg",
-        "--overwrite",
-        "--dmg-title",
-        appName,
-        appPath,
-        Build.distPath,
-      ],
-    );
-
-    final createdDmgName = "$appName $version.dmg";
-    final createdDmgPath = join(Build.distPath, createdDmgName);
     final targetDmgName = "$appName-macos-${arch.name}.dmg";
     final targetDmgPath = join(Build.distPath, targetDmgName);
-
-    final createdDmg = File(createdDmgPath);
-    if (createdDmg.existsSync()) {
-      final targetDmg = File(targetDmgPath);
-      if (targetDmg.existsSync()) {
-        targetDmg.deleteSync();
-      }
-
-      createdDmg.renameSync(targetDmgPath);
-      print("✅ DMG created: $targetDmgPath");
-    } else {
-      throw "DMG file not created: $createdDmgPath";
+    final targetDmg = File(targetDmgPath);
+    if (targetDmg.existsSync()) {
+      targetDmg.deleteSync();
     }
+
+    try {
+      await Build.exec(
+        name: "create-dmg",
+        [
+          "create-dmg",
+          "--overwrite",
+          "--dmg-title",
+          appName,
+          appPath,
+          Build.distPath,
+        ],
+      );
+
+      final createdDmg = File(join(Build.distPath, "$appName $version.dmg"));
+      if (!createdDmg.existsSync()) {
+        throw "DMG file not created: ${createdDmg.path}";
+      }
+      createdDmg.renameSync(targetDmgPath);
+    } catch (e) {
+      print("⚠️ create-dmg failed: $e");
+      print("Falling back to plain hdiutil DMG...");
+      await Build.exec(
+        name: "hdiutil",
+        [
+          "hdiutil",
+          "create",
+          "-volname",
+          appName,
+          "-srcfolder",
+          appPath,
+          "-ov",
+          "-format",
+          "UDZO",
+          targetDmgPath,
+        ],
+      );
+    }
+
+    if (!targetDmg.existsSync()) {
+      throw "DMG file not created: $targetDmgPath";
+    }
+    print("✅ DMG created: $targetDmgPath");
   }
 
   _buildWindowsApp({

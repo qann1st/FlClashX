@@ -189,7 +189,17 @@ jobs:
           echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup
-        run: dart setup.dart ${{ matrix.platform }} ${{ matrix.arch && format('--arch {0}', matrix.arch) }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }}
+        shell: bash
+        run: |
+          set +e
+          dart setup.dart ${{ matrix.platform }} ${{ matrix.arch && format('--arch {0}', matrix.arch) }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }} > setup.log 2>&1
+          status=$?
+          cat setup.log
+          if [ "$status" -ne 0 ]; then
+            tail -n 40 setup.log | tr -d '\r' | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}' > setup-annotation.txt
+            echo "::error title=Setup failed (exit $status)::$(cat setup-annotation.txt)"
+          fi
+          exit $status
 
       - name: Upload
         uses: actions/upload-artifact@v6
