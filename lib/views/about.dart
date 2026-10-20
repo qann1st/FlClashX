@@ -41,7 +41,7 @@ class AboutView extends StatelessWidget {
     final commonScaffoldState = context.commonScaffoldState;
     if (commonScaffoldState?.mounted != true) return;
 
-    if (Platform.isAndroid) {
+    if (AppUpdateService.supported) {
       final update = await commonScaffoldState?.loadingRun<AppUpdate?>(
         AppUpdateService.check,
         title: appLocalizations.checkUpdate,
@@ -119,6 +119,18 @@ class AboutView extends StatelessWidget {
           title: appLocalizations.update,
           message: TextSpan(text: appLocalizations.checkUpdateError),
         );
+        return;
+      }
+      if (installed == true && system.isDesktop && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            Localizations.localeOf(context).languageCode == 'ru'
+                ? 'Обновление загружено. Приложение будет перезапущено.'
+                : 'Update downloaded. The app will restart to install it.',
+          ),
+        ));
+        await Future.delayed(const Duration(seconds: 1));
+        if (context.mounted) await globalState.appController.handleExit();
       }
       return;
     }

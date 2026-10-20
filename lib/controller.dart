@@ -7,6 +7,7 @@ import 'package:archive/archive.dart';
 import 'package:flclashx/clash/clash.dart';
 import 'package:flclashx/common/archive.dart';
 import 'package:flclashx/services/subscription_notification_service.dart';
+import 'package:flclashx/services/app_update.dart';
 import 'package:flclashx/enum/enum.dart';
 import 'package:flclashx/plugins/app.dart';
 import 'package:flclashx/providers/providers.dart';
@@ -1151,6 +1152,10 @@ class AppController {
 
   Future<void> autoCheckUpdate() async {
     if (!_ref.read(appSettingProvider).autoCheckUpdate) return;
+    // Android/Windows/macOS are handled by AppUpdateService at startup, which
+    // can download and start the installer. Keep the legacy "open the release
+    // page" prompt only where there is no in-app installer (Linux).
+    if (AppUpdateService.supported) return;
     final res = await request.checkForUpdate();
     checkUpdateResultHandle(data: res);
   }

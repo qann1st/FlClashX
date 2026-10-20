@@ -256,11 +256,26 @@ class ApplicationState extends ConsumerState<Application> {
       },
     );
     progressNotifier.dispose();
-    if (!mounted || installed != true) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(isRussian ? 'Не удалось запустить установку обновления'
-          : 'Could not start update installation'),
-    ));
+    if (!mounted || installed == null) return;
+    if (installed != true) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isRussian
+            ? 'Не удалось запустить установку обновления'
+            : 'Could not start update installation'),
+      ));
+      return;
+    }
+    if (system.isDesktop) {
+      // The detached installer/updater replaces the running build, so this
+      // instance has to exit before it can finish. It relaunches the new one.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isRussian
+            ? 'Обновление загружено. Приложение будет перезапущено.'
+            : 'Update downloaded. The app will restart to install it.'),
+      ));
+      await Future.delayed(const Duration(seconds: 1));
+      if (mounted) await globalState.appController.handleExit();
+    }
   }
 
   void _autoUpdateProfilesTask() {
