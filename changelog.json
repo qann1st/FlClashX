@@ -2,9 +2,27 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.5.1",
+      "tag": "v0.5.1",
+      "date": "2026-10-21",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "0163d29",
+              "scope": "update",
+              "text": "Install updates from the S3 manifest"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.0",
       "tag": "v0.5.0",
-      "date": "2026-10-20",
+      "date": "2026-10-21",
       "prerelease": false,
       "groups": [
         {

@@ -1,6 +1,12 @@
 # Changelog
 
-## v0.5.0 (2026-10-20)
+## v0.5.1 (2026-10-21)
+
+**Features**
+
+- **update** Install updates from the S3 manifest (0163d29)
+
+## v0.5.0 (2026-10-21)
 
 **Breaking Changes**
 
