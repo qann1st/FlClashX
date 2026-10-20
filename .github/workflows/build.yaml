@@ -25,12 +25,14 @@ jobs:
           - platform: windows
             os: windows-11-arm
             arch: arm64
-          - platform: macos
-            os: macos-15-intel
-            arch: amd64
-          - platform: macos
-            os: macos-latest
-            arch: arm64
+          # macOS builds are disabled until Apple Developer ID credentials
+          # (certificate + notarization) are configured. See README "macOS build".
+          # - platform: macos
+          #   os: macos-15-intel
+          #   arch: amd64
+          # - platform: macos
+          #   os: macos-latest
+          #   arch: arm64
           - platform: linux
             os: ubuntu-24.04
             arch: amd64
@@ -243,7 +245,8 @@ jobs:
 
   sign-macos:
     needs: [build, check-signing]
-    if: startsWith(github.ref, 'refs/tags/v') && needs.check-signing.outputs.enabled == 'true'
+    # Re-enable together with the macOS entries in the build matrix.
+    if: false
     strategy:
       matrix:
         include:

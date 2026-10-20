@@ -410,6 +410,23 @@ proxy-groups:
  com.follow.clashx.action.CHANGE
 ```
 
+### macOS (сборка)
+
+Сборка macOS пока отключена в CI (`.github/workflows/build.yaml`, матрица `build`). Без подписи и
+нотаризации сборка не запустится у пользователей, а автообновление не сможет заменить `.app`.
+Что нужно, чтобы включить:
+
+1. **Apple Developer Program** — платный аккаунт ($99/год): https://developer.apple.com/programs/
+2. В `Certificates, Identifiers & Profiles`:
+   - зарегистрировать App ID с Bundle ID `com.follow.clash` (задаётся в `macos/Runner/Configs/AppInfo.xcconfig`);
+   - выпустить сертификат **Developer ID Application** (распространение вне App Store) и экспортировать его в `.p12`;
+   - взять **Team ID**.
+3. Для нотаризации — **App Store Connect API Key** (`.p8` + Key ID + Issuer ID).
+4. Прописать секреты репозитория (`Settings → Secrets and variables → Actions`):
+   `APPLE_CERTIFICATE` (base64 от `.p12`), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_DEVELOPER_ID`,
+   `APPLE_TEAM_ID`, `APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`.
+5. Вернуть в матрицу `build` записи `- platform: macos` (amd64/arm64) и восстановить условие у job `sign-macos`.
+
 ## Скачать
 
 <a href="https://github.com/pluralplay/FlClashX/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
