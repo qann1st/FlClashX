@@ -12,7 +12,7 @@
 
 [![Channel](https://img.shields.io/badge/Telegram-Chat-blue?style=flat-square&logo=telegram)](https://t.me/FlClashX)
 
-A fork of the multi-platform proxy client FlClash based on ClashMeta, simple and easy to use, open source and ad-free.
+A fork of the multi-platform proxy client FlClash based on Mihomo, simple and easy to use, open source and ad-free.
 
 on Desktop:
 
@@ -30,7 +30,7 @@ on Mobile:
 
 🛠️ Fixed default settings: process search mode on, TUN mode on, system proxy mode off, proxy list display mode set to 'list', changed camera behavior when adding a subscription via QR.
 
-📱 **Android 120Hz Display Support:** Added support for high refresh rate displays (120Hz) on Android devices for smoother animations and scrolling.
+📱 **Android 120Hz Display Support:** while the app is on screen the display runs at its highest rate (90/120/144 Hz); in the background the rate goes back to the system.
 
 🗑️ **Clear Application Data:** Added "Clear Data" button in Application Settings that removes all profiles from the profiles folder. Useful for troubleshooting or resetting the application.
 
@@ -58,251 +58,289 @@ on Mobile:
 - Added "serviceInfo" widget. Displays your service name. You can additionally pass the `flclashx-servicelogo` header for a custom logo (supports svg/png links), and clicking opens the support link (supportURL).
 - Added "changeServerButton" widget. Clicking redirects to the proxy page.
 
-🌐 Added parsing of custom headers from the subscription page:
+### Subscription headers
 
-- flclashx-widgets: arranges widgets in the order received from the subscription.
+The app reads the HTTP headers of the response that serves the subscription and keeps them on the profile. Headers are re-read on every subscription update; those that change app settings are re-applied on every update of the active profile and when switching to it. Whatever a header does not name stays as the user set it. Header names are case-insensitive. Full description with examples (Russian): [docs/panel-headers.md](docs/panel-headers.md), `flclashx-*` only: [docs/flclashx-headers.md](docs/flclashx-headers.md).
 
-  |        Value         | Name widget                                                 |
-  | :------------------: | ----------------------------------------------------------- |
-  |      `announce`      | Announce Badge                                              |
-  |    `networkSpeed`    | Network speed                                               |
-  |   `outboundModeV2`   | Proxy mode (new type)                                       |
-  |    `outboundMode`    | Proxy mode (old type)                                       |
-  |    `trafficUsage`    | Traffic usage                                               |
-  |  `networkDetection`  | Determining location and IP                                 |
-  |     `tunButton`      | TUN button (Desktop only)                                   |
-  |     `vpnButton`      | VPN button (Android only)                                   |
-  | `systemProxyButton`  | System Proxy Button (Desktop only)                          |
-  |     `intranetIp`     | Local IP-Address                                            |
-  |     `memoryInfo`     | Memory usage                                                |
-  |      `metainfo`      | Profile information                                         |
-  | `changeServerButton` | Change server button                                        |
-  |    `serviceInfo`     | Service information (only with header flclashx-servicename) |
+<details>
+<summary><strong>What the app sends</strong></summary>
 
-Usage:
+Every subscription download goes with `User-Agent: FlClashX/v<version> core/v<mihomo> Platform/<os>`, e.g. `FlClashX/v0.5.0 core/v1.19.32 Platform/android`.
 
-```bash
-    flclashx-widgets: announce,metainfo,outboundModeV2,networkDetection
+When "Send HWID" is on for the profile (on by default), these are added:
+
+| Header | Value |
+|---|---|
+| `x-hwid` | Android: `ANDROID_ID`; desktop: top 16 hex chars of SHA-256 of MachineGuid (Windows), systemGUID (macOS), machine-id (Linux) |
+| `x-device-os` | `Android`, `Windows`, `macOS`, `Linux` |
+| `x-ver-os` | OS version |
+| `x-device-model` | device model |
+</details>
+
+<details>
+<summary><strong>Common headers</strong></summary>
+
+| Header | Format | Effect |
+|---|---|---|
+| `subscription-userinfo` | `upload=; download=; total=; expire=` | Traffic and expiry on the profile card and dashboard. `total=0` is unlimited, `expire=0` never expires. `expire` drives the expiry notices 3, 2, 1 days before, on the day and after |
+| `content-disposition` | `attachment; filename="name.yaml"` | Profile name when added by link, unless `profile-title` is present |
+| `profile-title` | text, base64 or `base64:<base64>` | Profile name when added by link. A name the user typed is left alone |
+| `profile-web-page-url` | URL | "Website" button on the profile card |
+| `profile-update-interval` | hours, above 0 | Profile auto-update interval |
+| `announce` | text, base64 or `base64:<base64>` | Announcement card on the dashboard (up to 200 characters) and the text of the device-limit dialog |
+| `support-url` | URL | "Support" button on the profile card and in the device-limit dialog |
+| `x-hwid-max-devices-reached` | `true` | Dialog with the `announce` text and a "Support" button |
+| `x-hwid-not-supported` | `true` | "HWID not supported" dialog with a "Support" button: the app did not send a HWID the subscription requires (or the platform cannot provide one) |
+</details>
+
+<details>
+<summary><strong>flclashx-newdomain</strong></summary>
+
+Up to five fallback panel addresses, comma-separated: `host`, `host:port` or `https://host`. Tried in order when the main one does not answer. After a hard failure (domain does not resolve, 404, 410) the profile moves to the address that answered for good.
+
+```http
+flclashx-newdomain: sub2.myvpn.example, https://sub3.myvpn.example:8443
 ```
+</details>
 
-- flclashx-view: Configures the appearance of the proxy page obtained from the subscription.
+<details>
+<summary><strong>flclashx-servicename, flclashx-servicelogo, flclashx-serverinfo</strong></summary>
 
-|  Value   | Description                   | Possible values                   |
-| :------: | ----------------------------- | --------------------------------- |
-|  `type`  | Display mode                  | `list`,`tab`                      |
-|  `sort`  | Sorting type                  | `none`,`delay`,`name`             |
-| `layout` | Layout                        | `loose`,`standard`,`tight`        |
-|  `icon`  | Icon style (for list display) | `none`,`icon`          |
-|  `card`  | Card size                     | `expand`,`shrink`,`min`,`oneline` |
+The header of the extended dashboard (`app.board:extended` in `flclashx-view`):
 
-Usage:
+| Header | Format | Effect |
+|---|---|---|
+| `flclashx-servicename` | text or base64 | Service name in the header; title of the expiry notifications |
+| `flclashx-servicelogo` | image URL (SVG supported), may be base64 of the URL | Logo in the header |
+| `flclashx-serverinfo` | proxy group name, text or base64 | Group whose selected server is shown on the server panel with flag and IP |
 
-```bash
-    flclashx-view: type:list; sort:delay; layout:tight; icon:icon; card:shrink
+```http
+flclashx-servicename: MyVPN
+flclashx-servicelogo: https://cdn.myvpn.example/logo.svg
+flclashx-serverinfo: Auto
 ```
+</details>
 
-- flclashx-custom: Controls the application of styles for Dashboard and ProxyView.
+<details>
+<summary><strong>flclashx-buyplan, flclashx-buytraffic</strong></summary>
 
-|  Value   | Description                                                  |
-| :------: | ------------------------------------------------------------ |
-|  `add`   | Styles are applied only when the subscription is first added |
-| `update` | Styles are applied every time the subscription is updated    |
+| Header | Format | Effect |
+|---|---|---|
+| `flclashx-buyplan` | `URL` or `URL,<days>` | "Renew plan" button. With a number it appears when no more than that many days are left. Tapping an expiry notification opens it |
+| `flclashx-buytraffic` | `URL` or `URL,<percent>` | Buy-traffic button. With a number it appears when no more than that percent of traffic is left |
 
-Usage:
-
-```bash
-    flclashx-custom: update
+```http
+flclashx-buyplan: https://my.myvpn.example/renew,7
+flclashx-buytraffic: https://my.myvpn.example/traffic,10
 ```
+</details>
 
-- flclashx-denywidgets: When set to true, editing the Dashboard page is disabled. Accepts true/false.
+<details>
+<summary><strong>flclashx-widgets</strong></summary>
 
-Usage:
+`flclashx-widgets` sets the cards of the standard dashboard and their order. It does not affect the extended dashboard or the desktop layout. Names are case-insensitive.
 
-```bash
-    flclashx-denywidgets: true
+`currentOutbound`, `announcement`, `networkSpeed`, `outboundMode`, `vpnButton` (Android only), `networkTakeover` (desktop only), `serviceStatus`, `profiles`, `proxyGroups`, `connectionStats`, `intranetIp`, `memoryInfo`.
+
+The status card is always shown; the announcement appears by itself while the panel sends `announce`.
+
+```http
+flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
 ```
+</details>
 
-- flclashx-servicename: Your service name displayed in the ServiceInfo widget.
+<details>
+<summary><strong>flclashx-background</strong></summary>
 
-Usage:
+`URL` or `URL,<visibility 1–100>`. An image under every full-screen page, toned down with the page colour. Without a number 8 % is visible. Downloaded once into the disk cache.
 
-```bash
-    flclashx-servicename: FlClashX
+```http
+flclashx-background: https://cdn.myvpn.example/bg.jpg,25
 ```
+</details>
 
-- flclashx-servicelogo: Your logo used in the ServiceInfo widget (works only with active flclashx-servicename header). Supports png/svg.
+<details>
+<summary><strong>flclashx-view</strong></summary>
 
-Usage:
+One line of `key:value;key:value`. Spaces are ignored, values are case-insensitive, unknown keys and values are skipped.
 
-```bash
-    flclashx-servicelogo: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/remnawave.svg
+Proxies tab, prefix `proxies.`:
+
+| Key | Values |
+|---|---|
+| `proxies.type` | `list`, `tab` |
+| `proxies.sort` | `none`, `delay`, `name` |
+| `proxies.layout` | `loose`, `standard`, `tight` |
+| `proxies.icon` | `filled`, `plain`, `hidden` |
+| `proxies.card` | `loose`, `standard`, `compact` |
+
+App look, prefix `app.` required:
+
+| Key | Values |
+|---|---|
+| `app.board` | `extended` (extended dashboard with logo, plan and server), `standard` |
+| `app.navbar` | `floating`, `docked` |
+| `app.tabs` | `slide`, `fade` |
+| `app.glass` | `none`, `standard`, `ultra` |
+| `app.color` | `RRGGBB` or `AARRGGBB`, with or without `#`; becomes the primary colour and joins the palette |
+| `app.style` | `vivid`, `tinted`, `soft`, `monochrome` |
+| `app.black` | `true`, `false` (pure black background in the dark theme) |
+
+```http
+flclashx-view: app.board:extended;app.color:#FF5733;app.style:soft;app.navbar:docked;proxies.type:tab;proxies.sort:delay;proxies.card:compact
 ```
+</details>
 
-- flclashx-serverinfo: Proxy group name to display in the ChangeServerButton widget. The widget shows the active server from the specified group with country flag, ping, and a quick switch button.
+<details>
+<summary><strong>flclashx-settings</strong></summary>
 
-**Displayed elements:**
-  - Country flag (automatically extracted from serverDescription or proxy name)
-  - Active server name
-  - Current ping with color indication (green < 600ms, orange >= 600ms, red - timeout)
-  - Quick navigation button to proxy page
+Comma-separated flags. The named app switches are turned on, the rest of the list is turned off.
 
-Usage:
+| Flag | Setting |
+|---|---|
+| `minimize` | Minimize on window close |
+| `autorun` | Launch with the system |
+| `shadowstart` | Silent launch, no window |
+| `autostart` | Connect right after the app starts |
+| `autoupdate` | Check for app updates |
+| `openlogs` | Log collection |
+| `closeconnections` | Close connections when the proxy changes |
 
-```bash
-    flclashx-serverinfo: Proxy
+```http
+flclashx-settings: minimize,autostart,closeconnections
 ```
+</details>
 
-- flclashx-background: Sets a custom background image for the application. Provide a direct link to an image. Optionally append a comma and a transparency (visibility) value from 1 to 100 (higher = more visible image; omit it for the default dimmed look).
+<details>
+<summary><strong>flclashx-special</strong></summary>
 
-**Image Recommendations:**
-  - Format: PNG, JPG, or WebP
-  - Resolution: 1920x1080 or higher for desktop, 1080x1920 for mobile
-  - File size: Keep under 2MB for better performance
-  - Content: Use images with subtle patterns or gradients; avoid too bright or busy images
-  - Contrast: Ensure good readability of text over the background
+Comma-separated flags.
 
-Usage:
+| Flag | Effect |
+|---|---|
+| `androidsecure` | On Android zeroes the local ports, hides the "Port" item and turns the VPN system proxy off; subscriptions are then downloaded directly, not through a local port. Does nothing on other platforms |
+| `noglobal` | Removes Global mode from the mode card and picker, the "Rules/Global" button, the tray menu and the hotkey. A selected Global becomes Rule |
+| `denywidgets` | Hides the "Edit dashboard" button |
 
-```bash
-    flclashx-background: https://example.com/background.jpg
-    # with transparency (1-100, higher = more visible background):
-    flclashx-background: https://example.com/background.jpg,30
+```http
+flclashx-special: androidsecure,noglobal,denywidgets
 ```
+</details>
 
-- flclashx-settings: Manage application settings via header (with client-side override option). By default, all parameters are **disabled**. If you pass a parameter, it will be **enabled**. If you don't pass it - it stays **disabled**.
+<details>
+<summary><strong>Removed headers</strong></summary>
 
-|   Parameter   | Description                                      | Default      |
-| :-----------: | ------------------------------------------------ | :----------: |
-|  `minimize`   | Minimize application on exit instead of closing  | ❌ Disabled  |
-|   `autorun`   | Launch application on system startup             | ❌ Disabled  |
-| `shadowstart` | Launch application minimized to tray             | ❌ Disabled  |
-|  `autostart`  | Automatically start proxy on application launch  | ❌ Disabled  |
-| `autoupdate`  | Automatically check for application updates      | ❌ Disabled  |
-|  `openlogs`   | Enable logging (the "Logs" tab and core log stream) | ❌ Disabled |
-|`closeconnections`| Drop active connections when switching proxy/mode | ❌ Disabled |
+`flclashx-hex`, `flclashx-newboard`, `flclashx-custom`, `flclashx-globalmode`, `flclashx-androidsecure` and `flclashx-denywidgets` are gone: colour and dashboard choice come from `flclashx-view`, Global mode, secure Android and the dashboard edit lock from `flclashx-special`, and header settings always apply, without the `add`/`update` policy.
+</details>
 
-> Note: `closeconnections` is enabled by default in the app itself, but when `flclashx-settings` is used the state is set explicitly — if you don't pass the token, the option will be disabled.
+### Panel template
 
-**Client-side override:** Users can enable "Override provider settings" in Application Settings to apply their local configuration instead of subscription settings. The matching toggles in settings (including "Logs" and "Close connections") are editable only when "Override provider settings" is enabled.
+The same set in the form panel settings accept (Remnawave and alike): a `headers` array of `key`/`value` pairs. The host headers `subscription-userinfo`, `profile-title`, `announce` and `support-url` are usually added by the panel itself.
 
-Usage:
-
-```bash
-    flclashx-settings: minimize, autorun, shadowstart, autostart, autoupdate, openlogs, closeconnections
-```
-
-- flclashx-globalmode: When set to `false`, hides all proxy-mode controls from the client (tray, proxies page, mode-switch widgets).
-
-Usage:
-
-```bash
-    flclashx-globalmode: false
-```
-
-- flclashx-hex: Configures the app theme — primary color, scheme variant, and an optional "pure black" mode via `pureblack`. Variants: `tonalSpot`, `fidelity`, `monochrome`, `neutral`, `vibrant`, `expressive`, `content`, `rainbow`, `fruitSalad`.
-
-Usage:
-
-```bash
-    flclashx-hex: FF5733
-    flclashx-hex: FF5733:vibrant
-    flclashx-hex: FF5733:vibrant:pureblack
-```
-
-Parameters can also be used separately:
-
-```bash
-    flclashx-hex: FF5733
-    flclashx-hex: vibrant
-    flclashx-hex: pureblack
-```
-
-- flclashx-androidsecure: Forces `mixed-port: 0` on Android devices only, even when a port (e.g. 7890) is active in the config.
-
-Usage:
-
-```bash
-    flclashx-androidsecure: true
-```
-
-- flclashx-newboard: When `true`, enables the new home screen instead of the widget grid: a large logo and service name, a traffic/expiry card, an active-server panel (flag, IP, ping) with a fan of available locations, a connect button, and the bottom navigation. Widget editing is hidden in this mode. Users can enable the same look locally via the "New look" setting.
-
-Usage:
-
-```bash
-    flclashx-newboard: true
-```
-
-- flclashx-newdomain: Subscription domain migration. If the value differs from the current host of the profile link, on the next update the client automatically replaces the host in the subscription URL with the given one (path and query are preserved). Useful for moving the subscription page to a new domain without users reinstalling the profile.
-
-Usage:
-
-```bash
-    flclashx-newdomain: new.example.com
-```
-
-- flclashx-buyplan: Direct subscription purchase/renewal link. The "Renew subscription" button appears under the traffic card on the new dashboard (`flclashx-newboard`) only when less than 3 days remain until expiry (including already-expired subscriptions). Tapping it opens the given link.
-
-Usage:
-
-```bash
-    flclashx-buyplan: https://example.com/pay
-```
-
-- flclashx-buytraffic: Direct extra-traffic purchase link. The "Buy traffic" button appears under the traffic card on the new dashboard (`flclashx-newboard`) only when less than 10% of the traffic limit remains. When both triggers fire (`flclashx-buyplan` and `flclashx-buytraffic`), the buttons are shown in one row.
-
-Usage:
-
-```bash
-    flclashx-buytraffic: https://example.com/buy-traffic
+```json
+"headers": [
+  {
+    "key": "flclashx-view",
+    "value": "proxies.type:list;proxies.sort:none;proxies.layout:standard;app.board:extended;app.tabs:slide;app.glass:ultra;app.color:#007AFF;app.style:tinted;app.black:false;app.navbar:floating"
+  },
+  {
+    "key": "flclashx-widgets",
+    "value": "profiles,announcement,intranetIp,networkTakeover,vpnButton,currentOutbound"
+  },
+  {
+    "key": "flclashx-background",
+    "value": "https://assets.example.com/back.jpg,20"
+  },
+  {
+    "key": "flclashx-servicename",
+    "value": "Example VPN"
+  },
+  {
+    "key": "flclashx-servicelogo",
+    "value": "https://assets.example.com/logo.png"
+  },
+  {
+    "key": "flclashx-settings",
+    "value": "minimize, autorun, shadowstart, autostart, autoupdate"
+  },
+  {
+    "key": "flclashx-serverinfo",
+    "value": "SERVERS"
+  },
+  {
+    "key": "flclashx-special",
+    "value": "noglobal,androidsecure,denywidgets"
+  },
+  {
+    "key": "flclashx-buytraffic",
+    "value": "https://shop.example.com/#/buy-extra-traffic,10"
+  },
+  {
+    "key": "flclashx-buyplan",
+    "value": "https://shop.example.com/#/buy-plan,7"
+  }
+]
 ```
 
 ### YAML keys in the config
 
-These keys are set directly in the subscription's YAML config (in the `proxy-groups` section), not in HTTP response headers.
+Besides headers, the app reads the keys below from the subscription YAML and writes them into its settings on every subscription update and when switching to the profile. A key missing from the file goes back to its default, so a previous subscription's value never sticks.
 
-- flclashx-override (inside the GLOBAL group): Set inside the `GLOBAL` proxy-group. With `flclashx-override: true` the client uses this group's proxy list and order as a "curated GLOBAL": in Global mode the Proxies screen shows only the `GLOBAL` group with exactly these entries in this order, and the service groups (used by rule mode) are hidden. Without the flag the behavior is unchanged — `GLOBAL` is auto-built by the core from all groups.
+<details>
+<summary><strong>Config keys</strong></summary>
 
-Usage:
+| Key | Default when not named |
+|---|---|
+| `mixed-port` | 7890 |
+| `port`, `socks-port`, `redir-port`, `tproxy-port` | 0 |
 
-```yaml
-proxy-groups:
-  - name: GLOBAL
-    flclashx-override: true
-    type: select
-    proxies:
-      - 🎲 Any available
-      - 🔓 No VPN
-      - 🌍 Main VPN
-      - 🇩🇪 Germany
-      - 🇫🇮 Finland
-```
+The app's own downloads go through `mixed-port`, or `port` without it; when both are zero or `androidsecure` is set, the request goes without a local port: with TUN/VPN on it still reaches the core and follows the rules, without TUN it goes to the network directly.
 
-- description (on any proxy-group): A custom subtitle for the group on the Proxies screen. By default the group's type (Selector/URLTest/Fallback…) or the currently selected node is shown under its name; setting `description` displays the given text instead. Handy for clearer labels on nested groups.
+| `allow-lan` | false |
+| `ipv6` | true |
+| `log-level` | `error` |
+| `find-process-mode` | `always` (`strict` counts as `always`) |
+| `interface-name` | empty |
+| `routing-mark` | 0 |
+| `tcp-concurrent`, `unified-delay` | true |
+| `keep-alive-interval`, `keep-alive-idle`, `disable-keep-alive` | 30, 15, false |
+| `external-controller` | off; an address in the file turns the controller on there |
+| `secret` | empty; a controller without a secret is open without a password |
+| `external-ui`, `external-ui-name`, `external-ui-url` | with the controller on, zashboard is filled in; the "Zashboard" item in settings opens it with address and secret |
+| `geodata-loader` | `memconservative` |
+| `geo-auto-update`, `geo-update-interval` | false, 24 |
+| `geox-url` | MetaCubeX links |
+| `global-ua` | the app's User-Agent; affects only the core's own downloads |
+| `tun.device`, `tun.stack` | `FlClashX`, `mips` |
 
-Usage:
+`mode` and `tun.enable` are set by the subscription but never reset to defaults, because the user toggles them.
+</details>
+
+<details>
+<summary><strong>serverDescription and groupDescription</strong></summary>
+
+| Key | Where | Effect |
+|---|---|---|
+| `serverDescription` | on a proxy in `proxies` | Caption under the node in the proxies list instead of its type; a flag in it reaches the server card |
+| `groupDescription` | on a group in `proxy-groups` | Caption of a folded group in the proxies list. The group type is never shown |
 
 ```yaml
 proxy-groups:
   - name: 🌍 Main VPN
     type: select
-    description: Auto-pick the best location
+    groupDescription: Picks the best location
     proxies:
       - 🇩🇪 Germany
-      - 🇫🇮 Finland
+proxies:
+  - name: 🇩🇪 Germany
+    type: vless
+    serverDescription: 🇩🇪 Frankfurt, 10 Gbit/s
 ```
+</details>
 
-### Configuration Settings Override
+### Provider and user settings
 
-By default, the following configuration parameters received from the subscription are **not overridden** by the client:
-
-- `allow-lan` - Allow LAN connections
-- `ipv6` - Enable IPv6 support
-- `find-process-mode` - Process search mode
-- `tun-stack` - TUN mode network stack
-- `mixed-port` - Mixed port for HTTP/SOCKS proxy
-
-**Client-side override:** Users can enable "Override provider settings" or "Override network settings" in Application Settings to apply their local configuration instead of subscription settings. This is useful when you need custom network settings.
+A settings row set by the subscription (switches from `flclashx-settings`, `flclashx-view` keys on the theme page and in the proxies tab settings, config keys from the table above) is shown dimmed, with a hint at the top of the page. Tapping the row asks whether the user wants to change it. After agreeing the row belongs to the user: subscription updates and profile switches leave it alone. Right-clicking or long-pressing the row offers "Hand back to provider", and "Hand settings back to provider" in General → Logs and diagnostics returns everything at once.
 
 ## Application Usage
 
@@ -330,8 +368,6 @@ The following actions are supported:
 ## Download
 
 <a href="https://github.com/pluralplay/FlClashX/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
-<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.follow.clashx%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fpluralplay%2FFlClashX%22%2C%22author%22%3A%22pluralplay%22%2C%22name%22%3A%22FlClashX%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Afalse%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Atrue%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%2C%5C%22includeZips%5C%22%3Afalse%2C%5C%22zippedApkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22includeTarballs%5C%22%3Afalse%2C%5C%22tarballedApkFilterRegEx%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D
-"><img alt="Get it on Obtanium" src="snapshots/get-it-on-obtanium.svg" width="200px"/></a>
 
 ## Star
 

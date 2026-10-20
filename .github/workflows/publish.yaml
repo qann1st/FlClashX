@@ -23,10 +23,10 @@ on:
 jobs:
   aur-publish:
     if: ${{ inputs.aur }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup SSH for AUR
         env:
@@ -131,7 +131,7 @@ jobs:
     needs: [aur-publish]
     # Runs even if AUR was skipped/failed, as long as Telegram is requested.
     if: ${{ always() && inputs.telegram }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v5

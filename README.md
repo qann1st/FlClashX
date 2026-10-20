@@ -12,7 +12,7 @@
 
 [![Channel](https://img.shields.io/badge/Telegram-Chat-blue?style=flat-square&logo=telegram)](https://t.me/FlClashX)
 
-Форк многоплатформенного прокси-клиента FlClash на основе ClashMeta, простого и удобного в использовании, с открытым исходным кодом и без рекламы.
+Форк многоплатформенного прокси-клиента FlClash на основе Mihomo, простого и удобного в использовании, с открытым исходным кодом и без рекламы.
 
 Десктопный вид:
 
@@ -30,7 +30,7 @@
 
 🛠️ Исправлены стандартные настройки: режим поиска процессов вкл, режим tun вкл, режим системного прокси выкл, режим отображения списка прокси list, изменена работа камеры при добавлении подписки через QR.
 
-📱 **Поддержка 120Гц дисплеев на Android:** Добавлена поддержка высокочастотных дисплеев (120Гц) на устройствах Android для более плавных анимаций и прокрутки.
+📱 **Поддержка 120Гц дисплеев на Android:** пока приложение на экране, дисплей работает на самой высокой частоте (90/120/144 Гц); в фоне частота возвращается системе.
 
 🗑️ **Очистка данных приложения:** Добавлена кнопка "Очистить данные" в настройках приложения, которая удаляет все профили из папки profiles. Полезно для устранения неполадок или сброса приложения.
 
@@ -58,334 +58,325 @@
 - Добавлен виджет "serviceInfo". Передаёт название вашего сервиса. Можно передать дополнительно хедер `flclashx-servicelogo` для кастомного лого (поддерживается ссылка svg/png), дополнительно по клику открыватеся ссылка на поддержку (supportURL)
 - Добавлен виджет "changeServerButton". По клику перенаправляет на страницу прокси.
 
-### Добавлен парсинг кастомных хедеров со страницы подписки:
+### Заголовки подписки
+
+Приложение читает HTTP-заголовки ответа, которым панель отдаёт подписку, и хранит их на профиле. Заголовки перечитываются при каждом обновлении подписки, а те, что меняют настройки приложения, применяются заново при каждом обновлении активного профиля и при переключении на него. Что заголовок не называет, остаётся как выставил пользователь. Имена заголовков регистронезависимы. Полное описание с примерами: [docs/panel-headers.md](docs/panel-headers.md), только `flclashx-*`: [docs/flclashx-headers.md](docs/flclashx-headers.md).
+
+<details>
+<summary><strong>Что приложение отправляет</strong></summary>
+
+Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/v<mihomo> Platform/<ос>`, например `FlClashX/v0.5.0 core/v1.19.32 Platform/android`.
+
+Если у профиля включено «Отправлять HWID» (по умолчанию включено), добавляются:
+
+| Заголовок | Значение |
+|---|---|
+| `x-hwid` | Android: `ANDROID_ID`; десктоп: 16 верхних hex-символов SHA-256 от MachineGuid (Windows), systemGUID (macOS), machine-id (Linux) |
+| `x-device-os` | `Android`, `Windows`, `macOS`, `Linux` |
+| `x-ver-os` | версия ОС |
+| `x-device-model` | модель устройства |
+</details>
+
+<details>
+<summary><strong>Общие заголовки</strong></summary>
+
+| Заголовок | Формат | Что делает |
+|---|---|---|
+| `subscription-userinfo` | `upload=; download=; total=; expire=` | Трафик и срок подписки на карточке профиля и дашборде. `total=0` безлимит, `expire=0` бессрочно. `expire` питает уведомления об окончании за 3, 2, 1 день, в день окончания и после |
+| `content-disposition` | `attachment; filename="имя.yaml"` | Имя профиля при добавлении по ссылке, если нет `profile-title` |
+| `profile-title` | текст, base64 или `base64:<base64>` | Имя профиля при добавлении по ссылке. Имя, заданное пользователем, не трогается |
+| `profile-web-page-url` | URL | Кнопка «Сайт» на карточке профиля |
+| `profile-update-interval` | часы, больше 0 | Интервал автообновления профиля |
+| `announce` | текст, base64 или `base64:<base64>` | Карточка объявления на дашборде (до 200 символов) и текст диалога про лимит устройств |
+| `support-url` | URL | Кнопка «Поддержка» на карточке профиля и в диалоге про лимит устройств |
+| `x-hwid-max-devices-reached` | `true` | Диалог с текстом `announce` и кнопкой «Поддержка» |
+| `x-hwid-not-supported` | `true` | Диалог «HWID не поддерживается» с кнопкой «Поддержка»: приложение не отправило HWID, а подписка его требует (или платформа не может его дать) |
+</details>
+
+<details>
+<summary><strong>flclashx-newdomain</strong></summary>
+
+До пяти запасных адресов панели через запятую: `host`, `host:port` или `https://host`. Пробуются по порядку, когда основной не отвечает. После жёсткого отказа (домен не резолвится, 404, 410) профиль переезжает на ответивший адрес насовсем.
+
+```http
+flclashx-newdomain: sub2.myvpn.example, https://sub3.myvpn.example:8443
+```
+</details>
+
+<details>
+<summary><strong>flclashx-servicename, flclashx-servicelogo, flclashx-serverinfo</strong></summary>
+
+Шапка расширенного дашборда (`app.board:extended` в `flclashx-view`):
+
+| Заголовок | Формат | Что делает |
+|---|---|---|
+| `flclashx-servicename` | текст или base64 | Название сервиса в шапке; заголовок уведомлений об окончании подписки |
+| `flclashx-servicelogo` | URL картинки (SVG поддерживается), можно base64 от URL | Логотип в шапке |
+| `flclashx-serverinfo` | имя группы прокси, текст или base64 | Группа, чей выбранный сервер показывается на панели сервера с флагом и IP |
+
+```http
+flclashx-servicename: MyVPN
+flclashx-servicelogo: https://cdn.myvpn.example/logo.svg
+flclashx-serverinfo: Auto
+```
+</details>
+
+<details>
+<summary><strong>flclashx-buyplan, flclashx-buytraffic</strong></summary>
+
+| Заголовок | Формат | Что делает |
+|---|---|---|
+| `flclashx-buyplan` | `URL` или `URL,<дней>` | Кнопка «Продлить подписку». С числом появляется, когда до конца осталось не больше указанных дней. Тап по уведомлению об окончании ведёт сюда |
+| `flclashx-buytraffic` | `URL` или `URL,<процентов>` | Кнопка докупки трафика. С числом появляется, когда осталось не больше указанного процента |
+
+```http
+flclashx-buyplan: https://my.myvpn.example/renew,7
+flclashx-buytraffic: https://my.myvpn.example/traffic,10
+```
+</details>
 
 <details>
 <summary><strong>flclashx-widgets</strong></summary>
 
-Выстраивает виджеты в порядке, полученным с подписки
+`flclashx-widgets` задаёт набор и порядок карточек обычного дашборда. На расширенный дашборд и десктопную раскладку не влияет. Регистр имён не важен.
 
-|       Значение       | Виджет                                                      |
-| :------------------: | ----------------------------------------------------------- |
-|      `announce`      | Анонсы                                                      |
-|    `networkSpeed`    | Скорость сети                                               |
-|   `outboundModeV2`   | Режим работы прокси (новый вид)                             |
-|    `outboundMode`    | Режим работы прокси (старый вид)                            |
-|    `trafficUsage`    | Использование трафика                                       |
-|  `networkDetection`  | Определение локации и IP                                    |
-|     `tunButton`      | Кнопка TUN (только Desktop)                                 |
-|     `vpnButton`      | Кнопка VPN (только Android)                                 |
-| `systemProxyButton`  | Кнопка системного прокси (только Desktop)                   |
-|     `intranetIp`     | Локальный IP-адрес                                          |
-|     `memoryInfo`     | Использование памяти                                        |
-|      `metainfo`      | Информация о подписке                                       |
-| `changeServerButton` | Кнопка смены сервера                                        |
-|    `serviceInfo`     | Информация о сервисе (работает только с header flclashx-servicename) |
+`currentOutbound`, `announcement`, `networkSpeed`, `outboundMode`, `vpnButton` (только Android), `networkTakeover` (только десктоп), `serviceStatus`, `profiles`, `proxyGroups`, `connectionStats`, `intranetIp`, `memoryInfo`.
 
-Использование:
+Карточка статуса показывается всегда, объявление появляется само, пока панель шлёт `announce`.
 
-```bash
-flclashx-widgets: announce,metainfo,outboundModeV2,networkDetection
-```
-</details>
-
-<details>
-<summary><strong>flclashx-view</strong></summary>
-
-Настраивает вид страницы прокси, полученным с подписки
-
-| Значение | Описание                            | Возможные значения                |
-| :------: | ----------------------------------- | --------------------------------- |
-|  `type`  | Режим отображения                   | `list`,`tab`                      |
-|  `sort`  | Тип сортировки                      | `none`,`delay`,`name`             |
-| `layout` | Макет                               | `loose`,`standard`,`tight`        |
-|  `icon`  | Стиль иконок (для list-отображения) | `none`,`icon`          |
-|  `card`  | Размер карточки                     | `expand`,`shrink`,`min`,`oneline` |
-
-Использование:
-
-```bash
-flclashx-view: type:list; sort:delay; layout:tight; icon:icon; card:shrink
-```
-</details>
-
-<details>
-<summary><strong>flclashx-custom</strong></summary>
-
-Управляет состоянием применения стилей для Dashboard и ProxyView
-
-| Значение | Описание                                                |
-| :------: | ------------------------------------------------------- |
-|  `add`   | Стиль страницы прокси и виджеты применяются только при первом добавлении подписки |
-| `update` | Стиль страницы прокси и виджеты применяются каждый раз при обновлении подписки    |
-
-Использование:
-
-```bash
-flclashx-custom: update
-```
-</details>
-
-<details>
-<summary><strong>flclashx-denywidgets</strong></summary>
-
-При true — запрещает редактировать страницу Dashboard. Имеет значение true/false.
-
-Использование:
-
-```bash
-flclashx-denywidgets: true
-```
-</details>
-
-<details>
-<summary><strong>flclashx-servicename</strong></summary>
-
-Название вашего сервиса, отображаемое в виджете ServiceInfo.
-
-Использование:
-
-```bash
-flclashx-servicename: FlClashX
-```
-</details>
-
-<details>
-<summary><strong>flclashx-servicelogo</strong></summary>
-
-Ваш логотип, используемый в виджете ServiceInfo (работает только с активным хедером flclashx-servicename). Поддерживает png/svg.
-
-Использование:
-
-```bash
-flclashx-servicelogo: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/remnawave.svg
-```
-</details>
-
-<details>
-<summary><strong>flclashx-serverinfo</strong></summary>
-
-Название прокси-группы для отображения в виджете ChangeServerButton. Виджет показывает активный сервер из указанной группы с флагом страны, пингом и кнопкой для быстрого переключения. Если не передаётся — работает фолбек на «Изменить сервер»
-
-**Отображаемые элементы:**
-- Флаг страны (автоматически извлекается из имени прокси, если отсутствует — фолбек иконка)
-- Название активного сервера
-- Текущий пинг с цветовой индикацией (зелёный < 600ms, оранжевый >= 600ms, красный — timeout)
-- Кнопка быстрого перехода на страницу прокси
-
-Использование:
-
-```bash
-flclashx-serverinfo: Proxy
+```http
+flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
 ```
 </details>
 
 <details>
 <summary><strong>flclashx-background</strong></summary>
 
-Устанавливает пользовательское фоновое изображение для приложения. Укажите прямую ссылку на изображение. Опционально через запятую можно задать прозрачность (видимость) фона от 1 до 100 (чем больше — тем заметнее изображение; без параметра — стандартный приглушённый вид).
+`URL` или `URL,<видимость 1–100>`. Картинка под всеми полноэкранными страницами, приглушённая цветом страницы. Без числа видно 8 %. Качается один раз в дисковый кэш.
 
-**Рекомендации для изображения:**
-- Формат: PNG, JPG или WebP
-- Разрешение: 1920x1080 или выше для десктопа, 1080x1920 для мобильных устройств
-- Размер файла: Желательно до 2МБ для лучшей производительности
-- Содержание: Используйте изображения с тонкими узорами или градиентами; избегайте слишком ярких или загруженных изображений
-- Контраст: Обеспечьте хорошую читаемость текста на фоне
+```http
+flclashx-background: https://cdn.myvpn.example/bg.jpg,25
+```
+</details>
 
-Использование:
+<details>
+<summary><strong>flclashx-view</strong></summary>
 
-```bash
-flclashx-background: https://example.com/background.jpg
-# с прозрачностью (1-100, выше = заметнее фон):
-flclashx-background: https://example.com/background.jpg,30
+Одна строка `ключ:значение;ключ:значение`. Пробелы игнорируются, значения регистронезависимы, неизвестные ключи и значения пропускаются.
+
+Вкладка прокси, префикс `proxies.`:
+
+| Ключ | Значения |
+|---|---|
+| `proxies.type` | `list`, `tab` |
+| `proxies.sort` | `none`, `delay`, `name` |
+| `proxies.layout` | `loose`, `standard`, `tight` |
+| `proxies.icon` | `filled`, `plain`, `hidden` |
+| `proxies.card` | `loose`, `standard`, `compact` |
+
+Вид приложения, префикс `app.` обязателен:
+
+| Ключ | Значения |
+|---|---|
+| `app.board` | `extended` (расширенный дашборд с логотипом, планом и сервером), `standard` |
+| `app.navbar` | `floating`, `docked` |
+| `app.tabs` | `slide`, `fade` |
+| `app.glass` | `none`, `standard`, `ultra` |
+| `app.color` | `RRGGBB` или `AARRGGBB`, с `#` или без; становится основным цветом и добавляется в палитру |
+| `app.style` | `vivid`, `tinted`, `soft`, `monochrome` |
+| `app.black` | `true`, `false` (чистый чёрный фон в тёмной теме) |
+
+```http
+flclashx-view: app.board:extended;app.color:#FF5733;app.style:soft;app.navbar:docked;proxies.type:tab;proxies.sort:delay;proxies.card:compact
 ```
 </details>
 
 <details>
 <summary><strong>flclashx-settings</strong></summary>
 
-Управление настройками приложения через хедер (с возможностью переопределения со стороны клиента). По умолчанию все параметры выключены. Если вы передаёте параметр, то он будет включён. Если не передаёте — останется выключенным.
+Флаги через запятую. Названные переключатели приложения включаются, остальные из списка выключаются.
 
-|   Параметр    | Описание                                                 | По умолчанию |
-| :-----------: | -------------------------------------------------------- | :----------: |
-|  `minimize`   | Сворачивать приложение при выходе вместо закрытия        | ❌ Выкл      |
-|   `autorun`   | Запускать приложение при старте системы                  | ❌ Выкл      |
-| `shadowstart` | Запускать приложение свернутым в трей                    | ❌ Выкл      |
-|  `autostart`  | Автоматически запускать прокси при запуске приложения    | ❌ Выкл      |
-| `autoupdate`  | Автоматически проверять обновления приложения            | ❌ Выкл      |
-|  `openlogs`   | Включить логирование (вкладка «Логи» и стрим логов ядра) | ❌ Выкл      |
-|`closeconnections`| Разрывать активные соединения при смене прокси/режима | ❌ Выкл      |
+| Флаг | Настройка |
+|---|---|
+| `minimize` | Сворачивать при закрытии окна |
+| `autorun` | Запускать вместе с системой |
+| `shadowstart` | Тихий запуск, без показа окна |
+| `autostart` | Подключаться сразу после запуска приложения |
+| `autoupdate` | Проверять обновления приложения |
+| `openlogs` | Сбор логов |
+| `closeconnections` | Закрывать соединения при смене прокси |
 
-> Примечание: `closeconnections` в самом приложении по умолчанию включён, но при использовании `flclashx-settings` состояние задаётся явно — если не передать токен, опция будет выключена.
-
-Переопределение на стороне клиента: Пользователи могут включить «Переопределить настройки провайдера» в настройках приложения, чтобы применять свою локальную конфигурацию вместо настроек из подписки. Соответствующие переключатели в настройках (в т.ч. «Логи» и «Разрывать соединения») редактируются только при включённом «Переопределить настройки провайдера».
-
-Использование:
-
-```bash
-flclashx-settings: minimize, autorun, shadowstart, autostart, autoupdate, openlogs, closeconnections
+```http
+flclashx-settings: minimize,autostart,closeconnections
 ```
 </details>
 
 <details>
-<summary><strong>flclashx-globalmode</strong></summary>
+<summary><strong>flclashx-special</strong></summary>
 
-Данный хедер при FALSE позволяет скрыть все настройки режима прокси из клиента (трей, страница прокси, виджеты смены режима)
+Флаги через запятую.
 
-Использование:
-```bash
-flclashx-globalmode: false
+| Флаг | Что делает |
+|---|---|
+| `androidsecure` | На Android обнуляет локальные порты, прячет пункт «Порт» и выключает системный прокси VPN; подписки качаются напрямую, без локального порта. На других платформах ничего не делает |
+| `noglobal` | Убирает режим Global: из карточки и панели выбора режима, кнопки «Правила/Глобальный», меню трея и горячей клавиши. Выбранный Global переводится в Rule |
+| `denywidgets` | Прячет кнопку «Редактировать дашборд» |
+
+```http
+flclashx-special: androidsecure,noglobal,denywidgets
 ```
 </details>
 
 <details>
-<summary><strong>flclashx-hex</strong></summary>
+<summary><strong>Пример ответа панели</strong></summary>
 
-Данный хедер позволяет настроить тему в приложении, возможность передать основной цвет, вариант, и выбрать "Чисто черный режим" параметром `pureBlack`
-
-Варианты:
-|   Вариант    | Название|
-| :-----------: | ------ |
-|  `tonalSpot`   | Тональный акцент|
-|   `fidelity`   | Точная передача |
-| `monochrome` | Монохром |
-|  `neutral`  | Нейтральные |
-| `vibrant`  | Яркие |
-| `expressive`  | Экспрессивные |
-| `content`  | Контентная тема |
-| `rainbow`  | Радужные |
-| `fruitSalad`  | Фруктовый микс |
-
-Использование:
-```bash
-flclashx-hex: FF5733
-flclashx-hex: FF5733:vibrant
-flclashx-hex: FF5733:vibrant:pureblack
+```http
+HTTP/1.1 200 OK
+Content-Type: text/yaml; charset=utf-8
+Content-Disposition: attachment; filename="MyVPN.yaml"
+Subscription-Userinfo: upload=0; download=5368709120; total=107374182400; expire=1767225600
+profile-title: base64:TXlWUE4g4oCUINCf0YDQtdC80LjRg9C8
+profile-web-page-url: https://my.myvpn.example
+profile-update-interval: 12
+announce: base64:0J/RgNC40LLQtdGCISDQodC10YDQstC10YAg0L7QsdC90L7QstC70ZHQvSwg0L/QtdGA0LXQt9Cw0L/Rg9GB0YLQuNGC0LUg0L/RgNC40LvQvtC20LXQvdC40LUu
+support-url: https://t.me/myvpn_support
+flclashx-newdomain: sub2.myvpn.example, https://sub3.myvpn.example:8443
+flclashx-servicename: MyVPN
+flclashx-servicelogo: https://cdn.myvpn.example/logo.svg
+flclashx-serverinfo: Auto
+flclashx-buyplan: https://my.myvpn.example/renew,7
+flclashx-buytraffic: https://my.myvpn.example/traffic,10
+flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
+flclashx-background: https://cdn.myvpn.example/bg.jpg,25
+flclashx-view: app.board:extended;app.color:#FF5733;app.style:soft;app.black:false;app.navbar:docked;app.tabs:fade;app.glass:standard;proxies.type:tab;proxies.sort:delay;proxies.card:compact
+flclashx-settings: minimize,autostart,closeconnections
+flclashx-special: androidsecure,noglobal,denywidgets
 ```
-Так-же можно параметры использовать по отдельности:
-```bash
-flclashx-hex: FF5733
-flclashx-hex: vibrant
-flclashx-hex: pureblack
-```
-HEX-коды стандартных тем:
-|   HEX    | ЦВЕТ|
-| :-----------: | ------ |
-|  `795548`   | Brown (Коричневый)|
-|   `03A9F4`   | Light Blue (Светло-голубой) - по умолчанию |
-| `FFFF00` | Yellow (Желтый) |
-|  `BBC9CC`  | Light Blue Grey (Светло-серо-голубой) |
-| `ABD397`  | Light Green (Светло-зеленый) |
-| `D8C0C3`  | Light Pink (Светло-розовый) |
-| `665390`  | Deep Purple (Темно-фиолетовый) |
-</details>
 
-<details>
-<summary><strong>flclashx-androidsecure</strong></summary>
+Ответ при превышении лимита устройств отдаётся вместе с конфигом-заглушкой:
 
-Данный хедер позволяет принудительно включить Mixed-port:0 только на Андроид-девайсах, при активном 7890 (например) в конфиге.
-
-Использование:
-```bash
-flclashx-androidsecure: true
+```http
+HTTP/1.1 200 OK
+x-hwid-max-devices-reached: true
+announce: base64:0JTQvtGB0YLQuNCz0L3Rg9GCINC70LjQvNC40YIg0YPRgdGC0YDQvtC50YHRgtCyLg==
+support-url: https://t.me/myvpn_support
 ```
 </details>
 
 <details>
-<summary><strong>flclashx-newboard</strong></summary>
+<summary><strong>Чего больше нет</strong></summary>
 
-При `true` включает новый вид главной страницы вместо сетки виджетов: крупное лого и название сервиса, карточка трафика/срока, панель активного сервера (флаг, IP, пинг) с веером доступных локаций, кнопка подключения и нижняя навигация. Редактирование виджетов в этом режиме скрыто. Пользователь может включить тот же вид локально настройкой «Новый вид».
-
-Использование:
-```bash
-flclashx-newboard: true
-```
+`flclashx-hex`, `flclashx-newboard`, `flclashx-custom`, `flclashx-globalmode`, `flclashx-androidsecure` и `flclashx-denywidgets` убраны: цвет и выбор дашборда задаются через `flclashx-view`, режим Global, защищённый Android и запрет редактирования дашборда через `flclashx-special`, а настройки из заголовков применяются всегда, без политики `add`/`update`.
 </details>
 
-<details>
-<summary><strong>flclashx-newdomain</strong></summary>
+### Шаблон для панели
 
-Миграция домена подписки. Если значение отличается от текущего хоста ссылки профиля, при следующем обновлении клиент автоматически заменит хост в URL подписки на указанный (путь и параметры сохраняются). Удобно при переезде страницы подписки на новый домен без переустановки профиля у пользователей.
+Тот же набор в виде, который принимают настройки панели (Remnawave и подобные): массив `headers` из пар `key`/`value`. Хост-заголовки `subscription-userinfo`, `profile-title`, `announce` и `support-url` панель обычно добавляет сама.
 
-Использование:
-```bash
-flclashx-newdomain: new.example.com
+```json
+"headers": [
+  {
+    "key": "flclashx-view",
+    "value": "proxies.type:list;proxies.sort:none;proxies.layout:standard;app.board:extended;app.tabs:slide;app.glass:ultra;app.color:#007AFF;app.style:tinted;app.black:false;app.navbar:floating"
+  },
+  {
+    "key": "flclashx-widgets",
+    "value": "profiles,announcement,intranetIp,networkTakeover,vpnButton,currentOutbound"
+  },
+  {
+    "key": "flclashx-background",
+    "value": "https://assets.example.com/back.jpg,20"
+  },
+  {
+    "key": "flclashx-servicename",
+    "value": "Example VPN"
+  },
+  {
+    "key": "flclashx-servicelogo",
+    "value": "https://assets.example.com/logo.png"
+  },
+  {
+    "key": "flclashx-settings",
+    "value": "minimize, autorun, shadowstart, autostart, autoupdate"
+  },
+  {
+    "key": "flclashx-serverinfo",
+    "value": "SERVERS"
+  },
+  {
+    "key": "flclashx-special",
+    "value": "noglobal,androidsecure,denywidgets"
+  },
+  {
+    "key": "flclashx-buytraffic",
+    "value": "https://shop.example.com/#/buy-extra-traffic,10"
+  },
+  {
+    "key": "flclashx-buyplan",
+    "value": "https://shop.example.com/#/buy-plan,7"
+  }
+]
 ```
-</details>
-
-<details>
-<summary><strong>flclashx-buyplan</strong></summary>
-
-Прямая ссылка на оплату/продление подписки. Кнопка «Продлить подписку» появляется под карточкой трафика на новой главной (`flclashx-newboard`) только когда до конца подписки остаётся меньше 3 дней (в т.ч. если подписка уже истекла). По нажатию открывается переданная ссылка.
-
-Использование:
-```bash
-flclashx-buyplan: https://example.com/pay
-```
-</details>
-
-<details>
-<summary><strong>flclashx-buytraffic</strong></summary>
-
-Прямая ссылка на докупку трафика. Кнопка «Докупить трафик» появляется под карточкой трафика на новой главной (`flclashx-newboard`) только когда остаётся меньше 10% от лимита трафика. Если сработали оба триггера (`flclashx-buyplan` и `flclashx-buytraffic`), кнопки показываются в один ряд.
-
-Использование:
-```bash
-flclashx-buytraffic: https://example.com/buy-traffic
-```
-</details>
 
 ### YAML-ключи в конфиге
 
-Эти ключи указываются не в HTTP-заголовках ответа, а прямо в YAML-конфиге подписки (в секции `proxy-groups`).
+Кроме заголовков, приложение читает из YAML подписки ключи ниже и записывает их в свои настройки при каждом обновлении подписки и при переключении на профиль. Ключ, которого в файле нет, возвращается к значению по умолчанию, чтобы значение прошлой подписки не залипло.
 
 <details>
-<summary><strong>flclashx-override</strong> (в группе GLOBAL)</summary>
+<summary><strong>Ключи конфига</strong></summary>
 
-Указывается внутри прокси-группы `GLOBAL`. При `flclashx-override: true` клиент берёт список и порядок прокси из этой группы как «курированный GLOBAL»: в режиме «Глобальный» в разделе Proxies показывается только группа `GLOBAL` ровно с этими элементами и в этом порядке, а сервисные группы (нужные для rule-режима) скрываются. Без флага поведение прежнее — `GLOBAL` формируется ядром автоматически из всех групп.
+| Ключ | По умолчанию, если не назван |
+|---|---|
+| `mixed-port` | 7890 |
+| `port`, `socks-port`, `redir-port`, `tproxy-port` | 0 |
 
-Использование:
-```yaml
-proxy-groups:
-  - name: GLOBAL
-    flclashx-override: true
-    type: select
-    proxies:
-      - 🎲 Любой доступный
-      - 🔓 Без VPN
-      - 🌍 Основной VPN
-      - 🇩🇪 Германия
-      - 🇫🇮 Финляндия
-```
+Свои загрузки приложение ведёт через `mixed-port`, без него через `port`; если оба нулевые или стоит `androidsecure`, запрос идёт без локального порта: при включённом TUN/VPN попадает в ядро по правилам, без TUN уходит в сеть напрямую.
+
+| `allow-lan` | false |
+| `ipv6` | true |
+| `log-level` | `error` |
+| `find-process-mode` | `always` (`strict` считается как `always`) |
+| `interface-name` | пусто |
+| `routing-mark` | 0 |
+| `tcp-concurrent`, `unified-delay` | true |
+| `keep-alive-interval`, `keep-alive-idle`, `disable-keep-alive` | 30, 15, false |
+| `external-controller` | выключен; адрес из файла включает контроллер на нём |
+| `secret` | пусто; контроллер без секрета открыт без пароля |
+| `external-ui`, `external-ui-name`, `external-ui-url` | при включённом контроллере подставляется zashboard; пункт «Zashboard» в настройках открывает панель с адресом и секретом |
+| `geodata-loader` | `memconservative` |
+| `geo-auto-update`, `geo-update-interval` | false, 24 |
+| `geox-url` | ссылки MetaCubeX |
+| `global-ua` | User-Agent приложения; влияет только на загрузки самого ядра |
+| `tun.device`, `tun.stack` | `FlClashX`, `mips` |
+
+`mode` и `tun.enable` подписка задаёт, но к значению по умолчанию не возвращает, потому что их пользователь переключает сам.
 </details>
 
 <details>
-<summary><strong>description</strong> (в любой прокси-группе)</summary>
+<summary><strong>serverDescription и groupDescription</strong></summary>
 
-Кастомный подзаголовок группы в разделе Proxies. По умолчанию под названием группы показывается её тип (Selector/URLTest/Fallback…) либо текущий выбранный узел; если задать `description`, вместо этого выводится указанный текст. Удобно для понятных подписей вложенных групп.
+| Ключ | Где | Что делает |
+|---|---|---|
+| `serverDescription` | у прокси в `proxies` | Подпись под узлом в списке прокси вместо типа; флаг из неё попадает на карточку сервера |
+| `groupDescription` | у группы в `proxy-groups` | Подпись свёрнутой группы в списке прокси. Тип группы не показывается никогда |
 
-Использование:
 ```yaml
 proxy-groups:
   - name: 🌍 Основной VPN
     type: select
-    description: Авто-выбор лучшей локации
+    groupDescription: Авто-выбор лучшей локации
     proxies:
       - 🇩🇪 Германия
-      - 🇫🇮 Финляндия
+proxies:
+  - name: 🇩🇪 Германия
+    type: vless
+    serverDescription: 🇩🇪 Франкфурт, 10 Гбит/с
 ```
 </details>
 
-### Переопределение настроек конфигурации
-По умолчанию следующие параметры конфигурации, полученные от подписки, **не переопределяются** клиентом:
+### Настройки провайдера и пользователя
 
-- `allow-lan` - Разрешить подключения из локальной сети
-- `ipv6` - Включить поддержку IPv6
-- `find-process-mode` - Режим поиска процессов
-- `tun-stack` - Сетевой стек режима TUN
-- `mixed-port` - Смешанный порт для HTTP/SOCKS прокси
-
-**Переопределение на стороне клиента:** Пользователи могут включить "Переопределить настройки провайдера" или "Переопределить сетевые настройки" в настройках приложения, чтобы применять свою локальную конфигурацию вместо настроек из подписки. Это полезно, когда нужны кастомные сетевые настройки.
+Строка настройки, которую задаёт подписка (переключатели из `flclashx-settings`, ключи `flclashx-view` на странице темы и в настройках вкладки прокси, ключи конфига из таблицы выше), показана приглушённой, а вверху страницы появляется подсказка об этом. Тап по строке спрашивает, хочет ли пользователь менять её сам. После согласия строка принадлежит пользователю: обновления подписки и смена профиля её больше не трогают. Правый клик или долгое нажатие по строке предлагает «Вернуть провайдеру», а пункт «Вернуть настройки провайдеру» в «Общие → Логи и диагностика» возвращает всё разом.
 
 ## Использование
 
@@ -410,28 +401,9 @@ proxy-groups:
  com.follow.clashx.action.CHANGE
 ```
 
-### macOS (сборка)
-
-Сборка macOS пока отключена в CI (`.github/workflows/build.yaml`, матрица `build`). Без подписи и
-нотаризации сборка не запустится у пользователей, а автообновление не сможет заменить `.app`.
-Что нужно, чтобы включить:
-
-1. **Apple Developer Program** — платный аккаунт ($99/год): https://developer.apple.com/programs/
-2. В `Certificates, Identifiers & Profiles`:
-   - зарегистрировать App ID с Bundle ID `com.follow.clash` (задаётся в `macos/Runner/Configs/AppInfo.xcconfig`);
-   - выпустить сертификат **Developer ID Application** (распространение вне App Store) и экспортировать его в `.p12`;
-   - взять **Team ID**.
-3. Для нотаризации — **App Store Connect API Key** (`.p8` + Key ID + Issuer ID).
-4. Прописать секреты репозитория (`Settings → Secrets and variables → Actions`):
-   `APPLE_CERTIFICATE` (base64 от `.p12`), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_DEVELOPER_ID`,
-   `APPLE_TEAM_ID`, `APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`.
-5. Вернуть в матрицу `build` записи `- platform: macos` (amd64/arm64) и восстановить условие у job `sign-macos`.
-
 ## Скачать
 
 <a href="https://github.com/pluralplay/FlClashX/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
-<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.follow.clashx%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fpluralplay%2FFlClashX%22%2C%22author%22%3A%22pluralplay%22%2C%22name%22%3A%22FlClashX%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Afalse%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Atrue%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%2C%5C%22includeZips%5C%22%3Afalse%2C%5C%22zippedApkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22includeTarballs%5C%22%3Afalse%2C%5C%22tarballedApkFilterRegEx%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D
-"><img alt="Get it on Obtanium" src="snapshots/get-it-on-obtanium.svg" width="200px"/></a>
 
 ## Star
 
