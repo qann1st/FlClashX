@@ -32,7 +32,7 @@ class _UpdateDownloadDialog extends StatefulWidget {
 
 class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
   double _progress = 0;
-  bool _failed = false;
+  String? _error;
 
   @override
   void initState() {
@@ -41,7 +41,7 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
   }
 
   Future<void> _run() async {
-    final installed = await AppUpdateService.downloadAndInstall(
+    final result = await AppUpdateService.downloadAndInstall(
       widget.update,
       onProgress: (received, total) {
         if (!mounted) return;
@@ -51,31 +51,36 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
       },
     );
     if (!mounted) return;
-    if (installed) {
-      Navigator.of(context).pop(true);
-      return;
+    final appLocalizations = currentAppLocalizations;
+    switch (result) {
+      case UpdateInstallResult.started:
+        Navigator.of(context).pop(true);
+      case UpdateInstallResult.downloadFailed:
+        setState(() => _error = appLocalizations.updateDownloadFailed);
+      case UpdateInstallResult.installFailed:
+        setState(() => _error = appLocalizations.updateInstallFailed);
     }
-    setState(() => _failed = true);
   }
 
   @override
   Widget build(BuildContext context) {
     final appLocalizations = currentAppLocalizations;
+    final error = _error;
     return CommonDialog(
       title: '${appLocalizations.download} ${widget.update.displayVersion}',
-      actions: _failed
-          ? [
+      actions: error == null
+          ? null
+          : [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
                 child: Text(appLocalizations.close),
               ),
-            ]
-          : null,
+            ],
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!_failed) ...[
+          if (error == null) ...[
             ClipPath(
               clipper: ShapeBorderClipper(
                 shape: AppShape.all(AppCorner.xs),
@@ -93,7 +98,7 @@ class _UpdateDownloadDialogState extends State<_UpdateDownloadDialog> {
             ),
           ] else
             Text(
-              appLocalizations.updateDownloadFailed,
+              error,
               textAlign: TextAlign.center,
               style: AppTextStyle.subheadline.of(context),
             ),

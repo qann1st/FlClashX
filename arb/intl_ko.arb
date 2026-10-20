@@ -166,6 +166,7 @@
   "discoverNewVersion": "새 버전 발견",
   "checkUpdateError": "이미 최신 버전입니다",
   "updateDownloadFailed": "업데이트를 다운로드할 수 없습니다",
+  "updateInstallFailed": "업데이트를 자동으로 설치할 수 없습니다",
   "goDownload": "다운로드",
   "unknown": "알 수 없음",
   "country": "지역",

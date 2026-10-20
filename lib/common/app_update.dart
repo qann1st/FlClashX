@@ -196,9 +196,13 @@ String? _manifestPageUrl(Map<String, dynamic> json) {
 
 String _normalizeSha256(String value) {
   final normalized = value.trim().toLowerCase();
-  return normalized.startsWith('sha256:')
+  final withoutPrefix = normalized.startsWith('sha256:')
       ? normalized.substring('sha256:'.length)
       : normalized;
+  // A whole `sha256sum` line (`<hash>  ./file`) is accepted as well, because
+  // that is what the release publishes next to every asset.
+  final hex = RegExp(r'[0-9a-f]{64}').firstMatch(withoutPrefix);
+  return hex?.group(0) ?? withoutPrefix;
 }
 
 /// `v0.5.1` -> `0.5.1`; keeps a `-pre.N` suffix.
@@ -261,6 +265,18 @@ class _ParsedVersion {
 
   final List<Object> core;
   final List<Object> pre;
+}
+
+/// What starting an update ended up doing.
+enum UpdateInstallResult {
+  /// The installer runs detached; the app has to quit for it to replace files.
+  started,
+
+  /// The asset could not be fetched, or it did not match the manifest hash.
+  downloadFailed,
+
+  /// The asset arrived but the platform installer could not be started.
+  installFailed,
 }
 
 /// Checks the manifest and downloads and starts the platform installer.
@@ -340,21 +356,21 @@ class AppUpdateService {
   /// Downloads the asset, verifies its SHA-256 when the manifest carries one
   /// and starts the installer. The caller quits on desktop so the installer
   /// can replace the running files.
-  static Future<bool> downloadAndInstall(
+  static Future<UpdateInstallResult> downloadAndInstall(
     AppUpdate update, {
     void Function(int received, int total)? onProgress,
   }) async {
     final url = update.downloadUrl;
-    if (url == null || url.isEmpty) return false;
+    if (url == null || url.isEmpty) return UpdateInstallResult.downloadFailed;
     if (Platform.isAndroid) return _installAndroid(update, onProgress);
     if (Platform.isWindows) return _installWindows(update, onProgress);
     if (Platform.isMacOS) return _installMacOS(update, onProgress);
-    return false;
+    return UpdateInstallResult.installFailed;
   }
 
   // --------------------------------------------------------------- Android
 
-  static Future<bool> _installAndroid(
+  static Future<UpdateInstallResult> _installAndroid(
     AppUpdate update,
     void Function(int, int)? onProgress,
   ) async {
@@ -364,13 +380,16 @@ class AppUpdateService {
       p.join(directory.path, 'flclashx-update.apk'),
       onProgress: onProgress,
     );
-    if (apk == null) return false;
-    return await app?.installApk(apk.path) ?? false;
+    if (apk == null) return UpdateInstallResult.downloadFailed;
+    final started = await app?.installApk(apk.path) ?? false;
+    return started
+        ? UpdateInstallResult.started
+        : UpdateInstallResult.installFailed;
   }
 
   // --------------------------------------------------------------- Windows
 
-  static Future<bool> _installWindows(
+  static Future<UpdateInstallResult> _installWindows(
     AppUpdate update,
     void Function(int, int)? onProgress,
   ) async {
@@ -380,7 +399,7 @@ class AppUpdateService {
       p.join(directory.path, 'FlClashX-update-setup.exe'),
       onProgress: onProgress,
     );
-    if (setup == null) return false;
+    if (setup == null) return UpdateInstallResult.downloadFailed;
 
     // The Inno Setup installer needs elevation and closes the running app, so
     // wait for this instance, install silently (one UAC prompt) and relaunch.
@@ -415,13 +434,13 @@ class AppUpdateService {
         '-File',
         script.path,
       ], mode: ProcessStartMode.detached);
-      return true;
+      return UpdateInstallResult.started;
     } catch (error) {
       commonPrint.log(
         'update installer failed: ${compactError(error)}',
         logLevel: LogLevel.warning,
       );
-      return false;
+      return UpdateInstallResult.installFailed;
     }
   }
 
@@ -430,7 +449,7 @@ class AppUpdateService {
 
   // ----------------------------------------------------------------- macOS
 
-  static Future<bool> _installMacOS(
+  static Future<UpdateInstallResult> _installMacOS(
     AppUpdate update,
     void Function(int, int)? onProgress,
   ) async {
@@ -440,14 +459,14 @@ class AppUpdateService {
       p.join(directory.path, 'FlClashX-update.dmg'),
       onProgress: onProgress,
     );
-    if (dmg == null) return false;
+    if (dmg == null) return UpdateInstallResult.downloadFailed;
 
     final appPath = _macAppBundlePath();
     if (appPath == null) {
       // Running from the DMG or a translocated copy: the bundle cannot be
       // replaced in place, so open the image and let the user drag it over.
       await Process.start('open', [dmg.path], mode: ProcessStartMode.detached);
-      return false;
+      return UpdateInstallResult.installFailed;
     }
 
     final replaceScript = File(p.join(directory.path, 'flclashx-replace.sh'));
@@ -503,13 +522,13 @@ class AppUpdateService {
       await Process.start('/bin/bash', [
         script.path,
       ], mode: ProcessStartMode.detached);
-      return true;
+      return UpdateInstallResult.started;
     } catch (error) {
       commonPrint.log(
         'update installer failed: ${compactError(error)}',
         logLevel: LogLevel.warning,
       );
-      return false;
+      return UpdateInstallResult.installFailed;
     }
   }
 

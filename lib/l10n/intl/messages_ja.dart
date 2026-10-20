@@ -1602,6 +1602,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "updateDownloadFailed": MessageLookupByLibrary.simpleMessage(
       "アップデートをダウンロードできませんでした",
     ),
+    "updateInstallFailed": MessageLookupByLibrary.simpleMessage(
+      "アップデートを自動でインストールできませんでした",
+    ),
     "upload": MessageLookupByLibrary.simpleMessage("アップロード"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage("アップロード帯域幅"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),

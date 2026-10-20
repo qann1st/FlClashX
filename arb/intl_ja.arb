@@ -166,6 +166,7 @@
   "discoverNewVersion": "新しいバージョンが見つかりました",
   "checkUpdateError": "すでに最新バージョンです",
   "updateDownloadFailed": "アップデートをダウンロードできませんでした",
+  "updateInstallFailed": "アップデートを自動でインストールできませんでした",
   "goDownload": "ダウンロードへ",
   "unknown": "不明",
   "country": "地域",

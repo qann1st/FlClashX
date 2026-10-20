@@ -1325,6 +1325,16 @@ class AppLocalizations {
     );
   }
 
+  /// `Could not install the update automatically`
+  String get updateInstallFailed {
+    return Intl.message(
+      'Could not install the update automatically',
+      name: 'updateInstallFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Download`
   String get goDownload {
     return Intl.message('Download', name: 'goDownload', desc: '', args: []);

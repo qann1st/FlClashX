@@ -166,6 +166,7 @@
   "discoverNewVersion": "New version found",
   "checkUpdateError": "The app is already up to date",
   "updateDownloadFailed": "Could not download the update",
+  "updateInstallFailed": "Could not install the update automatically",
   "goDownload": "Download",
   "unknown": "Unknown",
   "country": "Region",

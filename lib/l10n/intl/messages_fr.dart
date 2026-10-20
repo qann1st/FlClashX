@@ -2015,6 +2015,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "updateDownloadFailed": MessageLookupByLibrary.simpleMessage(
       "Impossible de télécharger la mise à jour",
     ),
+    "updateInstallFailed": MessageLookupByLibrary.simpleMessage(
+      "Impossible d\'installer la mise à jour automatiquement",
+    ),
     "upload": MessageLookupByLibrary.simpleMessage("Envoi"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage(
       "Bande passante d’envoi",

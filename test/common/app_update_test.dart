@@ -108,6 +108,22 @@ void main() {
       expect(update?.sha256, 'ddeeff');
     });
 
+    test('accepts a whole sha256sum line as the hash', () {
+      const line =
+          '06506cbbac7b7427206120f28428110af7bf01275b5ed1971d512a9c91305a75  '
+          './FlClashX-windows-amd64-setup.exe';
+      final update = parse({
+        'version': '0.5.1',
+        'url': 'https://x',
+        'sha256': line,
+      });
+
+      expect(
+        update?.sha256,
+        '06506cbbac7b7427206120f28428110af7bf01275b5ed1971d512a9c91305a75',
+      );
+    });
+
     test('selects the macOS image and the Android package', () {
       expect(
         parse(
