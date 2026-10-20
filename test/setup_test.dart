@@ -22,7 +22,11 @@ void main() {
     });
 
     test('Flutter build environment does not depend on Core SHA256', () {
-      expect(setup.createBuildEnvironment('dev'), {'APP_ENV': 'dev'});
+      final environment = setup.createBuildEnvironment('dev');
+      expect(environment['APP_ENV'], 'dev');
+      // A hosted build also forwards the update manifest, so the assertion
+      // stays on the key the build always sets.
+      expect(environment.keys.first, 'APP_ENV');
     });
 
     test('omits verbose from flutter build args by default', () {
