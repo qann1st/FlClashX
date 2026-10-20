@@ -87,7 +87,7 @@ void main() {
   test('preserves frozen history before the first structured release', () {
     git(['checkout', '--quiet', '--orphan', 'frozen-history']);
     commit('chore: optimize commented policy');
-    git(['tag', 'v0.8.96']);
+    git(['tag', frozenBoundaryTag]);
     final builder = ChangelogBuilder(Git(workingDirectory: repo.path));
     expect(builder.build().changelog.versions, isEmpty);
 
