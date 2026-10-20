@@ -1315,6 +1315,16 @@ class AppLocalizations {
     );
   }
 
+  /// `Could not download the update`
+  String get updateDownloadFailed {
+    return Intl.message(
+      'Could not download the update',
+      name: 'updateDownloadFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Download`
   String get goDownload {
     return Intl.message('Download', name: 'goDownload', desc: '', args: []);

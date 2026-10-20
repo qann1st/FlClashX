@@ -16,6 +16,7 @@ import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.getSystemService
+import androidx.core.content.FileProvider
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -42,6 +43,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -51,6 +53,9 @@ import kotlinx.coroutines.launch
 class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware {
 
     private var activity: Activity? = null
+
+    // Set while the first update asks for "install unknown apps".
+    private var pendingInstallPath: String? = null
 
     private var activityBinding: ActivityPluginBinding? = null
 
@@ -195,6 +200,11 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 result.success(openAppSettings())
             }
 
+            "installApk" -> {
+                val path = call.argument<String>("path")
+                result.success(path != null && installApk(path))
+            }
+
             "getLastExitInfo" -> reply(result) {
                 GlobalState.lastExitInfo()
             }
@@ -266,6 +276,61 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 data = "package:${GlobalState.application.packageName}".toUri()
             }
             activity.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun installApk(path: String): Boolean {
+        val context = GlobalState.application
+        val file = File(path)
+        if (!file.isFile) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !context.packageManager.canRequestPackageInstalls()
+        ) {
+            // The first update asks for "install unknown apps" and then
+            // continues from onActivityResult, so the user sees one flow.
+            pendingInstallPath = path
+            val settingsIntent = Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                "package:${context.packageName}".toUri(),
+            )
+            return try {
+                val started = activity?.startActivityForResult(
+                    settingsIntent,
+                    INSTALL_PACKAGE_REQUEST_CODE,
+                ) != null
+                if (!started) {
+                    context.startActivity(settingsIntent.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                }
+                true
+            } catch (_: Exception) {
+                pendingInstallPath = null
+                false
+            }
+        }
+        return launchApkInstaller(path)
+    }
+
+    private fun launchApkInstaller(path: String): Boolean {
+        val context = GlobalState.application
+        val file = File(path)
+        if (!file.isFile) return false
+        return try {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileProvider",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(intent)
             true
         } catch (_: Exception) {
             false
@@ -497,6 +562,14 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
     }
 
     private fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode == INSTALL_PACKAGE_REQUEST_CODE) {
+            val path = pendingInstallPath
+            pendingInstallPath = null
+            if (path != null) {
+                launchApkInstaller(path)
+            }
+            return true
+        }
         if (requestCode != VPN_PERMISSION_REQUEST_CODE) {
             return false
         }
@@ -541,5 +614,6 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
         const val INSTALLED_APPS_PERMISSION_REQUEST_CODE = 1003
         const val LOCAL_NETWORK_PERMISSION_REQUEST_CODE = 1004
+        const val INSTALL_PACKAGE_REQUEST_CODE = 1005
     }
 }

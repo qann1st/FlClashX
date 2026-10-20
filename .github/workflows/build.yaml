@@ -12,6 +12,9 @@ concurrency:
 
 env:
   IS_STABLE: ${{ !contains(github.ref, '-') }}
+  # Release assets and the JSON manifest live in the maintainer's S3 bucket:
+  # the app never asks GitHub for them.
+  FLCLASHX_UPDATE_MANIFEST_URL: https://elysium.s3.cloud.ru/update.json
   # See CI Caches in .agents/commands.md.
   BRANCH_CACHE: ${{ !startsWith(github.ref, 'refs/tags/') }}
   FLUTTER_VERSION: '3.47.6'

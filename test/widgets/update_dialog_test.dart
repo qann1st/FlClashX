@@ -1,3 +1,4 @@
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -11,26 +12,11 @@ import '../helpers/test_app.dart';
 
 const _runningVersion = '0.8.95';
 
-const _payload =
-    '{"schemaVersion":2,"versions":[{"version":"0.8.96","tag":"v0.8.96",'
-    '"date":"2026-08-16","prerelease":false,"groups":['
-    '{"type":"breaking","entries":[{"id":"af20769","text":'
-    '"Re-import backups"}]},'
-    '{"type":"feat","entries":[{"id":"1a2b3c4","text":'
-    '"Override scripts"}]}]}]}';
-
-const _bulletsOnly =
-    '<!-- flclash:changelog:begin -->\n'
-    '- Override scripts\n'
-    '<!-- flclash:changelog:end -->\n';
-
-String _bodyWith(String payload) =>
-    '$_bulletsOnly\n<!-- flclash:changelog:json\n$payload\n-->\n';
-
-Map<String, dynamic> release(String? body) => <String, dynamic>{
-  'tag_name': 'v0.8.96',
-  'body': body,
-};
+AppUpdate updateWith(String? notes) => AppUpdate(
+  version: '0.8.96',
+  downloadUrl: 'https://bucket.example/FlClashX-update',
+  notes: notes,
+);
 
 Future<ProviderContainer> pumpApp(WidgetTester tester, {Locale? locale}) async {
   final container = ProviderContainer();
@@ -73,53 +59,37 @@ void main() {
     );
   });
 
-  testWidgets('renders the grouped notes carried by the release', (
+  testWidgets('renders the version and the notes from the manifest', (
     tester,
   ) async {
     final container = await pumpApp(tester);
 
     final shown = container
         .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: release(_bodyWith(_payload)));
+        .checkUpdateResultHandle(
+          update: updateWith('- Override scripts\n- Re-import backups'),
+        );
     await tester.pumpAndSettle();
 
     expect(find.textContaining('v0.8.96'), findsOneWidget);
+    expect(find.textContaining('Override scripts'), findsOneWidget);
     expect(find.textContaining('Re-import backups'), findsOneWidget);
-    expect(find.textContaining('Override scripts'), findsOneWidget);
-    expect(find.textContaining('Breaking changes'), findsOneWidget);
 
     await tapCancel(tester);
     await shown;
   });
 
-  testWidgets('localizes the group titles but not the entries', (tester) async {
-    final container = await pumpApp(tester, locale: const Locale('zh', 'CN'));
-
-    final shown = container
-        .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: release(_bodyWith(_payload)));
-    await tester.pumpAndSettle();
-
-    // Entry copy comes from the release payload and is English only; the group
-    // headings still follow the app locale.
-    expect(find.textContaining('新功能'), findsOneWidget);
-    expect(find.textContaining('Override scripts'), findsOneWidget);
-
-    await tapCancel(tester);
-    await shown;
-  });
-
-  testWidgets('falls back to the bullets of a release without a payload', (
+  testWidgets('a manifest without notes still shows the version', (
     tester,
   ) async {
     final container = await pumpApp(tester);
 
     final shown = container
         .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: release(_bulletsOnly));
+        .checkUpdateResultHandle(update: updateWith(null));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('- Override scripts'), findsOneWidget);
+    expect(find.textContaining('v0.8.96'), findsOneWidget);
 
     await tapCancel(tester);
     await shown;
@@ -132,7 +102,7 @@ void main() {
 
     final shown = container
         .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: release(_bodyWith(_payload)));
+        .checkUpdateResultHandle(update: updateWith('- Override scripts'));
     await tester.pumpAndSettle();
     await tapCancel(tester);
     await shown;

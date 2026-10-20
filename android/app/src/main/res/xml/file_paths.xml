@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- getApplicationSupportDirectory() lands in files/, the download in cache/ -->
+    <files-path name="files" path="." />
+    <cache-path name="cache" path="." />
+</paths>

@@ -165,6 +165,7 @@
   "checkUpdate": "Rechercher des mises à jour",
   "discoverNewVersion": "Nouvelle version disponible",
   "checkUpdateError": "L’app est déjà à jour",
+  "updateDownloadFailed": "Impossible de télécharger la mise à jour",
   "goDownload": "Télécharger",
   "unknown": "Inconnu",
   "country": "Région",

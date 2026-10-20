@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:fl_clash/common/app_update.dart';
 import 'package:fl_clash/common/l10n_labels.dart';
-import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
 import 'package:fl_clash/l10n/l10n.dart';
@@ -225,10 +225,18 @@ void main() {
     tester,
   ) async {
     final container = _containerFor(tester);
-    final originalAdapter = request.dio.httpClientAdapter;
-    addTearDown(() => request.dio.httpClientAdapter = originalAdapter);
+    final client = Dio();
+    AppUpdateService.httpClient = client;
+    AppUpdateService.selfInstallOverride = true;
+    AppUpdateService.currentVersionOverride = '0.8.95';
+    addTearDown(() {
+      AppUpdateService.httpClient = null;
+      AppUpdateService.selfInstallOverride = null;
+      AppUpdateService.currentVersionOverride = null;
+      client.close();
+    });
     final adapter = _PendingAdapter();
-    request.dio.httpClientAdapter = adapter;
+    client.httpClientAdapter = adapter;
 
     await tester.pumpWidget(
       UncontrolledProviderScope(

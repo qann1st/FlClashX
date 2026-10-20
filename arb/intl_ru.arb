@@ -165,6 +165,7 @@
   "checkUpdate": "Проверить обновления",
   "discoverNewVersion": "Доступна новая версия",
   "checkUpdateError": "Установлена последняя версия",
+  "updateDownloadFailed": "Не удалось скачать обновление",
   "goDownload": "Скачать",
   "unknown": "Неизвестно",
   "country": "Регион",

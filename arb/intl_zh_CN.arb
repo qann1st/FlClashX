@@ -165,6 +165,7 @@
   "checkUpdate": "检查更新",
   "discoverNewVersion": "发现新版本",
   "checkUpdateError": "当前应用已经是最新版了",
+  "updateDownloadFailed": "无法下载更新",
   "goDownload": "前往下载",
   "unknown": "未知",
   "country": "区域",

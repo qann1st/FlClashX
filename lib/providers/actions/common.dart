@@ -75,9 +75,9 @@ class CommonAction extends _$CommonAction {
 
   Future<bool> autoCheckUpdate() async {
     if (!ref.read(appSettingProvider).autoCheckUpdate) return false;
-    final Map<String, dynamic>? res;
+    final AppUpdate? update;
     try {
-      res = await request.checkForUpdate();
+      update = await AppUpdateService.check();
     } catch (error) {
       commonPrint.log(
         'checkForUpdate failed: ${compactError(error)}',
@@ -85,88 +85,75 @@ class CommonAction extends _$CommonAction {
       );
       return false;
     }
-    await checkUpdateResultHandle(data: res);
-    return res != null;
+    await checkUpdateResultHandle(update: update);
+    return update != null;
   }
 
-  TextSpan _releaseSpan(BuildContext context, String tagName, String? body) {
-    final version = parseReleaseChangelog(body);
+  TextSpan _updateSpan(BuildContext context, AppUpdate update) {
+    final notes = update.notes?.trim() ?? '';
     return TextSpan(
-      text: '$tagName \n',
+      text: '${update.displayVersion} \n',
       style: AppTextStyle.title2.of(context),
-      children: version == null
-          ? [
-              TextSpan(text: '\n', style: AppTextStyle.subheadline.of(context)),
-              for (final submit in parseReleaseBody(body))
-                TextSpan(
-                  text: '- $submit \n',
-                  style: AppTextStyle.subheadline.of(context),
-                ),
-            ]
-          : _changelogSpans(context, version),
+      children: [
+        const TextSpan(text: '\n'),
+        for (final line in notes.split('\n'))
+          if (line.trim().isNotEmpty)
+            TextSpan(
+              text: '${line.trim().replaceFirst(RegExp(r'^[-*] '), '')} \n',
+              style: AppTextStyle.subheadline.of(context),
+            ),
+      ],
     );
   }
 
-  List<TextSpan> _changelogSpans(
-    BuildContext context,
-    ChangelogVersion version,
-  ) {
-    return [
-      for (final group in version.visibleGroups) ...[
-        TextSpan(
-          text:
-              '\n${changelogGroupTitle(currentAppLocalizations, group.type)}\n',
-          style: AppTextStyle.subheadline
-              .of(context, emphasized: true)
-              .copyWith(
-                color: group.type == ChangelogType.breaking
-                    ? context.colorScheme.error
-                    : context.colorScheme.primary,
-              ),
-        ),
-        for (final entry in group.entries)
-          TextSpan(
-            text: '• ${entry.text}\n',
-            style: AppTextStyle.subheadline.of(context),
-          ),
-      ],
-    ];
-  }
-
   Future<void> checkUpdateResultHandle({
-    Map<String, dynamic>? data,
+    AppUpdate? update,
     bool isUser = false,
   }) async {
-    if (data != null) {
-      final context = globalState.navigatorKey.currentContext!;
-      final res = await dialogs.showMessage(
-        title: currentAppLocalizations.discoverNewVersion,
-        message: _releaseSpan(
-          context,
-          data['tag_name'] as String,
-          data['body'] as String?,
-        ),
-        confirmText: currentAppLocalizations.goDownload,
-        cancelText: isUser ? null : currentAppLocalizations.noLongerRemind,
-      );
-      if (res == true) {
+    if (update == null) {
+      if (isUser) {
         unawaited(
-          launchUrl(
-            Uri.parse('https://github.com/$updateRepository/releases/latest'),
+          dialogs.showMessage(
+            title: currentAppLocalizations.checkUpdate,
+            message: TextSpan(text: currentAppLocalizations.checkUpdateError),
           ),
         );
-      } else if (!isUser && res == false) {
+      }
+      return;
+    }
+    final context = globalState.navigatorKey.currentContext!;
+    final res = await dialogs.showMessage(
+      title: currentAppLocalizations.discoverNewVersion,
+      message: _updateSpan(context, update),
+      confirmText: AppUpdateService.canSelfInstall && update.hasDownload
+          ? currentAppLocalizations.update
+          : currentAppLocalizations.goDownload,
+      cancelText: isUser ? null : currentAppLocalizations.noLongerRemind,
+    );
+    if (res != true) {
+      if (!isUser && res == false) {
         ref
             .read(appSettingProvider.notifier)
             .update((state) => state.copyWith(autoCheckUpdate: false));
       }
-    } else if (isUser) {
-      unawaited(
-        dialogs.showMessage(
-          title: currentAppLocalizations.checkUpdate,
-          message: TextSpan(text: currentAppLocalizations.checkUpdateError),
-        ),
-      );
+      return;
+    }
+    if (AppUpdateService.canSelfInstall && update.hasDownload) {
+      final downloadContext = globalState.navigatorKey.currentContext;
+      if (downloadContext != null && downloadContext.mounted) {
+        final installed = await showAppUpdateDownloadDialog(
+          downloadContext,
+          update,
+        );
+        if (installed && !Platform.isAndroid) {
+          await ref.read(systemActionProvider.notifier).handleExit(false);
+        }
+        if (installed) return;
+      }
+    }
+    final page = update.pageUrl;
+    if (page != null && page.isNotEmpty) {
+      unawaited(launchUrl(Uri.parse(page)));
     }
   }
 }

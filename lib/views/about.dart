@@ -74,13 +74,13 @@ class AboutView extends ConsumerWidget {
     if (ref.read(loadingProvider(LoadingTag.checkUpdate))) return;
     final commonAction = ref.read(commonActionProvider.notifier);
     final result = await globalState.loadingRun(
-      () async => (release: await request.checkForUpdate()),
+      () async => (update: await AppUpdateService.check()),
       title: context.appLocalizations.checkUpdate,
       tag: LoadingTag.checkUpdate,
     );
     if (result == null) return;
     unawaited(
-      commonAction.checkUpdateResultHandle(data: result.release, isUser: true),
+      commonAction.checkUpdateResultHandle(update: result.update, isUser: true),
     );
   }
 

@@ -142,6 +142,24 @@ class App {
     return methodChannel.invokeMethod<bool>('openAppSettings');
   }
 
+  /// Hands a downloaded APK to the system installer. The user allows installs
+  /// from this app the first time, after which the update installs directly.
+  Future<bool> installApk(String path) async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await methodChannel.invokeMethod<bool>('installApk', {
+            'path': path,
+          }) ??
+          false;
+    } catch (error) {
+      commonPrint.log(
+        'installApk failed: ${compactError(error)}',
+        logLevel: LogLevel.warning,
+      );
+      return false;
+    }
+  }
+
   Future<AppExitInfo?> getLastExitInfo() async {
     try {
       final raw = await methodChannel

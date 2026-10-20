@@ -138,7 +138,14 @@ List<String> createFlutterBuildArgs({
 }
 
 Map<String, String> createBuildEnvironment(String env) {
-  return {'APP_ENV': env};
+  const manifestKey = 'FLCLASHX_UPDATE_MANIFEST_URL';
+  final manifestUrl = Platform.environment[manifestKey] ?? '';
+  return {
+    'APP_ENV': env,
+    // The app reads its update manifest from here; the code carries the same
+    // default, so a local build needs nothing set.
+    if (manifestUrl.isNotEmpty) manifestKey: manifestUrl,
+  };
 }
 
 /// The versions a build carries into the app: the release tag it was made

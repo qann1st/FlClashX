@@ -401,6 +401,52 @@ proxies:
  com.follow.clashx.action.CHANGE
 ```
 
+### Автообновление (S3-манифест)
+
+Приложение не обращается к GitHub за обновлениями: версия, файлы и контрольные суммы берутся из
+вашего S3-хранилища. Адрес манифеста по умолчанию — `https://elysium.s3.cloud.ru/update.json`;
+переопределяется на сборке через `--dart-define=FLCLASHX_UPDATE_MANIFEST_URL=…` (в CI — переменная
+окружения с тем же именем, `setup.dart` кладёт её в `env.json`).
+
+Формат `update.json`:
+
+```json
+{
+  "version": "0.5.1",
+  "notes": "- Что изменилось\n- И ещё одна строка",
+  "page": "https://example.com/download",
+  "urls": {
+    "windows-amd64": "https://.../FlClashX-windows-amd64-setup.exe",
+    "windows-arm64": "https://.../FlClashX-windows-arm64-setup.exe",
+    "macos-arm64": "https://.../FlClashX-macos-arm64.dmg",
+    "macos-amd64": "https://.../FlClashX-macos-amd64.dmg",
+    "android": "https://.../FlClashX-android-universal.apk"
+  },
+  "sha256s": {
+    "windows-amd64": "...",
+    "windows-arm64": "...",
+    "macos-arm64": "...",
+    "macos-amd64": "...",
+    "android": "..."
+  }
+}
+```
+
+Как это работает:
+
+- `version` сравнивается с версией установленной сборки: равная или меньшая игнорируется, суффикс
+  `-pre.N` считается младше релиза.
+- `urls`/`sha256s` можно задавать ключом `платформа-арх` или только `платформа`; поддерживаются и
+  старые плоские ключи (`windows_url`, `apk_url`, `url`, …), и список
+  `files: [{name, url, sha256}]` с именами ассетов из релиза.
+- `sha256` необязателен, но если задан — скачанный файл сверяется с ним и при несовпадении удаляется.
+- `page` — запасная ссылка на страницу загрузки, если для платформы нет файла или установка не удалась.
+- **Windows**: тихая установка Inno Setup с одним запросом UAC, затем приложение запускается заново.
+- **macOS**: монтируется `.dmg`, бандл `.app` заменяется через `ditto`; если не хватает прав — запрос
+  администратора. Из смонтированного DMG или из App Translocation замена невозможна — открывается образ.
+- **Android**: APK скачивается и передаётся системному установщику; один раз нужно разрешить установку
+  из этого источника.
+
 ## Скачать
 
 <a href="https://github.com/pluralplay/FlClashX/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
