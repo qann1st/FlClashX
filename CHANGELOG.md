@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.5.2 (2026-10-21)
+
+**Features**
+
+- **tool** Generate the S3 update manifest from the built artifacts (6cdcb42)
+
+**Bug Fixes**
+
+- **update** Tell a failed download from a failed install (2cccc21)
+
 ## v0.5.1 (2026-10-21)
 
 **Features**
