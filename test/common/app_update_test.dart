@@ -190,6 +190,32 @@ void main() {
     });
   });
 
+  group('buildWindowsUpdateLauncher', () {
+    test('opens the installer instead of installing silently', () {
+      final script = AppUpdateService.buildWindowsUpdateLauncher(
+        appPid: 4242,
+        setupPath: r'C:\Temp\FlClashX-update-setup.exe',
+        logPath: r'C:\Temp\FlClashX-update.log',
+      );
+
+      expect(script, contains(r"Start-Process -FilePath 'C:\Temp\"));
+      expect(script, contains(r'$appPid = 4242'));
+      // The user drives the wizard: no silent flags and no relaunch.
+      expect(script, isNot(contains('/SILENT')));
+      expect(script, isNot(contains('FlClashX.exe')));
+    });
+
+    test('quotes a path that holds a quote', () {
+      final script = AppUpdateService.buildWindowsUpdateLauncher(
+        appPid: 1,
+        setupPath: r"C:\it's\setup.exe",
+        logPath: 'C:\\log.txt',
+      );
+
+      expect(script, contains(r"'C:\it''s\setup.exe'"));
+    });
+  });
+
   group('expectedAssetName', () {
     test('matches the release builder', () {
       expect(

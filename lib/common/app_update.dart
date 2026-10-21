@@ -401,27 +401,18 @@ class AppUpdateService {
     );
     if (setup == null) return UpdateInstallResult.downloadFailed;
 
-    // The Inno Setup installer needs elevation and closes the running app, so
-    // wait for this instance, install silently (one UAC prompt) and relaunch.
-    // The script is detached, so it outlives the process that started it.
+    // The installer replaces files the running app and its helper service
+    // hold open, so it has to start after this process is gone. A detached
+    // script waits for the pid and then opens the installer for the user to
+    // run; it is not silent, and the app is not relaunched from here.
     final script = File(p.join(directory.path, 'FlClashX-update.ps1'));
-    final appExe = Platform.resolvedExecutable;
-    final escapedSetup = _psQuote(setup.path);
-    final escapedApp = _psQuote(appExe);
-    final escapedScript = _psQuote(script.path);
+    final log = File(p.join(directory.path, 'FlClashX-update.log'));
     await script.writeAsString(
-      '\$appPid = $pid\n'
-      'while (Get-Process -Id \$appPid -ErrorAction SilentlyContinue) {\n'
-      '  Start-Sleep -Milliseconds 400\n'
-      '}\n'
-      'try {\n'
-      '  Start-Process -FilePath $escapedSetup '
-      "-ArgumentList '/SILENT','/CLOSEAPPLICATIONS','/NORESTART' "
-      '-Verb RunAs -Wait -ErrorAction Stop\n'
-      '} catch {}\n'
-      'Start-Process -FilePath $escapedApp\n'
-      'Remove-Item -LiteralPath $escapedScript -Force '
-      '-ErrorAction SilentlyContinue\n',
+      buildWindowsUpdateLauncher(
+        appPid: pid,
+        setupPath: setup.path,
+        logPath: log.path,
+      ),
       flush: true,
     );
     try {
@@ -437,11 +428,60 @@ class AppUpdateService {
       return UpdateInstallResult.started;
     } catch (error) {
       commonPrint.log(
-        'update installer failed: ${compactError(error)}',
+        'update launcher failed, opening the setup directly: '
+        '${compactError(error)}',
         logLevel: LogLevel.warning,
       );
-      return UpdateInstallResult.installFailed;
+      // Without PowerShell, hand the file to the shell: `start` rises to the
+      // installer's own elevation prompt and shows its window.
+      try {
+        await Process.start('cmd.exe', [
+          '/c',
+          'start',
+          '',
+          setup.path,
+        ], mode: ProcessStartMode.detached);
+        return UpdateInstallResult.started;
+      } catch (fallbackError) {
+        commonPrint.log(
+          'update installer failed: ${compactError(fallbackError)}',
+          logLevel: LogLevel.warning,
+        );
+        return UpdateInstallResult.installFailed;
+      }
     }
+  }
+
+  /// The detached script that opens the downloaded installer once this
+  /// process has exited. It never installs silently: the user runs the wizard,
+  /// which also stops the helper service and restarts it when done.
+  @visibleForTesting
+  static String buildWindowsUpdateLauncher({
+    required int appPid,
+    required String setupPath,
+    required String logPath,
+  }) {
+    return '\$ErrorActionPreference = "Continue"\n'
+        '\$log = ${_psQuote(logPath)}\n'
+        '\$appPid = $appPid\n'
+        'try {\n'
+        '  "waiting for process \$appPid" | Out-File -FilePath \$log '
+        '-Encoding utf8\n'
+        '  \$deadline = (Get-Date).AddSeconds(30)\n'
+        '  while ((Get-Process -Id \$appPid -ErrorAction SilentlyContinue) '
+        '-and ((Get-Date) -lt \$deadline)) {\n'
+        '    Start-Sleep -Milliseconds 300\n'
+        '  }\n'
+        '  Start-Sleep -Milliseconds 600\n'
+        '  Start-Process -FilePath ${_psQuote(setupPath)}\n'
+        '  "installer started" | Out-File -FilePath \$log -Append '
+        '-Encoding utf8\n'
+        '} catch {\n'
+        '  "error: \$(\$_.Exception.Message)" | Out-File -FilePath \$log '
+        '-Append -Encoding utf8\n'
+        '}\n'
+        'Remove-Item -LiteralPath \$PSCommandPath -Force '
+        '-ErrorAction SilentlyContinue\n';
   }
 
   /// PowerShell single-quoted literal: single quotes are doubled.
