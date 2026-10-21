@@ -401,91 +401,35 @@ class AppUpdateService {
     );
     if (setup == null) return UpdateInstallResult.downloadFailed;
 
-    // The installer replaces files the running app and its helper service
-    // hold open, so it has to start after this process is gone. A detached
-    // script waits for the pid and then opens the installer for the user to
-    // run; it is not silent, and the app is not relaunched from here.
-    final script = File(p.join(directory.path, 'FlClashX-update.ps1'));
-    final log = File(p.join(directory.path, 'FlClashX-update.log'));
-    await script.writeAsString(
-      buildWindowsUpdateLauncher(
-        appPid: pid,
-        setupPath: setup.path,
-        logPath: log.path,
-      ),
-      flush: true,
-    );
+    // Hand the file to the shell and wait for that handoff to finish: `start`
+    // goes through ShellExecute, so the installer's own manifest raises the UAC
+    // prompt and its window stays up after this process is gone. The wizard
+    // stops FlClashX and FlClashXHelperService itself before replacing files,
+    // and offers to start the new build when it is done.
+    commonPrint.log('update: opening ${setup.path}');
     try {
-      await Process.start('powershell.exe', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        script.path,
-      ], mode: ProcessStartMode.detached);
+      final process = await Process.start('cmd.exe', [
+        '/c',
+        'start',
+        '',
+        setup.path,
+      ]);
+      await process.exitCode.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          process.kill();
+          return 0;
+        },
+      );
       return UpdateInstallResult.started;
     } catch (error) {
       commonPrint.log(
-        'update launcher failed, opening the setup directly: '
-        '${compactError(error)}',
+        'update installer failed: ${compactError(error)}',
         logLevel: LogLevel.warning,
       );
-      // Without PowerShell, hand the file to the shell: `start` rises to the
-      // installer's own elevation prompt and shows its window.
-      try {
-        await Process.start('cmd.exe', [
-          '/c',
-          'start',
-          '',
-          setup.path,
-        ], mode: ProcessStartMode.detached);
-        return UpdateInstallResult.started;
-      } catch (fallbackError) {
-        commonPrint.log(
-          'update installer failed: ${compactError(fallbackError)}',
-          logLevel: LogLevel.warning,
-        );
-        return UpdateInstallResult.installFailed;
-      }
+      return UpdateInstallResult.installFailed;
     }
   }
-
-  /// The detached script that opens the downloaded installer once this
-  /// process has exited. It never installs silently: the user runs the wizard,
-  /// which also stops the helper service and restarts it when done.
-  @visibleForTesting
-  static String buildWindowsUpdateLauncher({
-    required int appPid,
-    required String setupPath,
-    required String logPath,
-  }) {
-    return '\$ErrorActionPreference = "Continue"\n'
-        '\$log = ${_psQuote(logPath)}\n'
-        '\$appPid = $appPid\n'
-        'try {\n'
-        '  "waiting for process \$appPid" | Out-File -FilePath \$log '
-        '-Encoding utf8\n'
-        '  \$deadline = (Get-Date).AddSeconds(30)\n'
-        '  while ((Get-Process -Id \$appPid -ErrorAction SilentlyContinue) '
-        '-and ((Get-Date) -lt \$deadline)) {\n'
-        '    Start-Sleep -Milliseconds 300\n'
-        '  }\n'
-        '  Start-Sleep -Milliseconds 600\n'
-        '  Start-Process -FilePath ${_psQuote(setupPath)}\n'
-        '  "installer started" | Out-File -FilePath \$log -Append '
-        '-Encoding utf8\n'
-        '} catch {\n'
-        '  "error: \$(\$_.Exception.Message)" | Out-File -FilePath \$log '
-        '-Append -Encoding utf8\n'
-        '}\n'
-        'Remove-Item -LiteralPath \$PSCommandPath -Force '
-        '-ErrorAction SilentlyContinue\n';
-  }
-
-  /// PowerShell single-quoted literal: single quotes are doubled.
-  static String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
 
   // ----------------------------------------------------------------- macOS
 
