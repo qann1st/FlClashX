@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.4 (2026-10-21)
+
+**Bug Fixes**
+
+- **update** Launch the Windows installer straight from the app (f41010b)
+
 ## v0.5.3 (2026-10-21)
 
 **Bug Fixes**
