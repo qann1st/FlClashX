@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.3 (2026-10-21)
+
+**Bug Fixes**
+
+- **update** Open the downloaded installer on Windows (90016d3)
+
 ## v0.5.2 (2026-10-21)
 
 **Features**
