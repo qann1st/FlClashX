@@ -2,6 +2,24 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.5.5",
+      "tag": "v0.5.5",
+      "date": "2026-10-22",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "8138511",
+              "scope": "upstream",
+              "text": "Dashboard cards can be placed freely, glass covers panels, menus, dialogs and sheets, and the core moves to mihomo 1.19.33"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.4",
       "tag": "v0.5.4",
       "date": "2026-10-21",

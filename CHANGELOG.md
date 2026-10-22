@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.5 (2026-10-22)
+
+**Features**
+
+- **upstream** Dashboard cards can be placed freely, glass covers panels, menus, dialogs and sheets, and the core moves to mihomo 1.19.33 (8138511)
+
 ## v0.5.4 (2026-10-21)
 
 **Bug Fixes**
