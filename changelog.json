@@ -2,6 +2,24 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.5.6",
+      "tag": "v0.5.6",
+      "date": "2026-10-22",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "9cd70e6",
+              "scope": "update",
+              "text": "Stop the helper service before the Windows installer"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.5",
       "tag": "v0.5.5",
       "date": "2026-10-22",

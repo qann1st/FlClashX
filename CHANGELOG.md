@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.6 (2026-10-22)
+
+**Bug Fixes**
+
+- **update** Stop the helper service before the Windows installer (9cd70e6)
+
 ## v0.5.5 (2026-10-22)
 
 **Features**
