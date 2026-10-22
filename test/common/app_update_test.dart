@@ -190,6 +190,46 @@ void main() {
     });
   });
 
+  group('buildWindowsUpdateLauncher', () {
+    String script() => AppUpdateService.buildWindowsUpdateLauncher(
+      appPid: 4242,
+      setupPath: r'C:\Temp\FlClashX-update-setup.exe',
+      logPath: r'C:\Temp\FlClashX-update.log',
+    );
+
+    test('waits for the app, stops the helper and then opens the setup', () {
+      final launcher = script();
+      final waitForApp = launcher.indexOf(r'$appPid = 4242');
+      final stopService = launcher.indexOf(
+        'sc.exe stop "FlClashXHelperService"',
+      );
+      final queryService = launcher.indexOf('sc.exe query');
+      final startSetup = launcher.indexOf(
+        r"Start-Process -FilePath 'C:\Temp\FlClashX-update-setup.exe'",
+      );
+
+      expect(waitForApp, greaterThan(-1));
+      expect(stopService, greaterThan(waitForApp));
+      expect(queryService, greaterThan(stopService));
+      expect(startSetup, greaterThan(queryService));
+    });
+
+    test('leaves the wizard to the user', () {
+      expect(script(), isNot(contains('/SILENT')));
+      expect(script(), isNot(contains('-Verb RunAs -Wait')));
+    });
+
+    test('quotes a path that holds a quote', () {
+      final launcher = AppUpdateService.buildWindowsUpdateLauncher(
+        appPid: 1,
+        setupPath: r"C:\it's\setup.exe",
+        logPath: r'C:\log.txt',
+      );
+
+      expect(launcher, contains(r"'C:\it''s\setup.exe'"));
+    });
+  });
+
   group('expectedAssetName', () {
     test('matches the release builder', () {
       expect(

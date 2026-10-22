@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/print.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/app.dart';
@@ -401,35 +402,120 @@ class AppUpdateService {
     );
     if (setup == null) return UpdateInstallResult.downloadFailed;
 
-    // Hand the file to the shell and wait for that handoff to finish: `start`
-    // goes through ShellExecute, so the installer's own manifest raises the UAC
-    // prompt and its window stays up after this process is gone. The wizard
-    // stops FlClashX and FlClashXHelperService itself before replacing files,
-    // and offers to start the new build when it is done.
-    commonPrint.log('update: opening ${setup.path}');
+    // The helper service holds the core executable open and the wizard's own
+    // `taskkill` only makes the service manager restart it through its failure
+    // actions, which is what the "file in use" prompt comes from. Stop it first:
+    // an elevated launcher waits for this process to exit, stops the service
+    // through the service manager, and only then opens the installer.
+    final script = File(p.join(directory.path, 'FlClashX-update.ps1'));
+    final log = File(p.join(directory.path, 'FlClashX-update.log'));
+    await script.writeAsString(
+      buildWindowsUpdateLauncher(
+        appPid: pid,
+        setupPath: setup.path,
+        logPath: log.path,
+      ),
+      flush: true,
+    );
+    commonPrint.log('update: stopping the helper service, then ${setup.path}');
+    final elevate =
+        'try { Start-Process -FilePath \'powershell.exe\' -Verb RunAs '
+        '-WindowStyle Hidden -ArgumentList '
+        '@(\'-NoProfile\',\'-ExecutionPolicy\',\'Bypass\',\'-File\','
+        '${_psQuote(script.path)}) } catch { exit 1 }';
     try {
-      final process = await Process.start('cmd.exe', [
-        '/c',
-        'start',
-        '',
-        setup.path,
+      final launcher = await Process.start('powershell.exe', [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        elevate,
       ]);
-      await process.exitCode.timeout(
-        const Duration(seconds: 15),
+      final exitCode = await launcher.exitCode.timeout(
+        const Duration(minutes: 2),
         onTimeout: () {
-          process.kill();
-          return 0;
+          launcher.kill();
+          return 1;
         },
       );
-      return UpdateInstallResult.started;
-    } catch (error) {
+      if (exitCode == 0) return UpdateInstallResult.started;
+      // A declined elevation prompt lands here: the installer never started.
       commonPrint.log(
-        'update installer failed: ${compactError(error)}',
+        'update launcher exited with $exitCode; elevation was not granted',
         logLevel: LogLevel.warning,
       );
       return UpdateInstallResult.installFailed;
+    } catch (error) {
+      commonPrint.log(
+        'update launcher failed, opening the setup directly: '
+        '${compactError(error)}',
+        logLevel: LogLevel.warning,
+      );
+      try {
+        final process = await Process.start('cmd.exe', [
+          '/c',
+          'start',
+          '',
+          setup.path,
+        ]);
+        await process.exitCode.timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            process.kill();
+            return 0;
+          },
+        );
+        return UpdateInstallResult.started;
+      } catch (fallbackError) {
+        commonPrint.log(
+          'update installer failed: ${compactError(fallbackError)}',
+          logLevel: LogLevel.warning,
+        );
+        return UpdateInstallResult.installFailed;
+      }
     }
   }
+
+  /// The elevated script that runs once this process has exited: it stops the
+  /// helper service through the service manager and only then opens the
+  /// installer, so the wizard never finds a locked core executable.
+  @visibleForTesting
+  static String buildWindowsUpdateLauncher({
+    required int appPid,
+    required String setupPath,
+    required String logPath,
+  }) {
+    const pipe = 'RUNNING|STOP_PENDING|START_PENDING';
+    return '\$ErrorActionPreference = "Continue"\n'
+        '\$log = ${_psQuote(logPath)}\n'
+        'function Write-Log([string] \$text) {\n'
+        '  "\$(Get-Date -Format o) \$text" | Out-File -FilePath \$log '
+        '-Append -Encoding utf8\n'
+        '}\n'
+        'Write-Log "elevated launcher started"\n'
+        '\$appPid = $appPid\n'
+        '\$deadline = (Get-Date).AddSeconds(30)\n'
+        'while ((Get-Process -Id \$appPid -ErrorAction SilentlyContinue) '
+        '-and ((Get-Date) -lt \$deadline)) {\n'
+        '  Start-Sleep -Milliseconds 300\n'
+        '}\n'
+        'Write-Log "app exited"\n'
+        '& sc.exe stop "$appHelperService" | Out-Null\n'
+        '\$deadline = (Get-Date).AddSeconds(20)\n'
+        'while ((Get-Date) -lt \$deadline) {\n'
+        '  \$state = (& sc.exe query "$appHelperService" | Out-String)\n'
+        '  if (\$state -notmatch \'$pipe\') { break }\n'
+        '  Start-Sleep -Milliseconds 300\n'
+        '}\n'
+        'Write-Log "helper service stopped"\n'
+        'Start-Process -FilePath ${_psQuote(setupPath)}\n'
+        'Write-Log "installer started"\n'
+        'Remove-Item -LiteralPath \$PSCommandPath -Force '
+        '-ErrorAction SilentlyContinue\n';
+  }
+
+  /// PowerShell single-quoted literal: single quotes are doubled.
+  static String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
 
   // ----------------------------------------------------------------- macOS
 
