@@ -236,7 +236,7 @@ final class TrayDelaysProvider
   }
 }
 
-String _$trayDelaysHash() => r'266ed418b13319a7fcc6a3d8307b6786f6ce89bf';
+String _$trayDelaysHash() => r'7c9adee59f0939e8462a825522e400fb6b53339e';
 
 @ProviderFor(trayTitleState)
 final trayTitleStateProvider = TrayTitleStateProvider._();
@@ -514,7 +514,7 @@ final class VpnOptionsProvider
   }
 }
 
-String _$vpnOptionsHash() => r'220be0f5e1a3eb116ff8c27af55676d2305b53bd';
+String _$vpnOptionsHash() => r'77d917623fd452e04688752b33b11a192136905e';
 
 @ProviderFor(AccessControlState)
 final accessControlStateProvider = AccessControlStateProvider._();
@@ -3765,6 +3765,89 @@ final class PanelBackdropImageProvider
 
 String _$panelBackdropImageHash() =>
     r'4f9a56161af7a418e1f91265f4c1b6408cf47069';
+
+/// Where the panel's logo lies on disk, kept as its backdrop is so it shows
+/// at launch without the network.
+
+@ProviderFor(panelLogoPath)
+final panelLogoPathProvider = PanelLogoPathFamily._();
+
+/// Where the panel's logo lies on disk, kept as its backdrop is so it shows
+/// at launch without the network.
+
+final class PanelLogoPathProvider
+    extends $FunctionalProvider<AsyncValue<String?>, String?, FutureOr<String?>>
+    with $FutureModifier<String?>, $FutureProvider<String?> {
+  /// Where the panel's logo lies on disk, kept as its backdrop is so it shows
+  /// at launch without the network.
+  PanelLogoPathProvider._({
+    required PanelLogoPathFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'panelLogoPathProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$panelLogoPathHash();
+
+  @override
+  String toString() {
+    return r'panelLogoPathProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<String?> create(Ref ref) {
+    final argument = this.argument as String;
+    return panelLogoPath(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is PanelLogoPathProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$panelLogoPathHash() => r'f0abc719953a175b52c83a760a19270e036f16a9';
+
+/// Where the panel's logo lies on disk, kept as its backdrop is so it shows
+/// at launch without the network.
+
+final class PanelLogoPathFamily extends $Family
+    with $FunctionalFamilyOverride<FutureOr<String?>, String> {
+  PanelLogoPathFamily._()
+    : super(
+        retry: null,
+        name: r'panelLogoPathProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Where the panel's logo lies on disk, kept as its backdrop is so it shows
+  /// at launch without the network.
+
+  PanelLogoPathProvider call(String url) =>
+      PanelLogoPathProvider._(argument: url, from: this);
+
+  @override
+  String toString() => r'panelLogoPathProvider';
+}
 
 @ProviderFor(widgetEditingDenied)
 final widgetEditingDeniedProvider = WidgetEditingDeniedProvider._();

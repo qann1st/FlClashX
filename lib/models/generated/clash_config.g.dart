@@ -265,6 +265,16 @@ _Tun _$TunFromJson(Map<String, dynamic> json) => _Tun(
           ?.map((e) => e as String)
           .toList() ??
       const [],
+  includePackage:
+      (json['include-package'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      const [],
+  excludePackage:
+      (json['exclude-package'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      const [],
 );
 
 Map<String, dynamic> _$TunToJson(_Tun instance) => <String, dynamic>{
@@ -275,6 +285,8 @@ Map<String, dynamic> _$TunToJson(_Tun instance) => <String, dynamic>{
   'mtu': instance.mtu,
   'congestion-controller': instance.congestionController,
   'route-exclude-address': instance.routeExcludeAddress,
+  'include-package': instance.includePackage,
+  'exclude-package': instance.excludePackage,
 };
 
 const _$TunStackEnumMap = {

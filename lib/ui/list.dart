@@ -5,6 +5,7 @@ import 'package:fl_clash/common/input_limits.dart';
 import 'package:fl_clash/ui/context.dart';
 import 'package:fl_clash/ui/dialog.dart';
 import 'package:fl_clash/ui/focus.dart';
+import 'package:fl_clash/ui/frosted_surface.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/inherited.dart';
 import 'package:fl_clash/ui/input.dart';
@@ -591,9 +592,11 @@ Widget generateSection({
     children: [
       if (items.isNotEmpty && title != null)
         ListHeader(title: title, actions: actions),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [...genItems],
+      FrostedGroup(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [...genItems],
+        ),
       ),
       if (items.isNotEmpty && footer != null) ListFooter(text: footer),
     ],

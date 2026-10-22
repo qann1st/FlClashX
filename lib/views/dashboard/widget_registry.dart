@@ -65,23 +65,23 @@ extension DashboardWidgetView on DashboardWidget {
 
   /// The status card holds the start button, which has nowhere else to go,
   /// and the announcement comes and goes with the subscription.
-  bool get pinned =>
-      this == DashboardWidget.currentOutbound ||
-      this == DashboardWidget.announcement;
-
-  bool get removable => !pinned;
+  bool get removable =>
+      this != DashboardWidget.currentOutbound &&
+      this != DashboardWidget.announcement;
 }
 
-/// The pinned cards in their fixed order ahead of the saved ones, the
-/// announcement only while the subscription sends one.
-List<DashboardWidget> pinnedFirst(
-  Iterable<DashboardWidget> saved, {
+/// The saved cards with the status card and, while the subscription sends
+/// one, the announcement; a card the list never placed goes on top.
+List<DashboardWidget> withFixedCards(
+  List<DashboardWidget> saved, {
   required bool announcement,
 }) {
   return [
-    if (announcement) DashboardWidget.announcement,
-    DashboardWidget.currentOutbound,
+    if (announcement && !saved.contains(DashboardWidget.announcement))
+      DashboardWidget.announcement,
+    if (!saved.contains(DashboardWidget.currentOutbound))
+      DashboardWidget.currentOutbound,
     for (final card in saved)
-      if (!card.pinned) card,
+      if (announcement || card != DashboardWidget.announcement) card,
   ];
 }

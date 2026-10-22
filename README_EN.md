@@ -65,7 +65,7 @@ The app reads the HTTP headers of the response that serves the subscription and 
 <details>
 <summary><strong>What the app sends</strong></summary>
 
-Every subscription download goes with `User-Agent: FlClashX/v<version> core/v<mihomo> Platform/<os>`, e.g. `FlClashX/v0.5.0 core/v1.19.32 Platform/android`.
+Every subscription download goes with `User-Agent: FlClashX/v<version> core/v<mihomo> Platform/<os>`, e.g. `FlClashX/v0.5.0 core/v1.19.33 Platform/android`.
 
 When "Send HWID" is on for the profile (on by default), these are added:
 
@@ -111,7 +111,7 @@ The header of the extended dashboard (`app.board:extended` in `flclashx-view`):
 | Header | Format | Effect |
 |---|---|---|
 | `flclashx-servicename` | text or base64 | Service name in the header; title of the expiry notifications |
-| `flclashx-servicelogo` | image URL (SVG supported), may be base64 of the URL | Logo in the header |
+| `flclashx-servicelogo` | image URL (SVG supported), may be base64 of the URL | Logo in the header, downloaded once into the disk cache |
 | `flclashx-serverinfo` | proxy group name, text or base64 | Group whose selected server is shown on the server panel with flag and IP |
 
 ```http
@@ -142,7 +142,7 @@ flclashx-buytraffic: https://my.myvpn.example/traffic,10
 
 `currentOutbound`, `announcement`, `networkSpeed`, `outboundMode`, `vpnButton` (Android only), `networkTakeover` (desktop only), `serviceStatus`, `profiles`, `proxyGroups`, `connectionStats`, `intranetIp`, `memoryInfo`.
 
-The status card is always shown; the announcement appears by itself while the panel sends `announce`.
+The status card is always shown; the announcement appears by itself while the panel sends `announce`. Neither can be removed, but both can go anywhere: named in the header or dragged in the editor. Left out of the list, they go on top.
 
 ```http
 flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
@@ -181,7 +181,7 @@ App look, prefix `app.` required:
 | `app.board` | `extended` (extended dashboard with logo, plan and server), `standard` |
 | `app.navbar` | `floating`, `docked` |
 | `app.tabs` | `slide`, `fade` |
-| `app.glass` | `none`, `standard`, `ultra` |
+| `app.glass` | `none`, `standard`, `ultra` (glass on bars, menus, dialogs, sheets and dashboard cards; sheets and cards let 40% of the backdrop through, blurred, in `standard` and 55% in `ultra`) |
 | `app.color` | `RRGGBB` or `AARRGGBB`, with or without `#`; becomes the primary colour and joins the palette |
 | `app.style` | `vivid`, `tinted`, `soft`, `monochrome` |
 | `app.black` | `true`, `false` (pure black background in the dark theme) |

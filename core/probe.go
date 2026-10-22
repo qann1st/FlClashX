@@ -186,6 +186,10 @@ type probeRequest struct {
 	// A followed redirect loses the Location that Netflix names its region in.
 	noRedirect bool
 
+	// Russian state and bank sites chain to a root the system stores lack;
+	// a check that only asks whether they answer trusts their certificate.
+	insecure bool
+
 	// until sees the latest chunk and probeScanOverlap bytes before it.
 	until func(tail string) bool
 }
@@ -222,6 +226,7 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	if err != nil {
 		return fail(err)
 	}
+	tlsConfig.InsecureSkipVerify = req.insecure
 
 	timeout := req.timeout
 	if timeout <= 0 {

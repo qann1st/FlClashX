@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:fl_clash/common/cidr.dart';
 import 'package:fl_clash/enum/enum.dart';
 
 import 'clash_config.dart';
@@ -6,6 +7,7 @@ import 'clash_config.dart';
 /// [current] with the keys below taken from [config], the decoded profile,
 /// where [present] names them, and reset to the app default where it does
 /// not; `mode` and `tun.enable` are only ever set, never reset.
+/// The tun's app and route lists feed Android's VPN, not the core.
 PatchClashConfig syncProfileSettings(
   PatchClashConfig current,
   Map<String, dynamic> config,
@@ -42,6 +44,10 @@ PatchClashConfig syncProfileSettings(
     tun: current.tun.copyWith(
       device: defaults.tun.device,
       stack: defaults.tun.stack,
+      includePackage: defaults.tun.includePackage,
+      excludePackage: defaults.tun.excludePackage,
+      routeAddress: defaults.tun.routeAddress,
+      routeExcludeAddress: defaults.tun.routeExcludeAddress,
     ),
   );
   T? read<T>(String key) {
@@ -132,6 +138,10 @@ PatchClashConfig syncProfileSettings(
       },
     );
   }
+  List<String>? strings(String key, bool Function(String) valid) => read<List>(
+    key,
+  )?.whereType<String>().map((item) => item.trim()).where(valid).toList();
+
   final tunDevice = read<String>('tun.device');
   next = next.copyWith(
     tun: next.tun.copyWith(
@@ -140,6 +150,17 @@ PatchClashConfig syncProfileSettings(
           ? next.tun.device
           : tunDevice,
       stack: enumNamed('tun.stack', TunStack.values) ?? next.tun.stack,
+      includePackage:
+          strings('tun.include-package', (name) => name.isNotEmpty) ??
+          next.tun.includePackage,
+      excludePackage:
+          strings('tun.exclude-package', (name) => name.isNotEmpty) ??
+          next.tun.excludePackage,
+      routeAddress:
+          strings('tun.route-address', isCidr) ?? next.tun.routeAddress,
+      routeExcludeAddress:
+          strings('tun.route-exclude-address', isCidr) ??
+          next.tun.routeExcludeAddress,
     ),
   );
   return next;

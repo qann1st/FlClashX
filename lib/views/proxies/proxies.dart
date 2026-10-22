@@ -149,32 +149,35 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       ],
       ?primaryAction,
     ];
-    return CommonScaffold(
-      isLoading: isLoading,
-      resizeToAvoidBottomInset: false,
-      // The picker sheet keeps the bar it had, close last.
-      primaryAction: picker ? primaryAction : null,
-      groupActions: !picker,
-      searchActions: [?primaryAction],
-      iconActions: [
-        if (!picker) ...barActions,
-        if (_isTab && !picker)
-          IconButtonData(
-            glyph: AppGlyphs.locate,
-            onPressed: () {
-              _proxiesTabKey.currentState?.scrollToGroupSelected();
-            },
-            tooltip: context.appLocalizations.scrollToSelected,
-          ),
-        if (!_isTab && !picker) _buildFoldAllAction(),
-      ],
-      menuItems: picker ? const [] : _buildMenuItems(context),
-      title: context.appLocalizations.proxies,
-      searchState: AppBarSearchState(onSearch: _onSearch),
-      body: switch (proxiesType) {
-        ProxiesType.tab => _tabView,
-        ProxiesType.list => const ProxiesListView(),
-      },
+    return LiquidGlassScope(
+      enabled: false,
+      child: CommonScaffold(
+        isLoading: isLoading,
+        resizeToAvoidBottomInset: false,
+        // The picker sheet keeps the bar it had, close last.
+        primaryAction: picker ? primaryAction : null,
+        groupActions: !picker,
+        searchActions: [?primaryAction],
+        iconActions: [
+          if (!picker) ...barActions,
+          if (_isTab && !picker)
+            IconButtonData(
+              glyph: AppGlyphs.locate,
+              onPressed: () {
+                _proxiesTabKey.currentState?.scrollToGroupSelected();
+              },
+              tooltip: context.appLocalizations.scrollToSelected,
+            ),
+          if (!_isTab && !picker) _buildFoldAllAction(),
+        ],
+        menuItems: picker ? const [] : _buildMenuItems(context),
+        title: context.appLocalizations.proxies,
+        searchState: AppBarSearchState(onSearch: _onSearch),
+        body: switch (proxiesType) {
+          ProxiesType.tab => _tabView,
+          ProxiesType.list => const ProxiesListView(),
+        },
+      ),
     );
   }
 }

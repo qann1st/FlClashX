@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:collection/collection.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/service_probe.dart' show routedOutbound;
@@ -147,13 +149,13 @@ class _EmptyHero extends StatelessWidget {
 }
 
 /// The panel's logo, png or svg, else the app's own icon.
-class _ServiceLogo extends StatelessWidget {
+class _ServiceLogo extends ConsumerWidget {
   const _ServiceLogo({this.url});
 
   final String? url;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final url = this.url;
     final fallback = Image.asset(
       'assets/images/icon.png',
@@ -161,18 +163,21 @@ class _ServiceLogo extends StatelessWidget {
       height: _logoSize,
       fit: BoxFit.cover,
     );
-    final Widget logo = url == null
+    final path = url == null
+        ? null
+        : ref.watch(panelLogoPathProvider(url)).value;
+    final Widget logo = url == null || path == null
         ? fallback
         : url.toLowerCase().endsWith('.svg')
-        ? SvgPicture.network(
-            url,
+        ? SvgPicture.file(
+            File(path),
             width: _logoSize,
             height: _logoSize,
             fit: BoxFit.cover,
             placeholderBuilder: (_) => fallback,
           )
-        : Image.network(
-            url,
+        : Image.file(
+            File(path),
             width: _logoSize,
             height: _logoSize,
             fit: BoxFit.cover,
@@ -276,6 +281,7 @@ class _ServerPanel extends ConsumerWidget {
             routedOutbound,
           ])
         : null;
+    void changeServer() => showProxiesSheet(context, groupName: groupName);
     final swap = groups.isEmpty
         ? null
         : SizedBox(
@@ -283,7 +289,7 @@ class _ServerPanel extends ConsumerWidget {
             child: DashboardIconButton(
               glyph: AppGlyphs.swap,
               tooltip: appLocalizations.changeServer,
-              onPressed: () => showProxiesSheet(context, groupName: groupName),
+              onPressed: changeServer,
             ),
           );
     return DashboardCard(
@@ -325,23 +331,32 @@ class _ServerPanel extends ConsumerWidget {
             ),
           ),
           if (serverName.isNotEmpty)
-            SizedBox(
-              width: 52,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _SignalBars(delay: delay),
-                  if (delay != null && delay > 0)
-                    Text(
-                      '$delay ms',
-                      maxLines: 1,
-                      style: DashboardText.figure(
-                        context,
-                        AppTextStyle.caption1,
-                        color: colorScheme.delayColor(delay) ?? colors.thumb,
-                      ),
-                    ),
-                ],
+            Tooltip(
+              message: appLocalizations.changeServer,
+              child: InkWell(
+                mouseCursor: clickableCursor,
+                onTap: groups.isEmpty ? null : changeServer,
+                customBorder: AppShape.xs,
+                child: SizedBox(
+                  width: 52,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _SignalBars(delay: delay),
+                      if (delay != null && delay > 0)
+                        Text(
+                          '$delay ms',
+                          maxLines: 1,
+                          style: DashboardText.figure(
+                            context,
+                            AppTextStyle.caption1,
+                            color:
+                                colorScheme.delayColor(delay) ?? colors.thumb,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
         ],

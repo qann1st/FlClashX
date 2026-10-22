@@ -5,6 +5,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/views/proxies/card.dart';
 import 'package:fl_clash/views/proxies/list.dart';
+import 'package:fl_clash/views/proxies/proxies.dart';
 import 'package:fl_clash/widgets/widgets.dart' hide ListHeader;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,6 +43,7 @@ void main() {
     List<Group>? groups,
     Set<String> unfoldSet = const {'G0', 'G1', 'G2'},
     ValueListenable<Brightness>? brightness,
+    Widget list = const ProxiesListView(),
   }) async {
     tester.view.physicalSize = const Size(900, 700);
     tester.view.devicePixelRatio = 1;
@@ -82,7 +84,7 @@ void main() {
             ),
           ),
           child: brightness == null
-              ? const ProxiesListView()
+              ? list
               : ValueListenableBuilder(
                   valueListenable: brightness,
                   builder: (_, brightness, child) => Theme(
@@ -236,12 +238,37 @@ void main() {
     expect(surfaceOf(tester, 'G0').shadows, isNull);
   });
 
-  testWidgets('a folded pinned header takes the page color of a new theme', (
-    tester,
-  ) async {
+  testWidgets('the proxies page draws no glass with glass on', (tester) async {
+    await pumpList(
+      tester,
+      list: const LiquidGlassScope(enabled: true, child: ProxiesView()),
+    );
+
+    expect(find.byType(ProxiesListView), findsOneWidget);
+    expect(find.byType(LiquidGlass), findsNothing);
+  });
+
+  testWidgets('a header covers nothing at rest, so no square shows behind '
+      'its corners', (tester) async {
+    await pumpList(tester, unfoldSet: const {});
+
+    final header = find.ancestor(
+      of: headerOf('G0'),
+      matching: find.byType(PinnedHeaderSliver),
+    );
+    expect(
+      find.descendant(of: header, matching: find.byType(ColoredBox)),
+      findsNothing,
+    );
+  });
+
+  testWidgets('a pinned header over its rows takes the page color of a new '
+      'theme', (tester) async {
     final brightness = ValueNotifier(Brightness.light);
     addTearDown(brightness.dispose);
-    await pumpList(tester, unfoldSet: const {}, brightness: brightness);
+    await pumpList(tester, brightness: brightness);
+    tester.state<ScrollableState>(scrollable()).position.jumpTo(200);
+    await tester.pump();
 
     brightness.value = Brightness.dark;
     await tester.pumpAndSettle();

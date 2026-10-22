@@ -65,7 +65,7 @@
 <details>
 <summary><strong>Что приложение отправляет</strong></summary>
 
-Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/v<mihomo> Platform/<ос>`, например `FlClashX/v0.5.0 core/v1.19.32 Platform/android`.
+Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/v<mihomo> Platform/<ос>`, например `FlClashX/v0.5.0 core/v1.19.33 Platform/android`.
 
 Если у профиля включено «Отправлять HWID» (по умолчанию включено), добавляются:
 
@@ -111,7 +111,7 @@ flclashx-newdomain: sub2.myvpn.example, https://sub3.myvpn.example:8443
 | Заголовок | Формат | Что делает |
 |---|---|---|
 | `flclashx-servicename` | текст или base64 | Название сервиса в шапке; заголовок уведомлений об окончании подписки |
-| `flclashx-servicelogo` | URL картинки (SVG поддерживается), можно base64 от URL | Логотип в шапке |
+| `flclashx-servicelogo` | URL картинки (SVG поддерживается), можно base64 от URL | Логотип в шапке, качается один раз в дисковый кэш |
 | `flclashx-serverinfo` | имя группы прокси, текст или base64 | Группа, чей выбранный сервер показывается на панели сервера с флагом и IP |
 
 ```http
@@ -142,7 +142,7 @@ flclashx-buytraffic: https://my.myvpn.example/traffic,10
 
 `currentOutbound`, `announcement`, `networkSpeed`, `outboundMode`, `vpnButton` (только Android), `networkTakeover` (только десктоп), `serviceStatus`, `profiles`, `proxyGroups`, `connectionStats`, `intranetIp`, `memoryInfo`.
 
-Карточка статуса показывается всегда, объявление появляется само, пока панель шлёт `announce`.
+Карточка статуса показывается всегда, объявление появляется само, пока панель шлёт `announce`. Убрать их нельзя, но можно поставить на любое место: по имени в заголовке или перетаскиванием в редакторе. Не названные в списке, они встают наверх.
 
 ```http
 flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
@@ -181,7 +181,7 @@ flclashx-background: https://cdn.myvpn.example/bg.jpg,25
 | `app.board` | `extended` (расширенный дашборд с логотипом, планом и сервером), `standard` |
 | `app.navbar` | `floating`, `docked` |
 | `app.tabs` | `slide`, `fade` |
-| `app.glass` | `none`, `standard`, `ultra` |
+| `app.glass` | `none`, `standard`, `ultra` (стекло на панелях, меню, диалогах, шторках и карточках главной; шторки и карточки пропускают 40 % фона с блюром в `standard` и 55 % в `ultra`) |
 | `app.color` | `RRGGBB` или `AARRGGBB`, с `#` или без; становится основным цветом и добавляется в палитру |
 | `app.style` | `vivid`, `tinted`, `soft`, `monochrome` |
 | `app.black` | `true`, `false` (чистый чёрный фон в тёмной теме) |

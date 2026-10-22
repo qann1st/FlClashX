@@ -565,13 +565,16 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                Positioned(
-                  top: -cover,
-                  left: 0,
-                  right: 0,
-                  height: cover + listHeaderHeight / 2,
-                  child: ColoredBox(color: pageColor),
-                ),
+                // At rest nothing lies under it, and a cover would show square
+                // behind its corners over a translucent page.
+                if (floating > 0)
+                  Positioned(
+                    top: -cover,
+                    left: 0,
+                    right: 0,
+                    height: cover + listHeaderHeight / 2,
+                    child: ColoredBox(color: pageColor),
+                  ),
                 buildHeader(floating: floating, lift: lift),
               ],
             ),

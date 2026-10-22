@@ -290,6 +290,46 @@ void main() {
     expect(children.map((item) => item['label']), contains('A'));
   });
 
+  test('a group of thousands lists the first hundred and offers the rest '
+      'in the app', () async {
+    await update(
+      _trayState(
+        groups: [
+          Group(
+            name: 'Big',
+            type: GroupType.Selector,
+            all: [
+              for (var i = 0; i < 2000; i++) Proxy(name: 'P$i', type: 'Direct'),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final submenu = _items(
+      showCall(),
+    ).firstWhere((item) => item['type'] == 'submenu');
+    final children = (submenu['items'] as List).cast<Map<Object?, Object?>>();
+    final proxies = children.where((item) => item['type'] == 'checkbox');
+    expect(proxies, hasLength(trayProxyLimit));
+    expect(children.last['label'], 'More (1900)…');
+  });
+
+  test('a pick beyond the hundred takes the last place', () {
+    final group = Group(
+      name: 'Big',
+      type: GroupType.Selector,
+      all: [for (var i = 0; i < 300; i++) Proxy(name: 'P$i', type: 'Direct')],
+    );
+
+    final shown = group.trayProxies('P250');
+
+    expect(shown, hasLength(trayProxyLimit));
+    expect(shown.first.name, 'P0');
+    expect(shown.last.name, 'P250');
+    expect(group.trayProxies('P5').last.name, 'P99');
+  });
+
   test('shows each bound hotkey dimmed beside its entry', () async {
     await update(
       _trayState(

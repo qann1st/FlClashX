@@ -357,6 +357,18 @@ void main() {
       ]);
     });
 
+    test('keeps a FlClashX 0.4 config without the hero flag on the standard '
+        'page', () async {
+      final data = await migrateLegacyConfig(
+        configMap: legacyConfig(profiles: const []),
+        sourcePath: source.path,
+        targetPath: target.path,
+      );
+
+      final config = Config.realFromJson(data.configMap);
+      expect(config.themeProps.style, ThemeStyle.original);
+    });
+
     test('links added rules to the profile that declared them', () async {
       writeFile(join(source.path, 'profiles', 'p1.yaml'), '');
 

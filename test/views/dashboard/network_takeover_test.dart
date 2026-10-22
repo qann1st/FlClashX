@@ -132,7 +132,15 @@ void main() {
     );
     final tun = switchOf(_rowCases[1]);
 
-    expect(find.byType(LiquidGlass), findsNothing);
+    // Only the card's own frost is glass, not the controls on it.
+    expect(
+      find.descendant(
+        of: find.byType(LiquidGlass),
+        matching: find.byType(LiquidGlass),
+      ),
+      findsNothing,
+    );
+    expect(find.byType(LiquidGlass), findsOneWidget);
 
     final press = find.ancestor(of: tun, matching: find.byType(ElasticPress));
     final gesture = await tester.startGesture(tester.getCenter(tun));

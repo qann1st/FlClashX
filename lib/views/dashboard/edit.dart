@@ -100,23 +100,25 @@ class _DashboardEditorState extends ConsumerState<DashboardEditor>
         .read(appSettingProvider.notifier)
         .update(
           (state) => state.copyWith(
-            dashboardWidgets: _keepingOtherPlatforms(
-              state.dashboardWidgets,
-              shown,
-            ),
+            dashboardWidgets: _keepingHidden(state.dashboardWidgets, shown),
           ),
         );
   }
 
-  /// Cards this platform cannot show stay where they were among the rest.
-  List<DashboardWidget> _keepingOtherPlatforms(
+  /// Cards not shown here, for another platform or an announcement the
+  /// subscription stopped sending, stay where they were among the rest.
+  List<DashboardWidget> _keepingHidden(
     List<DashboardWidget> saved,
     List<DashboardWidget> shown,
   ) {
     final result = [...shown];
     var at = 0;
     for (final card in saved) {
-      if (card.platforms.contains(widget.platform)) {
+      final hidden =
+          !card.platforms.contains(widget.platform) ||
+          card == DashboardWidget.announcement &&
+              !widget.widgets.contains(card);
+      if (!hidden) {
         final index = result.indexOf(card);
         if (index != -1) at = index + 1;
       } else {
@@ -141,14 +143,8 @@ class _DashboardEditorState extends ConsumerState<DashboardEditor>
     _save();
   }
 
-  int get _pinnedCount => _cards.where((card) => card.pinned).length;
-
   void _reorder(int from, int to) {
-    final floor = _pinnedCount;
-    if (from < floor) {
-      return;
-    }
-    setState(() => _cards = _cards.copyAndReorder(from, math.max(to, floor)));
+    setState(() => _cards = _cards.copyAndReorder(from, to));
     _save();
   }
 
@@ -165,7 +161,7 @@ class _DashboardEditorState extends ConsumerState<DashboardEditor>
     final shown = _shown;
     final addable = [
       for (final card in DashboardWidget.values)
-        if (!card.pinned &&
+        if (card.removable &&
             card.platforms.contains(widget.platform) &&
             !shown.contains(card))
           card,
@@ -207,7 +203,7 @@ class _DashboardEditorState extends ConsumerState<DashboardEditor>
                       cardKey: widget.cardKeyOf(card),
                       index: index,
                       dragsAtOnce: dragsAtOnce,
-                      sway: card.pinned ? null : sway,
+                      sway: sway,
                       onRemove: card.removable ? () => _remove(card) : null,
                     ),
                   ),
@@ -440,9 +436,7 @@ class _EditableCard extends StatelessWidget {
     final content = Stack(
       fit: StackFit.passthrough,
       children: [
-        if (item.pinned)
-          card
-        else if (dragsAtOnce)
+        if (dragsAtOnce)
           ReorderableDragStartListener(index: index, child: card)
         else
           ReorderableDelayedDragStartListener(index: index, child: card),

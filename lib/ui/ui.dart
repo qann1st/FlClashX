@@ -22,6 +22,7 @@ export 'flag.dart';
 export 'focus.dart';
 export 'font.dart';
 export 'form_sheet.dart';
+export 'frosted_surface.dart';
 export 'inherited.dart';
 export 'input.dart';
 export 'item_position.dart';

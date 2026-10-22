@@ -134,7 +134,15 @@ void main() {
       tester.element(find.byType(OutboundModeCard)),
     ).colorScheme;
 
-    expect(find.byType(LiquidGlass), findsNothing);
+    // Only the card's own frost is glass, not the controls on it.
+    expect(
+      find.descendant(
+        of: find.byType(LiquidGlass),
+        matching: find.byType(LiquidGlass),
+      ),
+      findsNothing,
+    );
+    expect(find.byType(LiquidGlass), findsOneWidget);
     expect(decorationOf(tester, Mode.rule).color, colorScheme.primary);
   });
 

@@ -112,8 +112,11 @@ Map<String, Map<String, int>> trayDelays(Ref ref) {
   final delays = <String, Map<String, int>>{};
   for (final group in groups) {
     final testUrl = group.testUrl.takeFirstValid([defaultTestUrl]);
+    final selected = allGroups
+        .getGroup(group.name)
+        ?.getCurrentSelectedName(selectedMap[group.name] ?? '');
     final groupDelays = <String, int>{};
-    for (final proxy in group.all) {
+    for (final proxy in group.trayProxies(selected)) {
       final delay = computeProxyDelayState(
         proxyName: proxy.name,
         testUrl: testUrl,
@@ -176,8 +179,10 @@ SharedState sharedState(Ref ref) {
   ref.watch(loadedLocaleProvider);
   final currentProfile = ref.watch(
     currentProfileProvider.select(
+      // A panel's profile label is often the user's name; the VPN
+      // notification is titled with the service, as the expiry notice is.
       (state) => CurrentProfileSelectorState(
-        label: state?.label ?? '',
+        label: state?.headers.serviceName ?? state?.label ?? '',
         selectedMap: state?.selectedMap ?? {},
       ),
     ),
@@ -262,7 +267,10 @@ Future<VpnOptions> vpnOptions(Ref ref) async {
     port: clashConfig.mixedPort,
     ipv6: vpnSetting.ipv6,
     dnsHijacking: vpnSetting.dnsHijacking,
-    accessControlProps: vpnSetting.accessControlProps,
+    accessControlProps: vpnSetting.accessControlProps.withPackages(
+      include: tun.includePackage,
+      exclude: tun.excludePackage,
+    ),
     allowBypass: vpnSetting.allowBypass,
     bypassDomain: networkSetting.bypassDomain,
     routeAddress: await routeAddress,

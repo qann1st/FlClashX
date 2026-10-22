@@ -38,4 +38,31 @@ void main() {
     expect(kept.logLevel, LogLevel.warning);
     expect(kept.allowLan, isTrue);
   });
+
+  test('owned route lists survive a sync that brings others', () {
+    const mine = PatchClashConfig(
+      tun: Tun(
+        routeAddress: ['10.0.0.0/8'],
+        routeExcludeAddress: ['192.168.0.0/16'],
+      ),
+    );
+    const theirs = PatchClashConfig(
+      tun: Tun(
+        routeAddress: ['0.0.0.0/1'],
+        routeExcludeAddress: ['172.16.0.0/12'],
+      ),
+    );
+
+    final kept = keepOwnedSettings(mine, theirs, {
+      'clash.tun.route-address',
+      'clash.tun.route-exclude-address',
+    });
+
+    expect(kept.tun.routeAddress, ['10.0.0.0/8']);
+    expect(kept.tun.routeExcludeAddress, ['192.168.0.0/16']);
+    expect(
+      managedClashKeysOf(['tun.route-address', 'tun.route-exclude-address']),
+      {'clash.tun.route-address', 'clash.tun.route-exclude-address'},
+    );
+  });
 }

@@ -259,15 +259,18 @@ class RouteAddressItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, ref) {
-    return ConfigListEditItem(
-      title: (l) => l.routeAddress,
-      itemMaxLength: TextInputLimits.cidr,
-      itemValidator: validateCidr,
-      selector: patchClashConfigProvider.select(
-        (state) => state.tun.routeAddress,
-      ),
-      onChanged: _tunWriter(
-        (state, value) => state.copyWith.tun(routeAddress: value),
+    return ManagedSetting(
+      settingKey: 'clash.tun.route-address',
+      child: ConfigListEditItem(
+        title: (l) => l.routeAddress,
+        itemMaxLength: TextInputLimits.cidr,
+        itemValidator: validateCidr,
+        selector: patchClashConfigProvider.select(
+          (state) => state.tun.routeAddress,
+        ),
+        onChanged: _tunWriter(
+          (state, value) => state.copyWith.tun(routeAddress: value),
+        ),
       ),
     );
   }
@@ -377,15 +380,18 @@ List<Widget> tunItems({required bool isMipsStack}) {
       ),
     const BypassPrivateRouteItem(),
     const RouteAddressItem(),
-    ConfigListEditItem(
-      title: (l) => l.routeExcludeAddress,
-      itemMaxLength: TextInputLimits.cidr,
-      itemValidator: validateCidr,
-      selector: patchClashConfigProvider.select(
-        (state) => state.tun.routeExcludeAddress,
-      ),
-      onChanged: _tunWriter(
-        (state, value) => state.copyWith.tun(routeExcludeAddress: value),
+    ManagedSetting(
+      settingKey: 'clash.tun.route-exclude-address',
+      child: ConfigListEditItem(
+        title: (l) => l.routeExcludeAddress,
+        itemMaxLength: TextInputLimits.cidr,
+        itemValidator: validateCidr,
+        selector: patchClashConfigProvider.select(
+          (state) => state.tun.routeExcludeAddress,
+        ),
+        onChanged: _tunWriter(
+          (state, value) => state.copyWith.tun(routeExcludeAddress: value),
+        ),
       ),
     ),
   ];

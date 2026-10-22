@@ -284,6 +284,35 @@ extension AccessControlPropsExt on AccessControlProps {
     AccessControlMode.acceptSelected => copyWith(acceptList: value),
     AccessControlMode.rejectSelected => copyWith(rejectList: value),
   };
+
+  /// Android's VPN allows apps or disallows them, never both: allowed win.
+  AccessControlProps withPackages({
+    required List<String> include,
+    required List<String> exclude,
+  }) {
+    if (include.isEmpty && exclude.isEmpty) {
+      return this;
+    }
+    final accepted = {
+      if (enable && mode == AccessControlMode.acceptSelected) ...acceptList,
+      ...include,
+    };
+    if (accepted.isNotEmpty) {
+      return copyWith(
+        enable: true,
+        mode: AccessControlMode.acceptSelected,
+        acceptList: accepted.toList(),
+      );
+    }
+    return copyWith(
+      enable: true,
+      mode: AccessControlMode.rejectSelected,
+      rejectList: {
+        if (enable && mode == AccessControlMode.rejectSelected) ...rejectList,
+        ...exclude,
+      }.toList(),
+    );
+  }
 }
 
 @freezed

@@ -636,10 +636,13 @@ class CommonScaffoldState extends State<CommonScaffold> {
   Widget _buildFloatingHeader(Widget appBar) {
     final top = MediaQuery.paddingOf(context).top;
     final backdrop = PageBackdropScope.of(context);
+    // On glass the title lets what scrolls under it show, as iOS's large one.
+    final glass = LiquidGlassScope.of(context);
     return FloatingHeader(
       backgroundColor: backdrop?.scrimOf(_pageColor) ?? _pageColor,
       fadeStart: top / (top + pageToolbarHeight),
-      overhang: _headerOverhang,
+      overhang: glass ? -pageToolbarHeight / 3 : _headerOverhang,
+      alpha: glass ? 0.6 : 0.9,
       child: appBar,
     );
   }

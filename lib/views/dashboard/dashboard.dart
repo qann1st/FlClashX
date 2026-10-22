@@ -364,7 +364,7 @@ class _MobileDashboard extends ConsumerWidget {
         SliverLayoutBuilder(
           builder: (context, constraints) {
             final side = dashboardMobileSideOf(constraints.crossAxisExtent);
-            final widgets = pinnedFirst([
+            final widgets = withFixedCards([
               for (final widget in saved)
                 if (widget.platforms.contains(platform)) widget,
             ], announcement: announcement);

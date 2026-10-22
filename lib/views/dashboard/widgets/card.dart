@@ -51,7 +51,8 @@ class DashboardCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final density = DashboardDensityScope.of(context);
-    final shape = AppShape.all(dashboardCardRadius(density));
+    final radius = dashboardCardRadius(density);
+    final shape = AppShape.all(radius);
     final content = Padding(
       padding: padding ?? dashboardCardPadding(density),
       child: child,
@@ -59,13 +60,11 @@ class DashboardCard extends StatelessWidget {
     return Semantics(
       container: true,
       label: semanticLabel,
-      child: Container(
+      child: FrostedSurface(
         clipBehavior: clipBehavior,
-        decoration: ShapeDecoration(
-          color: DashboardColors.of(context).card,
-          shape: shape,
-          shadows: DashboardShadows.e1(context),
-        ),
+        color: DashboardColors.of(context).card,
+        radius: AppRadius.all(radius),
+        shadows: DashboardShadows.e1(context),
         child: Material(
           type: MaterialType.transparency,
           child: onTap == null

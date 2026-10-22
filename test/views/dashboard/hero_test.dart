@@ -89,10 +89,12 @@ void main() {
     List<Profile> profiles = const [],
     List<Group> groups = const [],
     bool running = false,
+    String? logoPath,
   }) {
     container = ProviderContainer(
       overrides: [
         initProvider.overrideWithBuild((_, _) => true),
+        panelLogoPathProvider.overrideWith((_, _) async => logoPath),
         profilesProvider.overrideWith(() => TestProfiles(profiles)),
         outboundIpProbeProvider.overrideWith(_Ips.new),
         ipQualityProvider.overrideWith(
@@ -184,6 +186,47 @@ void main() {
     expect(find.byTooltip('Start'), findsOneWidget);
     expect(tester.getSize(find.byType(FilledButton).last).width, 450 - 32);
     expect(tester.takeException(), isNull);
+  });
+
+  const logo = 'https://assets.example.com/logo.png';
+  final icon = File('assets/images/icon.png').absolute.path;
+  bool fromFile(Widget widget) =>
+      widget is Image &&
+      widget.image is FileImage &&
+      (widget.image as FileImage).file.path == icon;
+  List<Group> logoGroups() => [
+    _group('Auto', ['🇳🇱 Amsterdam'], now: '🇳🇱 Amsterdam'),
+  ];
+
+  testWidgets('the logo shows from its file on disk', (tester) async {
+    setUp_(
+      profiles: [
+        _profile(headers: const {'flclashx-servicelogo': logo}),
+      ],
+      groups: logoGroups(),
+      logoPath: icon,
+    );
+    await pump(tester);
+
+    expect(find.byWidgetPredicate(fromFile), findsOneWidget);
+  });
+
+  testWidgets('the app icon stands in until the logo is on disk', (
+    tester,
+  ) async {
+    setUp_(
+      profiles: [
+        _profile(headers: const {'flclashx-servicelogo': logo}),
+      ],
+      groups: logoGroups(),
+    );
+    await pump(tester);
+
+    expect(find.byWidgetPredicate(fromFile), findsNothing);
+    expect(
+      find.image(const AssetImage('assets/images/icon.png')),
+      findsWidgets,
+    );
   });
 
   testWidgets('a flag in the node description stands in for one in its name', (
@@ -340,7 +383,27 @@ void main() {
     );
     await pump(tester);
 
-    await tester.tap(find.byTooltip('Change server'));
+    await tester.tap(find.byTooltip('Change server').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ProxiesView), findsOneWidget);
+  });
+
+  testWidgets('the delay opens the server picker as the swap button does', (
+    tester,
+  ) async {
+    setUp_(
+      profiles: [
+        _profile(headers: const {'flclashx-serverinfo': 'Auto'}),
+      ],
+      groups: [
+        _group('Auto', ['🇳🇱 Amsterdam'], now: '🇳🇱 Amsterdam'),
+      ],
+    );
+    await pump(tester);
+
+    expect(find.byTooltip('Change server'), findsNWidgets(2));
+    await tester.tap(find.byTooltip('Change server').last);
     await tester.pumpAndSettle();
 
     expect(find.byType(ProxiesView), findsOneWidget);

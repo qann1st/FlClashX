@@ -21,7 +21,12 @@ enum ServiceTarget {
   primeVideo('prime-video', 'Prime Video', 'primevideo'),
   spotify('spotify', 'Spotify', 'spotify'),
   tiktok('tiktok', 'TikTok', 'tiktok'),
-  discord('discord', 'Discord', 'discord');
+  discord('discord', 'Discord', 'discord'),
+  gosuslugi('gosuslugi', 'Госуслуги', 'gosuslugi'),
+  sberbank('sberbank', 'Сбербанк', 'sberbank'),
+  vk('vk', 'VK', 'vk'),
+  yandex('yandex', 'Яндекс', 'yandex'),
+  kinopoisk('kinopoisk', 'Кинопоиск', 'kinopoisk');
 
   const ServiceTarget(this.id, this.label, this.icon);
 

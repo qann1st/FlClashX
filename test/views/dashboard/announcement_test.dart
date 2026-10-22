@@ -133,19 +133,37 @@ void main() {
     await teardown(tester);
   });
 
-  testWidgets('cannot be removed or dragged while editing, and neither can '
-      'the status card', (tester) async {
-    setUpProfiles([_profile(announce: _text)]);
+  void seed(List<DashboardWidget> widgets) {
     container
         .read(appSettingProvider.notifier)
-        .update(
-          (state) => state.copyWith(
-            dashboardWidgets: const [
-              DashboardWidget.currentOutbound,
-              DashboardWidget.networkSpeed,
-            ],
-          ),
-        );
+        .update((state) => state.copyWith(dashboardWidgets: widgets));
+  }
+
+  List<DashboardWidget> saved() =>
+      container.read(appSettingProvider).dashboardWidgets;
+
+  testWidgets('stays where the saved cards put it', (tester) async {
+    setUpProfiles([_profile(announce: _text)]);
+    seed(const [
+      DashboardWidget.currentOutbound,
+      DashboardWidget.networkSpeed,
+      DashboardWidget.announcement,
+    ]);
+    await pumpDashboard(tester);
+
+    double topOf(Finder finder) => tester.getTopLeft(finder).dy;
+    expect(
+      topOf(find.byType(NetworkSpeedCard)),
+      lessThan(topOf(find.byType(AnnouncementCard))),
+    );
+
+    await teardown(tester);
+  });
+
+  testWidgets('cannot be removed while editing, nor can the status card, '
+      'yet both drag to a new place', (tester) async {
+    setUpProfiles([_profile(announce: _text)]);
+    seed(const [DashboardWidget.currentOutbound, DashboardWidget.networkSpeed]);
     await pumpDashboard(tester);
     await tester.tap(find.byTooltip('Edit dashboard'));
     await tester.pump(const Duration(milliseconds: 500));
@@ -156,19 +174,53 @@ void main() {
     expect(find.text('Announcement'), findsOneWidget);
 
     double topOf(Finder finder) => tester.getTopLeft(finder).dy;
+    final announcement = find.byType(AnnouncementCard);
     final status = find.byType(CurrentOutboundCard);
+    expect(topOf(announcement), lessThan(topOf(status)));
+    final rise = topOf(status) - topOf(announcement) + 10;
     final gesture = await tester.startGesture(tester.getCenter(status));
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-    await gesture.moveBy(const Offset(0, 300));
-    await tester.pump(const Duration(milliseconds: 100));
+    for (var step = 0; step < 4; step++) {
+      await gesture.moveBy(Offset(0, -rise / 4));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     await gesture.up();
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    expect(topOf(status), lessThan(topOf(announcement)));
+    expect(saved(), const [
+      DashboardWidget.currentOutbound,
+      DashboardWidget.announcement,
+      DashboardWidget.networkSpeed,
+    ]);
+
+    await teardown(tester);
+  });
+
+  testWidgets('keeps its place through an edit made while it is away', (
+    tester,
+  ) async {
+    setUpProfiles([_profile()]);
+    seed(const [
+      DashboardWidget.currentOutbound,
+      DashboardWidget.announcement,
+      DashboardWidget.networkSpeed,
+      DashboardWidget.profiles,
+    ]);
+    await pumpDashboard(tester);
+    await tester.tap(find.byTooltip('Edit dashboard'));
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(AnnouncementCard), findsNothing);
+    await tester.tap(find.byTooltip('Remove Network speed'));
     await tester.pump(const Duration(seconds: 2));
 
-    expect(topOf(find.byType(AnnouncementCard)), lessThan(topOf(status)));
-    expect(topOf(status), lessThan(topOf(find.byType(NetworkSpeedCard))));
-    expect(container.read(appSettingProvider).dashboardWidgets, const [
+    expect(saved(), const [
       DashboardWidget.currentOutbound,
-      DashboardWidget.networkSpeed,
+      DashboardWidget.announcement,
+      DashboardWidget.profiles,
     ]);
 
     await teardown(tester);

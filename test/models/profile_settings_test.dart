@@ -193,4 +193,48 @@ void main() {
     expect(synced.hosts, {'a.example': '10.0.0.1'});
     expect(synced.tun.mtu, 1500);
   });
+
+  test(
+    'the tun app lists are taken from the profile and dropped without it',
+    () {
+      final synced = syncProfileSettings(
+        _tuned,
+        const {
+          'tun': {
+            'include-package': [' com.a ', 'com.b', '', 7],
+            'exclude-package': ['com.c'],
+          },
+        },
+        const ['tun', 'tun.include-package', 'tun.exclude-package'],
+      );
+
+      expect(synced.tun.includePackage, ['com.a', 'com.b']);
+      expect(synced.tun.excludePackage, ['com.c']);
+
+      final dropped = syncProfileSettings(synced, const {}, const []);
+      expect(dropped.tun.includePackage, isEmpty);
+      expect(dropped.tun.excludePackage, isEmpty);
+    },
+  );
+
+  test('the tun routes are taken from the profile, valid ones only, and '
+      'dropped without it', () {
+    final synced = syncProfileSettings(
+      _tuned,
+      const {
+        'tun': {
+          'route-address': ['0.0.0.0/1', ' 128.0.0.0/1 ', 'nonsense', '::/1'],
+          'route-exclude-address': ['10.0.0.0/8', 5],
+        },
+      },
+      const ['tun', 'tun.route-address', 'tun.route-exclude-address'],
+    );
+
+    expect(synced.tun.routeAddress, ['0.0.0.0/1', '128.0.0.0/1', '::/1']);
+    expect(synced.tun.routeExcludeAddress, ['10.0.0.0/8']);
+
+    final dropped = syncProfileSettings(synced, const {}, const []);
+    expect(dropped.tun.routeAddress, isEmpty);
+    expect(dropped.tun.routeExcludeAddress, isEmpty);
+  });
 }

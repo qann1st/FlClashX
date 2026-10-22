@@ -528,7 +528,24 @@ extension GroupExt on Group {
   /// A saved pick outlives a subscription update that renames or drops it.
   bool _isMember(String proxyName) =>
       all.isEmpty || all.any((proxy) => proxy.name == proxyName);
+
+  /// The first [trayProxyLimit], [selected] put last when it lies beyond.
+  List<Proxy> trayProxies(String? selected) {
+    if (all.length <= trayProxyLimit) {
+      return all;
+    }
+    final shown = all.take(trayProxyLimit).toList();
+    if (selected != null && !shown.any((proxy) => proxy.name == selected)) {
+      if (all.firstWhereOrNull((proxy) => proxy.name == selected)
+          case final pick?) {
+        shown[trayProxyLimit - 1] = pick;
+      }
+    }
+    return shown;
+  }
 }
+
+const trayProxyLimit = 100;
 
 @freezed
 abstract class IpInfo with _$IpInfo {

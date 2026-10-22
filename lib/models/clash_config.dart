@@ -1018,6 +1018,8 @@ abstract class Tun with _$Tun {
     @JsonKey(name: 'route-exclude-address')
     @Default([])
     List<String> routeExcludeAddress,
+    @JsonKey(name: 'include-package') @Default([]) List<String> includePackage,
+    @JsonKey(name: 'exclude-package') @Default([]) List<String> excludePackage,
   }) = _Tun;
 
   factory Tun.fromJson(Map<String, Object?> json) => _$TunFromJson(json);

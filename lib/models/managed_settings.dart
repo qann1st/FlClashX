@@ -39,6 +39,8 @@ const managedClashKeys = {
   'global-ua',
   'tun.device',
   'tun.stack',
+  'tun.route-address',
+  'tun.route-exclude-address',
 };
 
 String clashSettingKey(String yamlKey) => 'clash.$yamlKey';
@@ -71,6 +73,8 @@ const networkPageKeys = {
   'clash.keep-alive-idle',
   'clash.keep-alive-interval',
   'clash.routing-mark',
+  'clash.tun.route-address',
+  'clash.tun.route-exclude-address',
 };
 
 const themePageKeys = {
@@ -175,6 +179,14 @@ PatchClashConfig keepOwnedSettings(
       ),
       'clash.tun.stack' => next.copyWith(
         tun: next.tun.copyWith(stack: current.tun.stack),
+      ),
+      'clash.tun.route-address' => next.copyWith(
+        tun: next.tun.copyWith(routeAddress: current.tun.routeAddress),
+      ),
+      'clash.tun.route-exclude-address' => next.copyWith(
+        tun: next.tun.copyWith(
+          routeExcludeAddress: current.tun.routeExcludeAddress,
+        ),
       ),
       _ => next,
     };

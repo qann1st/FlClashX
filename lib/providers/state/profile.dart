@@ -65,6 +65,18 @@ Future<ImageProvider?> panelBackdropImage(Ref ref) async {
   }
 }
 
+/// Where the panel's logo lies on disk, kept as its backdrop is so it shows
+/// at launch without the network.
+@riverpod
+Future<String?> panelLogoPath(Ref ref, String url) async {
+  try {
+    return (await DefaultCacheManager().getSingleFile(url)).path;
+  } catch (error) {
+    commonPrint.log('logo $url unavailable: $error');
+    return null;
+  }
+}
+
 @riverpod
 bool widgetEditingDenied(Ref ref) {
   return ref.watch(

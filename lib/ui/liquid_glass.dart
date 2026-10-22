@@ -175,6 +175,29 @@ class LiquidGlassStyle {
   factory LiquidGlassStyle.alert(ColorScheme colorScheme) =>
       LiquidGlassStyle.menu(colorScheme).copyWith(blur: 16);
 
+  /// Lets 40% through, 55% in ultra, frosted wide for the smallest capture.
+  factory LiquidGlassStyle.frost(
+    Color surface,
+    LiquidGlassQuality quality, {
+    double? opacity,
+  }) {
+    final dark = surface.computeLuminance() < 0.5;
+    return LiquidGlassStyle(
+      tint: surface.withValues(
+        alpha: surface.a * (opacity ?? frostOpacity(quality)),
+      ),
+      contrast: dark ? -0.4 : 0.4,
+      blur: 24,
+      refraction: 0,
+      bevel: 0,
+      saturation: 1.6,
+      rim: 0,
+    );
+  }
+
+  static double frostOpacity(LiquidGlassQuality quality) =>
+      quality == LiquidGlassQuality.ultra ? 0.45 : 0.6;
+
   factory LiquidGlassStyle.tinted(ColorScheme colorScheme, Color color) {
     final dark = colorScheme.brightness == Brightness.dark;
     return LiquidGlassStyle(
@@ -624,12 +647,15 @@ class LiquidGlass extends StatelessWidget {
     required this.style,
     this.clipper,
     this.shadows = const [],
+    this.corners,
     this.pressed = false,
     this.glow,
     this.child,
   });
 
   final LiquidGlassStyle style;
+
+  final BorderRadius? corners;
 
   /// Shapes the pane to its path in place of the pill. The glass bends
   /// to the path by how far it reaches from the pane's center in each
@@ -676,6 +702,7 @@ class LiquidGlass extends StatelessWidget {
       return _LiquidGlassPane(
         style: style,
         clipper: clipper,
+        corners: corners,
         shadows: shadows,
         press: 0,
         fading: false,
@@ -690,6 +717,7 @@ class LiquidGlass extends StatelessWidget {
       builder: (context, press, child) => _LiquidGlassPane(
         style: style,
         clipper: clipper,
+        corners: corners,
         shadows: shadows,
         press: press,
         fading: !pressed,
@@ -705,6 +733,7 @@ class _LiquidGlassPane extends SingleChildRenderObjectWidget {
   const _LiquidGlassPane({
     required this.style,
     required this.clipper,
+    required this.corners,
     required this.shadows,
     required this.press,
     required this.fading,
@@ -714,6 +743,7 @@ class _LiquidGlassPane extends SingleChildRenderObjectWidget {
 
   final LiquidGlassStyle style;
   final CustomClipper<Path>? clipper;
+  final BorderRadius? corners;
   final List<BoxShadow> shadows;
   final double press;
   final bool fading;
@@ -724,6 +754,7 @@ class _LiquidGlassPane extends SingleChildRenderObjectWidget {
     return _RenderLiquidGlass(
       style: style,
       clipper: clipper,
+      corners: corners,
       shadows: shadows,
       press: press,
       fading: fading,
@@ -739,6 +770,7 @@ class _LiquidGlassPane extends SingleChildRenderObjectWidget {
     renderObject
       ..style = style
       ..clipper = clipper
+      ..corners = corners
       ..shadows = shadows
       ..press = press
       ..fading = fading
@@ -750,12 +782,14 @@ class _RenderLiquidGlass extends RenderProxyBox {
   _RenderLiquidGlass({
     required LiquidGlassStyle style,
     required CustomClipper<Path>? clipper,
+    required BorderRadius? corners,
     required List<BoxShadow> shadows,
     required double press,
     required bool fading,
     required LiquidGlassGlow? glow,
   }) : _style = style,
        _clipper = clipper,
+       _corners = corners,
        _shadows = shadows,
        _press = press,
        _fading = fading,
@@ -789,6 +823,15 @@ class _RenderLiquidGlass extends RenderProxyBox {
         value.shouldReclip(old)) {
       _reclip();
     }
+  }
+
+  BorderRadius? _corners;
+  set corners(BorderRadius? value) {
+    if (value == _corners) {
+      return;
+    }
+    _corners = value;
+    markNeedsPaint();
   }
 
   Path? _outline;
@@ -898,7 +941,9 @@ class _RenderLiquidGlass extends RenderProxyBox {
         offset & size,
         shape: outline != null
             ? LiquidGlassOutline(outline)
-            : LiquidGlassCorners(BorderRadius.circular(size.shortestSide / 2)),
+            : LiquidGlassCorners(
+                _corners ?? BorderRadius.circular(size.shortestSide / 2),
+              ),
         style: _style,
         shadows: _shadows,
         glow:

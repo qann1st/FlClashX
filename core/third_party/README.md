@@ -2,7 +2,7 @@
 
 ## sing-tun
 
-`github.com/metacubex/sing-tun v0.4.27`, copied from the module cache, with one
+`github.com/metacubex/sing-tun v0.4.28`, copied from the module cache, with one
 change in `tun_darwin.go`: `flushDNSCache` runs `dscacheutil -flushcache` with
 `go ... .Run()` instead of `.Start()`, so the finished child is reaped and the
 core no longer keeps a `<defunct>` process per TUN start on macOS. Upstream

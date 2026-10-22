@@ -1,7 +1,7 @@
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show VoidCallback, visibleForTesting;
 import 'package:tray/tray.dart';
 
 import 'app_localizations.dart';
@@ -241,6 +241,11 @@ class AppTray implements TrayPort {
               proxyName: proxyName,
             );
           },
+          onMore: () {
+            proxiesAction.updateCurrentGroupName(group.name);
+            read(currentPageLabelProvider.notifier).toPage(PageLabel.proxies);
+            window?.show();
+          },
         ),
       TrayMenuAction(
         label: HotAction.delayTest.label,
@@ -258,12 +263,15 @@ class AppTray implements TrayPort {
     required String? selectedName,
     required Map<String, int> delays,
     required void Function(String proxyName) onSelected,
+    required VoidCallback onMore,
   }) {
+    final shown = group.trayProxies(selectedName);
+    final hidden = group.all.length - shown.length;
     return TrayMenuSubmenu(
       label: group.name,
       detail: _delayText(delays[selectedName]),
       items: [
-        for (final proxy in group.all)
+        for (final proxy in shown)
           TrayMenuCheckbox(
             label: proxy.name,
             checked: selectedName == proxy.name,
@@ -272,6 +280,13 @@ class AppTray implements TrayPort {
               onSelected(proxy.name);
             },
           ),
+        if (hidden > 0) ...[
+          const TrayMenuSeparator(),
+          TrayMenuAction(
+            label: '${currentAppLocalizations.more} ($hidden)…',
+            onSelected: onMore,
+          ),
+        ],
       ],
     );
   }
