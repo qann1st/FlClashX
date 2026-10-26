@@ -1,12 +1,12 @@
 name: build-core
 run-name: build-core ${{ github.event.inputs.version }}
 
-# A desktop core alone, for a mihomo release the app has not shipped with yet.
+# A desktop core alone, for a Prizrak-Core release the app has not shipped with yet.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "mihomo release (e.g. v1.19.32)"
+        description: "Prizrak-Core release (e.g. v1.19.33-r3)"
         required: true
 
 env:
@@ -36,10 +36,10 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: core/go.sum
 
-      - name: Pin the mihomo release
+      - name: Pin the Prizrak-Core release
         working-directory: core
         run: |
-          go get github.com/metacubex/mihomo@${{ github.event.inputs.version }}
+          go mod edit -replace=github.com/metacubex/mihomo=github.com/legiz-ru/Prizrak-Core@${{ github.event.inputs.version }}
           go mod tidy
 
       - name: Build core

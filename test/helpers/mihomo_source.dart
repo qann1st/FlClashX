@@ -2,8 +2,8 @@ import 'dart:io';
 
 String? _mihomoSourceDir;
 
-/// Where the Go toolchain keeps the mihomo release `core/go.mod` requires;
-/// the tests that keep the Dart models in step with mihomo's structs read it
+/// Where the Go toolchain keeps the core release `core/go.mod` requires;
+/// the tests that keep the Dart models in step with the core's structs read it
 /// from there, so `go` must be on PATH and the module downloaded.
 String mihomoSourceDir() {
   return _mihomoSourceDir ??= () {
