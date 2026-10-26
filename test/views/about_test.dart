@@ -67,7 +67,7 @@ void main() {
 
     expect(find.text('Original repository'), findsOneWidget);
     expect(find.text('github.com/chen08209/FlClash'), findsOneWidget);
-    expect(find.text('github.com/MetaCubeX/mihomo'), findsOneWidget);
+    expect(find.text('github.com/legiz-ru/Prizrak-Core'), findsOneWidget);
     expect(find.text('t.me/flclashx'), findsOneWidget);
     expect(find.text('Thanks for contribution'), findsOneWidget);
     expect(find.text('Gratitude'), findsOneWidget);

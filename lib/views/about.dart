@@ -51,7 +51,7 @@ const _gratitude = [
 ];
 
 const _upstreamRepository = 'chen08209/FlClash';
-const _coreRepository = 'MetaCubeX/mihomo';
+const _coreRepository = 'legiz-ru/Prizrak-Core';
 const _telegram = 'https://t.me/flclashx';
 
 /// The running core's version when it answers, else the one this build was
