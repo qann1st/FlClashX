@@ -261,6 +261,7 @@ const customProxyTypes = [
   'shadowquic',
   'gost-relay',
   'direct',
+  'freedom',
   'dns',
   'reject',
   'rematch',
