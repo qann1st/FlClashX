@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.7 (2026-10-26)
+
+**Features**
+
+- **ua** Name the core and its version in the User-Agent (637e3bc)
+- **about** Point the core link at Prizrak-Core (19b1217)
+- **core** Ship the Prizrak-Core fork (0126f44)
+
 ## v0.5.6 (2026-10-22)
 
 **Bug Fixes**
