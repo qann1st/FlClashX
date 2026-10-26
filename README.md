@@ -65,7 +65,7 @@
 <details>
 <summary><strong>Что приложение отправляет</strong></summary>
 
-Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/v<mihomo> Platform/<ос>`, например `FlClashX/v0.5.0 core/v1.19.33 Platform/android`.
+Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/Prizrak-Core/v<версия ядра> Platform/<ос>`, например `FlClashX/v0.5.0 core/Prizrak-Core/v1.19.33-r3 Platform/android`.
 
 Если у профиля включено «Отправлять HWID» (по умолчанию включено), добавляются:
 

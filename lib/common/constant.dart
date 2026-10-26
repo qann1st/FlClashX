@@ -11,6 +11,9 @@ import 'package:material_ui/material_ui.dart';
 
 const appName = 'FlClashX';
 const appHelperService = 'FlClashXHelperService';
+
+/// The core this app ships: a mihomo fork.
+const coreDisplayName = 'Prizrak-Core';
 const coreManifestName = 'manifest.json';
 const browserUa =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -34,7 +37,7 @@ const safeModeBuild = bool.fromEnvironment('SAFE_MODE');
 /// CI release tag with its `-pre.N`; empty locally, where pubspec stands in.
 const appVersionDefine = String.fromEnvironment('APP_VERSION');
 
-/// The mihomo release the core was linked with, for when it cannot be asked.
+/// The core release the binary was linked with, for when it cannot be asked.
 const coreVersionDefine = String.fromEnvironment('CORE_VERSION');
 
 const disclaimerVersion = 2;

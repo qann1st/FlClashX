@@ -10,11 +10,11 @@ extension PackageInfoExtension on PackageInfo {
 
   String get ua => uaWith(coreVersionDefine);
 
-  /// `FlClashX/v<app> core/<mihomo> Platform/<os>`; the core token is left
-  /// out until a version is known.
+  /// `FlClashX/v<app> core/Prizrak-Core/v<core> Platform/<os>`; the core token
+  /// is left out until a version is known.
   String uaWith(String coreVersion) => [
     '$appName/v$displayVersion',
-    if (coreVersion.isNotEmpty) 'core/$coreVersion',
+    if (coreVersion.isNotEmpty) 'core/$coreDisplayName/$coreVersion',
     'Platform/${Platform.operatingSystem}',
   ].join(' ');
 }

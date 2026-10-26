@@ -58,7 +58,7 @@ void main() {
 
       expect(
         globalState.ua,
-        'FlClashX/v1.2.3 core/v1.19.32 Platform/${Platform.operatingSystem}',
+        'FlClashX/v1.2.3 core/Prizrak-Core/v1.19.32 Platform/${Platform.operatingSystem}',
       );
     });
   });
