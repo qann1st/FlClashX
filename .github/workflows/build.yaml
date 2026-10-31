@@ -344,14 +344,17 @@ jobs:
           - platform: linux
             os: ubuntu-22.04
             arch: amd64
-          # macOS builds are disabled until Apple Developer ID credentials
-          # (certificate + notarization) are configured.
-          # - platform: macos
-          #   os: macos-15-intel
-          #   arch: amd64
-          # - platform: macos
-          #   os: macos-15
-          #   arch: arm64
+          # Release.xcconfig pins ARCHS to the host, so each runner builds a
+          # single-architecture app and the setup hook builds the matching core
+          # slice. Both images are ad-hoc signed: the first launch needs a
+          # right-click Open, while the in-app updater replaces the bundle with
+          # no prompt (the DMG it downloads never gets the quarantine flag).
+          - platform: macos
+            os: macos-15-intel
+            arch: amd64
+          - platform: macos
+            os: macos-15
+            arch: arm64
           - platform: windows
             os: windows-11-arm
             arch: arm64
@@ -420,7 +423,12 @@ jobs:
       - name: Setup Xcode
         if: startsWith(matrix.platform,'macos')
         run: |
-          sudo xcode-select -s /Applications/Xcode_26.3.app || sudo xcode-select -s /Applications/Xcode_26.2.app
+          for app in Xcode_26.3.app Xcode_26.2.app Xcode.app; do
+            if [[ -d "/Applications/$app" ]]; then
+              sudo xcode-select -s "/Applications/$app"
+              break
+            fi
+          done
           xcodebuild -version
 
       - name: Setup NDK
@@ -440,7 +448,9 @@ jobs:
       # See .agents/flutter-upgrade.md before bumping FLUTTER_VERSION.
       - name: Disable Impeller on Intel macOS
         if: matrix.platform == 'macos' && matrix.arch == 'amd64'
-        run: plutil -replace FLTEnableImpeller -bool NO macos/Runner/Info.plist
+        run: |
+          plutil -insert FLTEnableImpeller -bool NO macos/Runner/Info.plist \
+            || plutil -replace FLTEnableImpeller -bool NO macos/Runner/Info.plist
 
       # FlClashHttpOverrides.trustCoreRoots trusts this bundle beside the system roots.
       # Pinned by hash, so a new bundle from https://curl.se/docs/caextract.html is a reviewed bump.
@@ -452,7 +462,21 @@ jobs:
         run: |
           bundle=assets/ca/ca-certificates.crt
           curl -fsSL --retry 3 -o "$bundle" "https://curl.se/ca/$CA_BUNDLE"
-          echo "$CA_BUNDLE_SHA256  $bundle" | sha256sum -c -
+          # GNU coreutils are not on the macOS images; shasum ships there.
+          if command -v sha256sum >/dev/null; then
+            echo "$CA_BUNDLE_SHA256  $bundle" | sha256sum -c -
+          else
+            echo "$CA_BUNDLE_SHA256  $bundle" | shasum -a 256 -c -
+          fi
+
+      # setup.dart installs the npm create-dmg, whose CLI takes the .app first;
+      # its native helpers need the build scripts npm 11 blocks by default.
+      - name: Install create-dmg
+        if: matrix.platform == 'macos'
+        run: |
+          node --version
+          npm install --global --allow-scripts=fs-xattr,macos-alias create-dmg \
+            || npm install --global create-dmg
 
       - name: Setup
         env:
@@ -529,6 +553,23 @@ jobs:
           for file in $(find . -type f -not -name "*.sha256"); do
             sha256sum "$file" > "${file}.sha256"
           done
+
+      # The app reads this manifest from the bucket, never from GitHub: the file
+      # is attached here so it can be uploaded to the bucket unchanged (files
+      # first, the manifest last).
+      - name: Generate the update manifest
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          grep -E '^- ' release.md | head -n 9 > notes.txt || true
+          dart run tool/update_manifest.dart \
+            --dist ./dist \
+            --version "$version" \
+            --base-url "https://elysium.s3.cloud.ru/releases/$version" \
+            --page "https://github.com/${{ github.repository }}/releases" \
+            --notes notes.txt \
+            --out ./dist/update.json
+          cat ./dist/update.json
 
       - name: Release
         uses: softprops/action-gh-release@v2

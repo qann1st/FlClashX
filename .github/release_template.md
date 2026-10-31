@@ -33,7 +33,6 @@
                 <a href="https://github.com/qann1st/FlClashX/releases/download/vVERSION/FlClashX-windows-arm64.zip"><img src="https://img.shields.io/badge/Portable-arm-67b7d1.svg?logo=windows"></a>
             </td>
         </tr>
-<!-- macOS builds are disabled until Apple Developer ID credentials are configured.
         <tr>
             <td>macOS</td>
             <td>
@@ -41,7 +40,6 @@
                 <a href="https://github.com/qann1st/FlClashX/releases/download/vVERSION/FlClashX-macos-amd64.dmg"><img src="https://img.shields.io/badge/DMG-Intel%20X64-%2300A9E0.svg?logo=apple"></a><br>
             </td>
         </tr>
--->
         <tr>
             <td>Linux</td>
             <td>
@@ -53,6 +51,8 @@
         </tr>
     </tbody>
 </table>
+
+<sub>macOS builds are ad-hoc signed: on the first launch use right-click → Open.</sub>
 
 
 </div>
