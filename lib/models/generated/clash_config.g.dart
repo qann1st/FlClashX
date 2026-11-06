@@ -33,6 +33,11 @@ _ProxyGroup _$ProxyGroupFromJson(Map<String, dynamic> json) => _ProxyGroup(
   hashKey: json['hash-key'] as String?,
   defaultSelected: json['default-selected'] as String?,
   emptyFallback: json['empty-fallback'] as String?,
+  useLightGBM: json['uselightgbm'] as bool?,
+  collectData: json['collectdata'] as bool?,
+  sampleRate: (json['sample-rate'] as num?)?.toDouble(),
+  preferASN: json['prefer-asn'] as bool?,
+  policyPriority: json['policy-priority'] as String?,
   includeAllProxies: _readIncludeAll(json, 'include-all-proxies') as bool?,
   includeAllProviders: _readIncludeAll(json, 'include-all-providers') as bool?,
   hidden: json['hidden'] as bool?,
@@ -67,6 +72,11 @@ Map<String, dynamic> _$ProxyGroupToJson(_ProxyGroup instance) =>
       'hash-key': instance.hashKey,
       'default-selected': instance.defaultSelected,
       'empty-fallback': instance.emptyFallback,
+      'uselightgbm': instance.useLightGBM,
+      'collectdata': instance.collectData,
+      'sample-rate': instance.sampleRate,
+      'prefer-asn': instance.preferASN,
+      'policy-priority': instance.policyPriority,
       'include-all-proxies': instance.includeAllProxies,
       'include-all-providers': instance.includeAllProviders,
       'hidden': instance.hidden,
@@ -81,6 +91,7 @@ const _$GroupTypeEnumMap = {
   GroupType.Fallback: 'fallback',
   GroupType.LoadBalance: 'load-balance',
   GroupType.Relay: 'relay',
+  GroupType.Smart: 'smart',
 };
 
 const _$LoadBalanceStrategyEnumMap = {
@@ -94,6 +105,7 @@ _Proxy _$ProxyFromJson(Map<String, dynamic> json) => _Proxy(
   type: json['type'] as String,
   now: json['now'] as String?,
   serverDescription: json['serverDescription'] as String?,
+  providerName: json['provider-name'] as String?,
 );
 
 Map<String, dynamic> _$ProxyToJson(_Proxy instance) => <String, dynamic>{
@@ -101,6 +113,7 @@ Map<String, dynamic> _$ProxyToJson(_Proxy instance) => <String, dynamic>{
   'type': instance.type,
   'now': instance.now,
   'serverDescription': instance.serverDescription,
+  'provider-name': instance.providerName,
 };
 
 _CustomProxy _$CustomProxyFromJson(Map<String, dynamic> json) => _CustomProxy(
@@ -146,9 +159,24 @@ const _$ProxyFieldEnumMap = {
   ProxyField.flow: 'flow',
   ProxyField.wsPath: 'wsPath',
   ProxyField.wsHost: 'wsHost',
+  ProxyField.wsHeaders: 'wsHeaders',
+  ProxyField.wsMaxEarlyData: 'wsMaxEarlyData',
+  ProxyField.wsEarlyDataHeaderName: 'wsEarlyDataHeaderName',
+  ProxyField.wsHttpUpgrade: 'wsHttpUpgrade',
+  ProxyField.wsHttpUpgradeFastOpen: 'wsHttpUpgradeFastOpen',
+  ProxyField.httpMethod: 'httpMethod',
+  ProxyField.httpPath: 'httpPath',
+  ProxyField.httpHost: 'httpHost',
+  ProxyField.httpHeaders: 'httpHeaders',
+  ProxyField.h2Host: 'h2Host',
+  ProxyField.h2Path: 'h2Path',
   ProxyField.grpcServiceName: 'grpcServiceName',
   ProxyField.xhttpPath: 'xhttpPath',
   ProxyField.xhttpHost: 'xhttpHost',
+  ProxyField.mkcpSeed: 'mkcpSeed',
+  ProxyField.mkcpHeader: 'mkcpHeader',
+  ProxyField.mekyaUrl: 'mekyaUrl',
+  ProxyField.headers: 'headers',
   ProxyField.tls: 'tls',
   ProxyField.sni: 'sni',
   ProxyField.servername: 'servername',
@@ -160,6 +188,17 @@ const _$ProxyFieldEnumMap = {
   ProxyField.plugin: 'plugin',
   ProxyField.pluginMode: 'pluginMode',
   ProxyField.pluginHost: 'pluginHost',
+  ProxyField.pluginPath: 'pluginPath',
+  ProxyField.pluginUsername: 'pluginUsername',
+  ProxyField.pluginPassword: 'pluginPassword',
+  ProxyField.pluginVersion: 'pluginVersion',
+  ProxyField.pluginVersionHint: 'pluginVersionHint',
+  ProxyField.pluginRestlsScript: 'pluginRestlsScript',
+  ProxyField.pluginKey: 'pluginKey',
+  ProxyField.pluginCrypt: 'pluginCrypt',
+  ProxyField.pluginTls: 'pluginTls',
+  ProxyField.pluginMux: 'pluginMux',
+  ProxyField.pluginSkipCertVerify: 'pluginSkipCertVerify',
   ProxyField.udpOverTcp: 'udpOverTcp',
   ProxyField.protocolParam: 'protocolParam',
   ProxyField.obfsParam: 'obfsParam',
@@ -975,6 +1014,7 @@ const _$LogLevelEnumMap = {
 
 const _$FindProcessModeEnumMap = {
   FindProcessMode.always: 'always',
+  FindProcessMode.strict: 'strict',
   FindProcessMode.off: 'off',
 };
 

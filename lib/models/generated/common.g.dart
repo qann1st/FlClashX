@@ -197,6 +197,7 @@ _Group _$GroupFromJson(Map<String, dynamic> json) => _Group(
           .toList() ??
       const [],
   now: json['now'] as String?,
+  fixed: json['fixed'] as String?,
   hidden: json['hidden'] as bool?,
   testUrl: json['testUrl'] as String?,
   icon: json['icon'] as String? ?? '',
@@ -208,6 +209,7 @@ Map<String, dynamic> _$GroupToJson(_Group instance) => <String, dynamic>{
   'type': _$GroupTypeEnumMap[instance.type]!,
   'all': instance.all,
   'now': instance.now,
+  'fixed': instance.fixed,
   'hidden': instance.hidden,
   'testUrl': instance.testUrl,
   'icon': instance.icon,
@@ -221,6 +223,7 @@ const _$GroupTypeEnumMap = {
   GroupType.Fallback: 'fallback',
   GroupType.LoadBalance: 'load-balance',
   GroupType.Relay: 'relay',
+  GroupType.Smart: 'smart',
 };
 
 _HotKeyAction _$HotKeyActionFromJson(Map<String, dynamic> json) =>

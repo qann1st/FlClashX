@@ -605,6 +605,25 @@ rules:
       expect(config.proxyGroups.single.id, 0);
       expect(config.rules.single.id, 0);
     });
+    test('keeps the options a smart group reads', () {
+      final config = _read('''
+proxy-groups:
+  - name: Smart
+    type: smart
+    uselightgbm: true
+    collectdata: true
+    sample-rate: 0.5
+    prefer-asn: true
+''');
+
+      final group = config.proxyGroups.single;
+      expect(group.type, GroupType.Smart);
+      expect(group.definition, containsPair('type', 'smart'));
+      expect(group.definition, containsPair('uselightgbm', true));
+      expect(group.definition, containsPair('collectdata', true));
+      expect(group.definition, containsPair('sample-rate', 0.5));
+      expect(group.definition, containsPair('prefer-asn', true));
+    });
   });
 
   group('overrides', () {
@@ -658,8 +677,8 @@ tun:
 
     test('a group the app cannot hold, naming it', () {
       expect(
-        () => _read('proxy-groups:\n  - {name: Smart, type: smart}\n'),
-        throwsA(_issue(.entry, item: 'Smart')),
+        () => _read('proxy-groups:\n  - {name: Bogus, type: bogus}\n'),
+        throwsA(_issue(.entry, item: 'Bogus')),
       );
     });
   });
