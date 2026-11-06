@@ -15,9 +15,9 @@ class FlClashHttpOverrides extends HttpOverrides {
 
   static const _coreRootsAsset = 'assets/ca/ca-certificates.crt';
 
-  /// The curated root bundle release CI fetches; empty in a local build,
-  /// where the system roots stand alone. mihomo ships an empty bundle of
-  /// its own and falls back to the system roots the same way.
+  /// The curated root bundle this repository ships; release CI refreshes it
+  /// from a pinned cacert.pem. An empty bundle leaves the system roots alone,
+  /// as mihomo's own empty bundle does.
   static Future<void> trustCoreRoots() async {
     try {
       final data = await rootBundle.load(_coreRootsAsset);
