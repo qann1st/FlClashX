@@ -2,6 +2,49 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.5.8",
+      "tag": "v0.5.8",
+      "date": "2026-11-06",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "8085e17",
+              "scope": "groups",
+              "text": "Show and keep the core's smart groups"
+            },
+            {
+              "id": "fd7abb9",
+              "scope": "core",
+              "text": "Move to Prizrak-Core v1.19.33-r11"
+            },
+            {
+              "id": "febd7f3",
+              "scope": "upstream",
+              "text": "Adopt 0.5.0-pre.7"
+            }
+          ]
+        },
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "9c17848",
+              "scope": "ci",
+              "text": "Show the macOS download row in pre releases"
+            },
+            {
+              "id": "8f98f97",
+              "scope": "models",
+              "text": "List the freedom proxy the core parses"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.7",
       "tag": "v0.5.7",
       "date": "2026-10-26",

@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.5.8 (2026-11-06)
+
+**Features**
+
+- **groups** Show and keep the core's smart groups (8085e17)
+- **core** Move to Prizrak-Core v1.19.33-r11 (fd7abb9)
+- **upstream** Adopt 0.5.0-pre.7 (febd7f3)
+
+**Bug Fixes**
+
+- **ci** Show the macOS download row in pre releases (9c17848)
+- **models** List the freedom proxy the core parses (8f98f97)
+
 ## v0.5.7 (2026-10-26)
 
 **Features**
