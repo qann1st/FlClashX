@@ -72,7 +72,7 @@ Future<ProviderContainer> _pumpHome(
               builder: (_) => _page('profiles', primaryAction: _addAction()),
             ),
             NavigationItem(
-              glyph: AppGlyphs.tools,
+              glyph: AppGlyphs.settings,
               label: PageLabel.tools,
               builder: (_) => _page('tools'),
             ),
@@ -215,6 +215,20 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('the lens stops asking for frames once its wobble cannot show', (
+    tester,
+  ) async {
+    final container = await _pumpHome(tester);
+    container.read(currentPageLabelProvider.notifier).toPage(PageLabel.tools);
+    await tester.pump();
+    var elapsed = Duration.zero;
+    while (tester.binding.hasScheduledFrame && elapsed.inSeconds < 3) {
+      await tester.pump(const Duration(milliseconds: 16));
+      elapsed += const Duration(milliseconds: 16);
+    }
+    expect(elapsed, lessThan(const Duration(milliseconds: 1200)));
+  });
+
   testWidgets('a flick carries the lens on to the next item', (tester) async {
     final container = await _pumpHome(tester);
     final bar = tester.getRect(find.byType(FloatingNavigationBar));
@@ -302,7 +316,7 @@ void main() {
           child: NavigationDock(
             destinations: const [
               NavigationDockDestination(glyph: AppGlyphs.dashboard, label: 'a'),
-              NavigationDockDestination(glyph: AppGlyphs.tools, label: 'b'),
+              NavigationDockDestination(glyph: AppGlyphs.settings, label: 'b'),
             ],
             selectedIndex: 0,
             onSelected: (_) {},
@@ -498,7 +512,7 @@ void main() {
                 destinations: [
                   for (var index = 0; index < count; index++)
                     NavigationDockDestination(
-                      glyph: AppGlyphs.tools,
+                      glyph: AppGlyphs.settings,
                       label: '$index',
                     ),
                 ],
@@ -537,7 +551,7 @@ void main() {
                 destinations: [
                   for (final text in ['Home', 'Apps', 'Logs', label])
                     NavigationDockDestination(
-                      glyph: AppGlyphs.tools,
+                      glyph: AppGlyphs.settings,
                       label: text,
                     ),
                 ],
@@ -606,6 +620,63 @@ void main() {
 
     await tester.pumpAndSettle();
     expect(painted(), resting);
+  });
+
+  testWidgets('a pointer lifts a tonal button part way, with no state layer', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Center(
+          child: TonalButtonTheme(
+            child: ElasticPress(
+              child: IconButton(
+                tooltip: _addLabel,
+                onPressed: () {},
+                icon: const GlyphIcon(AppGlyphs.add),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final press = find.byType(ElasticPress);
+    final resting = tester.getRect(press);
+    double width() =>
+        _painted(tester, tester.renderObject(press), resting).width;
+    final ink = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byType(IconButton),
+        matching: find.byType(InkWell),
+      ),
+    );
+    for (final state in [
+      WidgetState.hovered,
+      WidgetState.focused,
+      WidgetState.pressed,
+    ]) {
+      expect(ink.overlayColor!.resolve({state}), Colors.transparent);
+    }
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(resting.center);
+    await tester.pumpAndSettle();
+    final hovered = width();
+    expect(hovered, greaterThan(resting.width * 1.05));
+
+    await mouse.down(resting.center);
+    await tester.pumpAndSettle();
+    expect(width(), greaterThan(hovered));
+
+    await mouse.up();
+    await tester.pumpAndSettle();
+    expect(width(), moreOrLessEquals(hovered));
+
+    await mouse.moveTo(Offset.zero);
+    await tester.pumpAndSettle();
+    expect(width(), resting.width);
+    await mouse.removePointer();
   });
 
   testWidgets(

@@ -120,6 +120,19 @@ void main() {
       expect(await Service().stop(), isFalse);
     });
 
+    test(
+      'a restart is its own command and reports the platform result',
+      () async {
+        mockChannel((call) async => call.method == 'restart');
+
+        expect(await Service().restart(), isTrue);
+        expect(calls.map((call) => call.method), ['restart']);
+
+        mockChannel((_) async => null);
+        expect(await Service().restart(), isFalse);
+      },
+    );
+
     test('an absent shutdown result is treated as success', () async {
       mockChannel((_) async => null);
 
@@ -144,7 +157,6 @@ void main() {
             localNetworkTip: 'localNetworkTip',
             currentProfileName: 'profile',
             stopText: 'stop',
-            onlyStatisticsProxy: false,
           ),
         ),
         isEmpty,
@@ -159,14 +171,14 @@ void main() {
         localNetworkTip: 'localNetworkTip',
         currentProfileName: 'profile',
         stopText: 'stop',
-        onlyStatisticsProxy: true,
+        showStopAction: false,
       );
 
       expect(await Service().syncState(state), 'ok');
 
       final sent = json.decode(calls.single.arguments as String);
       expect(sent['currentProfileName'], 'profile');
-      expect(sent['onlyStatisticsProxy'], isTrue);
+      expect(sent['showStopAction'], isFalse);
     });
   });
 
@@ -211,6 +223,15 @@ void main() {
         expect(listener.stops, 1);
       },
     );
+
+    test('a restart asks for a run the stop report can answer', () async {
+      await Service().stop();
+      await Service().restart();
+
+      await reportStopped(lastRevision());
+
+      expect(listener.stops, 1);
+    });
 
     test('a report older than the newest command is dropped', () async {
       await Service().start();

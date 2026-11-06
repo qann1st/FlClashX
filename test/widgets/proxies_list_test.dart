@@ -116,15 +116,6 @@ void main() {
       )
       .first;
 
-  Future<void> revealHeaderOf(WidgetTester tester, String groupName) async {
-    await tester.scrollUntilVisible(
-      actionOf(groupName, 'Scroll to selected'),
-      200,
-      scrollable: scrollable(),
-    );
-    await tester.pumpAndSettle();
-  }
-
   ShapeDecoration surfaceOf(WidgetTester tester, String groupName) =>
       tester
               .widget<DecoratedBox>(
@@ -137,20 +128,6 @@ void main() {
               )
               .decoration
           as ShapeDecoration;
-
-  testWidgets('scroll to selected lands the row under the pinned header', (
-    tester,
-  ) async {
-    await pumpList(tester, selectedMap: {'G1': 'G1-25'});
-    await revealHeaderOf(tester, 'G1');
-
-    await tester.tap(actionOf('G1', 'Scroll to selected'));
-    await tester.pumpAndSettle();
-
-    final header = tester.getRect(headerOf('G1'));
-    final card = tester.getRect(find.byKey(const ValueKey('G1.G1-25')).first);
-    expect(card.top, header.bottom);
-  });
 
   testWidgets('folding a group leaves the cards of the others as they were', (
     tester,
@@ -338,19 +315,6 @@ void main() {
     expect(tester.getRect(headerOf('G2')).top, first.top);
   });
 
-  testWidgets('scroll to selected stays put without a selection', (
-    tester,
-  ) async {
-    await pumpList(tester);
-    await revealHeaderOf(tester, 'G1');
-    final before = tester.getRect(headerOf('G1'));
-
-    await tester.tap(actionOf('G1', 'Scroll to selected'));
-    await tester.pumpAndSettle();
-
-    expect(tester.getRect(headerOf('G1')), before);
-  });
-
   testWidgets('a group name too long for its header stays on one line', (
     tester,
   ) async {
@@ -369,6 +333,58 @@ void main() {
     await tester.pump();
 
     expect(_RecordingProxiesAction.tested, ['G0']);
+  });
+
+  testWidgets('a collapsed group still carries its delay test button', (
+    tester,
+  ) async {
+    await pumpList(tester, unfoldSet: const {});
+
+    expect(actionOf('G0', 'Delay test'), findsOneWidget);
+    await tester.tap(actionOf('G0', 'Delay test'));
+    await tester.pump();
+
+    expect(_RecordingProxiesAction.tested, ['G0']);
+  });
+
+  testWidgets('a nested group reads as the host it resolves to, not its type', (
+    tester,
+  ) async {
+    const sub = Group(
+      type: GroupType.Selector,
+      name: 'Sub',
+      all: [
+        Proxy(name: 'Host A', type: 'ss'),
+        Proxy(name: 'Host B', type: 'ss'),
+      ],
+    );
+    const parent = Group(
+      type: GroupType.Selector,
+      name: 'G0',
+      all: [Proxy(name: 'Sub', type: 'Selector')],
+    );
+    await pumpList(
+      tester,
+      groups: [parent, sub],
+      selectedMap: {'Sub': 'Host A'},
+      unfoldSet: const {'G0'},
+    );
+
+    final subCard = find.byKey(const ValueKey('G0.Sub')).first;
+    expect(
+      find.descendant(
+        of: subCard,
+        matching: find.text('Host A', findRichText: true),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: subCard,
+        matching: find.text('Selector', findRichText: true),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('a group under test spins its button and ignores taps', (

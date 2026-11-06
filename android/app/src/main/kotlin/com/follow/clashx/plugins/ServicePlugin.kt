@@ -4,6 +4,7 @@ import com.follow.clashx.ServiceController
 import com.follow.clashx.ServiceState
 import com.follow.clashx.common.Components
 import com.follow.clashx.models.SharedState
+import com.follow.clashx.service.NetworkObserver
 import com.google.gson.Gson
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BinaryMessenger
@@ -54,6 +55,7 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "syncState" -> syncState(call, result)
             "start" -> start(call, result)
             "stop" -> stop(call, result)
+            "restart" -> restart(call, result)
             else -> result.notImplemented()
         }
     }
@@ -66,6 +68,7 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun initialize(result: MethodChannel.Result) {
+        NetworkObserver.start()
         ServiceController.setEventListener(::sendEvent)
             .onSuccess { result.success("") }
             .onFailure { error -> result.success(error.message.orEmpty()) }
@@ -119,6 +122,12 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private fun stop(call: MethodCall, result: MethodChannel.Result) {
         commandRevision = call.arguments as? Int ?: commandRevision
         ServiceState.requestStop()
+        result.success(true)
+    }
+
+    private fun restart(call: MethodCall, result: MethodChannel.Result) {
+        commandRevision = call.arguments as? Int ?: commandRevision
+        ServiceState.requestRestart()
         result.success(true)
     }
 

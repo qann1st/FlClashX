@@ -81,7 +81,8 @@ void main() {
           chains: ['JP-02', 'auto'],
           checkedAt: 1700000000000,
           coreEpoch: 7,
-          picksVersion: 42,
+          routeVersion: 42,
+          hits: [RouteHit(host: 'www.netflix.com:443', exit: 'JP-02')],
         ),
       );
 
@@ -91,7 +92,10 @@ void main() {
       expect(check.node, 'JP-02');
       expect(check.chains, ['JP-02', 'auto']);
       expect(check.coreEpoch, 7);
-      expect(check.picksVersion, 42);
+      expect(check.routeVersion, 42);
+      expect(check.hits, const [
+        RouteHit(host: 'www.netflix.com:443', exit: 'JP-02'),
+      ]);
       expect(
         check.checkedAt,
         DateTime.fromMillisecondsSinceEpoch(1700000000000),
@@ -177,8 +181,8 @@ void main() {
       when(() => core.outboundIp(any())).thenAnswer((invocation) async {
         sent = invocation.positionalArguments.single as OutboundIpParams;
         return const OutboundIpResult(
-          url: 'https://www.cloudflare.com/cdn-cgi/trace',
-          body: 'fl=1\nip=203.0.113.7\nloc=US\n',
+          url: 'http://ip-api.com/json',
+          body: '{"query":"203.0.113.7","countryCode":"US"}',
         );
       });
 
@@ -195,8 +199,8 @@ void main() {
     test('parses whichever source answered, not just the first', () async {
       when(() => core.outboundIp(any())).thenAnswer(
         (_) async => OutboundIpResult(
-          url: 'https://api.country.is',
-          body: jsonEncode({'ip': '198.51.100.4', 'country': 'DE'}),
+          url: 'https://ident.me/json',
+          body: jsonEncode({'ip': '198.51.100.4', 'cc': 'DE'}),
         ),
       );
 
@@ -210,8 +214,8 @@ void main() {
     test('gives up on an error, an empty body or an unparseable one', () async {
       final answers = <OutboundIpResult?>[
         const OutboundIpResult(error: 'timeout'),
-        const OutboundIpResult(url: 'https://api.country.is'),
-        const OutboundIpResult(url: 'https://api.country.is', body: 'garbage'),
+        const OutboundIpResult(url: 'https://ident.me/json'),
+        const OutboundIpResult(url: 'https://ident.me/json', body: 'garbage'),
         const OutboundIpResult(
           url: 'https://unknown.example',
           body: 'ip=1.2.3.4',

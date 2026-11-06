@@ -17,6 +17,7 @@ void main() {
   late CoreController controller;
 
   setUpAll(() {
+    registerFallbackValue(Duration.zero);
     registerFallbackValue(
       const SetupParams(selectedMap: {}, testUrl: 'http://x.com'),
     );
@@ -63,24 +64,24 @@ void main() {
   });
 
   group('lifecycle methods', () {
-    test('start, restart, stop, and close delegate to interface', () async {
+    test('start, restart, and close delegate to interface', () async {
       const result = CoreLifecycleResult(
         revision: 1,
         outcome: CoreLifecycleOutcome.applied,
       );
       when(() => mock.start()).thenAnswer((_) async => result);
       when(() => mock.restart()).thenAnswer((_) async => result);
-      when(() => mock.stop()).thenAnswer((_) async => result);
+
       when(() => mock.close()).thenAnswer((_) async => result);
 
       expect(await controller.start(), same(result));
       expect(await controller.restart(), same(result));
-      expect(await controller.stop(), same(result));
+
       expect(await controller.close(), same(result));
 
       verify(() => mock.start()).called(1);
       verify(() => mock.restart()).called(1);
-      verify(() => mock.stop()).called(1);
+
       verify(() => mock.close()).called(1);
     });
 
@@ -207,13 +208,20 @@ void main() {
     });
 
     test('watchRoute delegates to interface', () async {
-      const snapshot = RouteSnapshot(
-        coreEpoch: 3,
-        picksVersion: 1,
-        picks: {'Proxy': 'HK-01'},
-      );
+      const snapshot = RouteSnapshot(coreEpoch: 3, routeVersion: 1);
       when(() => mock.watchRoute(true)).thenAnswer((_) async => snapshot);
       expect(await controller.watchRoute(true), snapshot);
+    });
+
+    test('checkRoutes delegates to interface', () async {
+      const params = CheckRoutesParams(
+        routes: [
+          [RouteHit(host: 'example.com:443', exit: 'HK-01')],
+        ],
+      );
+      const check = RouteCheck(coreEpoch: 3, routeVersion: 2, held: [true]);
+      when(() => mock.checkRoutes(params)).thenAnswer((_) async => check);
+      expect(await controller.checkRoutes(params), check);
     });
   });
 
@@ -308,10 +316,14 @@ void main() {
 
   group('misc methods', () {
     test('getDelay delegates structured delay', () async {
-      when(() => mock.asyncTestDelay(any(), any())).thenAnswer(
+      when(() => mock.asyncTestDelay(any(), any(), any())).thenAnswer(
         (_) async => const Delay(name: 'P1', value: 100, url: 'test.com'),
       );
-      final result = await controller.getDelay('test.com', 'P1');
+      final result = await controller.getDelay(
+        'test.com',
+        'P1',
+        const Duration(seconds: 1),
+      );
       expect(result?.name, 'P1');
       expect(result?.value, 100);
     });
@@ -326,6 +338,12 @@ void main() {
       when(() => mock.stopListener()).thenAnswer((_) async => false);
       final result = await controller.stopListener();
       expect(result, false);
+    });
+
+    test('restartListener delegates', () async {
+      when(() => mock.restartListener()).thenAnswer((_) async => true);
+      final result = await controller.restartListener();
+      expect(result, true);
     });
 
     test('updateGeoData delegates', () async {

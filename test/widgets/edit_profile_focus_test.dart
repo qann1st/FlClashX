@@ -130,6 +130,13 @@ void main() {
     } catch (_) {}
   });
 
+  testWidgets('the sections of the edit page keep a gap between them', (
+    tester,
+  ) async {
+    await pumpEditProfile(tester);
+    expect(find.byType(ListSectionGap), findsNWidgets(2));
+  });
+
   testWidgets('tabbing into the edit page reaches the form past its bar', (
     tester,
   ) async {
@@ -193,7 +200,7 @@ void main() {
     );
 
     await tester.enterText(interval, '');
-    await tester.tap(find.byType(Switch).first);
+    await tester.tap(find.byType(CommonSwitch));
     await tester.pump();
     await tester.tap(find.byTooltip('Save'));
     await tester.pump();

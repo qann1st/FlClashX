@@ -69,11 +69,12 @@ void main() {
     expect(find.text('github.com/chen08209/FlClash'), findsOneWidget);
     expect(find.text('github.com/legiz-ru/Prizrak-Core'), findsOneWidget);
     expect(find.text('t.me/flclashx'), findsOneWidget);
-    expect(find.text('Thanks for contribution'), findsOneWidget);
-    expect(find.text('Gratitude'), findsOneWidget);
-    for (final name in ['pluralplay', 'kastov', 'x_kit_', 'legiz']) {
+    expect(find.text('Fork author'), findsOneWidget);
+    expect(find.text('Other contributors'), findsOneWidget);
+    for (final name in ['pluralplay', 'kastov', 'katsukibtw']) {
       expect(find.text(name), findsOneWidget);
     }
+    expect(find.text('x_kit_'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

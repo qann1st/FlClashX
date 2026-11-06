@@ -21,23 +21,6 @@ class IconRecordsDao extends DatabaseAccessor<Database>
 
   final int maxCapacity = 1000;
 
-  Future<IconRecord?> get(String url) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-
-    return transaction(() async {
-      final record = await iconRecords
-          .readable((row) => row, where: (t) => t.url.equals(url))
-          .getSingleOrNull();
-
-      if (record != null) {
-        await (update(iconRecords)..where((t) => t.url.equals(url))).write(
-          IconRecordsCompanion(lastAccessed: Value(now)),
-        );
-      }
-      return record;
-    });
-  }
-
   Future<void> put(String url) async {
     final now = DateTime.now().millisecondsSinceEpoch;
 

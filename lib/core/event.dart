@@ -116,10 +116,6 @@ class CoreEventManager {
   final ObserverList<CoreEventListener> _listeners =
       ObserverList<CoreEventListener>();
 
-  bool get hasListeners {
-    return _listeners.isNotEmpty;
-  }
-
   void sendEvent(CoreEvent event) {
     _controller.add(event);
   }

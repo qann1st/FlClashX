@@ -9,8 +9,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class RequestsView extends ConsumerStatefulWidget {
   final ScrollController? scrollController;
+  final List<CommonPopupMenuItem> titleMenuItems;
 
-  const RequestsView({super.key, this.scrollController});
+  const RequestsView({
+    super.key,
+    this.scrollController,
+    this.titleMenuItems = const [],
+  });
 
   @override
   ConsumerState<RequestsView> createState() => _RequestsViewState();
@@ -64,6 +69,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     final appLocalizations = context.appLocalizations;
     return CommonScaffold(
       title: PageLabel.requests.label,
+      titleMenuItems: widget.titleMenuItems,
       searchState: AppBarSearchState(onSearch: _listController.search),
       onKeywordsUpdate: _listController.updateKeywords,
       body: ValueListenableBuilder<TrackerInfosState>(
@@ -109,7 +115,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
                       controller: _scrollController,
                       padding: EdgeInsets.only(
                         top: context.contentTopPadding,
-                        bottom: 16 + BottomInsetScope.of(context),
+                        bottom: 16 + context.bottomInset,
                       ),
                       trackerInfos: requests,
                       table: table,

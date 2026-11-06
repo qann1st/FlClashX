@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -56,10 +57,13 @@ private class FakeApp(
     private val localNetworkGranted: Boolean = true,
     private val vpnGranted: Boolean = true,
     private val holdVpnPreparation: Boolean = false,
+    private val holdExplanation: Boolean = false,
 ) : AppGateway {
     var beforeVpnPrepared: (() -> Unit)? = null
     var cancelledPreparations = 0
     var localNetworkRequests = 0
+    var explainedRefusals = 0
+    private var heldExplanation: (() -> Boolean)? = null
 
     private var heldCallback: ((Boolean) -> Unit)? = null
 
@@ -85,6 +89,20 @@ private class FakeApp(
         if (heldCallback === callback) {
             heldCallback = null
         }
+    }
+
+    override fun explainVpnRefusal(isCurrent: () -> Boolean) {
+        heldExplanation = isCurrent
+        if (!holdExplanation) {
+            deliverExplanation()
+        }
+    }
+
+    fun deliverExplanation() {
+        if (heldExplanation?.invoke() == true) {
+            explainedRefusals++
+        }
+        heldExplanation = null
     }
 }
 
@@ -182,11 +200,10 @@ class ServiceStateMachineTest {
             SharedState(
                 currentProfileName = "Work",
                 stopText = "Disconnect",
-                onlyStatisticsProxy = true,
             ),
         )
 
-        assertEquals(NotificationParams("Work", "Disconnect", true), params)
+        assertEquals(NotificationParams("Work", "Disconnect"), params)
     }
 
     @Test
@@ -307,6 +324,37 @@ class ServiceStateMachineTest {
         assertEquals(1, host.stopCalls)
         assertEquals(RunState.STOPPED, machine.runState.value)
         assertFalse(machine.isRunRequested)
+    }
+
+    /** The explanation reaches the main thread only after the refused start was rolled back. */
+    @Test
+    fun `a denied vpn permission is explained by the app in front`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val app = FakeApp(vpnGranted = false, holdExplanation = true)
+        host.app = app
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+
+        assertFalse(machine.requestStart().await())
+        app.deliverExplanation()
+        assertEquals(1, app.explainedRefusals)
+        assertFalse(host.toasts.contains(VPN_PERMISSION_MESSAGE))
+    }
+
+    @Test
+    fun `a denied vpn permission is not explained once a stop superseded the start`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val app = FakeApp(vpnGranted = false, holdExplanation = true)
+        host.app = app
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+
+        assertFalse(machine.requestStart().await())
+        machine.requestStop().await()
+        app.deliverExplanation()
+
+        assertEquals(0, app.explainedRefusals)
+        assertFalse(host.toasts.contains(VPN_PERMISSION_MESSAGE))
     }
 
     @Test
@@ -764,11 +812,10 @@ class ServiceStateMachineTest {
             SharedState(
                 currentProfileName = "Work",
                 stopText = "Disconnect",
-                onlyStatisticsProxy = true,
             ),
         )
 
-        assertEquals(listOf(NotificationParams("Work", "Disconnect", true)), host.notificationParams)
+        assertEquals(listOf(NotificationParams("Work", "Disconnect")), host.notificationParams)
     }
 
     @Test
@@ -828,6 +875,133 @@ class ServiceStateMachineTest {
             assertEquals(RunState.STARTED, machine.runState.value)
             assertTrue(machine.captureRequestToken().running)
         }
+
+    @Test
+    fun `a restart replaces the running service with one built from the current options`() =
+        runTest {
+            val host = FakeHost(backgroundScope)
+            val machine = ServiceStateMachine(host)
+            machine.syncSharedState(configuredState())
+            machine.requestStart().await()
+            val previous = host.runtime
+            val states = mutableListOf<RunState>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                machine.runState.toList(states)
+            }
+            machine.syncSharedState(configuredState(stack = "mixed"))
+
+            assertTrue(machine.requestRestart().await())
+            testScheduler.runCurrent()
+
+            assertEquals(1, host.stopCalls)
+            assertEquals(2, host.startCalls)
+            assertEquals("mixed", host.lastStartOptions?.stack)
+            assertNotSame(previous, host.runtime)
+            assertEquals(RunState.STARTED, machine.runState.value)
+            assertFalse(states.contains(RunState.STOPPING) || states.contains(RunState.STOPPED))
+            assertEquals(0, host.stoppedNotifications)
+        }
+
+    @Test
+    fun `a restart while nothing runs only starts`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+
+        assertTrue(machine.requestRestart().await())
+
+        assertEquals(0, host.stopCalls)
+        assertEquals(1, host.startCalls)
+        assertEquals(RunState.STARTED, machine.runState.value)
+    }
+
+    /** Flutter's old restart was exactly this pair, and its start adopted the run it meant to end. */
+    @Test
+    fun `a stop and a start that overtake a restart still end on a new service`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+        machine.requestStart().await()
+        val previous = host.runtime
+
+        val restart = machine.requestRestart()
+        machine.requestStop()
+        val start = machine.requestStart()
+
+        assertTrue(start.await())
+        assertFalse(restart.await())
+        assertEquals(1, host.stopCalls)
+        assertEquals(2, host.startCalls)
+        assertNotSame(previous, host.runtime)
+        assertEquals(RunState.STARTED, machine.runState.value)
+    }
+
+    @Test
+    fun `a stop that overtakes a restart leaves the service stopped`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+        machine.requestStart().await()
+
+        val restart = machine.requestRestart()
+        val stop = machine.requestStop()
+
+        assertTrue(stop.await())
+        assertFalse(restart.await())
+        assertEquals(1, host.startCalls)
+        assertEquals(null, host.runtime)
+        assertFalse(machine.isRunRequested)
+        assertEquals(RunState.STOPPED, machine.runState.value)
+    }
+
+    @Test
+    fun `a restart asked twice in a row replaces the service once`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+        machine.requestStart().await()
+
+        val first = machine.requestRestart()
+        val second = machine.requestRestart()
+
+        assertTrue(second.await())
+        assertFalse(first.await())
+        assertEquals(1, host.stopCalls)
+        assertEquals(2, host.startCalls)
+        assertEquals(RunState.STARTED, machine.runState.value)
+    }
+
+    @Test
+    fun `a start after a served restart adopts the new service`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+        machine.requestStart().await()
+        machine.requestRestart().await()
+        machine.requestStop()
+
+        assertTrue(machine.requestStart().await())
+
+        assertEquals(1, host.stopCalls)
+        assertEquals(2, host.startCalls)
+        assertEquals(RunState.STARTED, machine.runState.value)
+    }
+
+    @Test
+    fun `a restart whose new service fails reports the run stopped`() = runTest {
+        val host = FakeHost(backgroundScope)
+        val machine = ServiceStateMachine(host)
+        machine.syncSharedState(configuredState())
+        machine.requestStart().await()
+        host.startSucceeds = false
+
+        assertFalse(machine.requestRestart().await())
+
+        assertEquals(null, host.runtime)
+        assertFalse(machine.isRunRequested)
+        assertEquals(RunState.STOPPED, machine.runState.value)
+        assertEquals(1, host.stoppedNotifications)
+    }
 
     @Test
     fun `a start rebinds when the running service is not the one the options ask for`() = runTest {

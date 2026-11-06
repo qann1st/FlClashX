@@ -28,7 +28,21 @@ class CommonAction extends _$CommonAction {
         .update((state) => state.copyWith(showTrayTitle: !state.showTrayTitle));
   }
 
+  void updateMonochromeTrayIcon() {
+    ref
+        .read(appSettingProvider.notifier)
+        .update(
+          (state) =>
+              state.copyWith(monochromeTrayIcon: !state.monochromeTrayIcon),
+        );
+  }
+
+  /// The cycling hotkey, which has nowhere to ask before taking the mode
+  /// over from the subscription.
   void updateMode() {
+    ref
+        .read(managedSettingsActionProvider.notifier)
+        .takeOverIfLocked('clash.mode');
     final modes = ref.read(availableModesProvider);
     ref.read(patchClashConfigProvider.notifier).update((state) {
       final index = modes.indexWhere((item) => item == state.mode);
@@ -154,6 +168,13 @@ class CommonAction extends _$CommonAction {
     final page = update.pageUrl;
     if (page != null && page.isNotEmpty) {
       unawaited(launchUrl(Uri.parse(page)));
+    } else if (isUser) {
+      unawaited(
+        dialogs.showAlert(
+          title: currentAppLocalizations.checkUpdate,
+          message: TextSpan(text: currentAppLocalizations.checkUpdateError),
+        ),
+      );
     }
   }
 }

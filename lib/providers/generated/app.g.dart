@@ -1001,14 +1001,17 @@ abstract class _$SideWidth extends $Notifier<double> {
   }
 }
 
-/// Whether the native window currently draws a backdrop behind the content.
+/// The opacity the sidebar keeps its own color at over the backdrop the native
+/// window draws behind the content, or null while it draws none.
 
 @ProviderFor(WindowBlur)
 final windowBlurProvider = WindowBlurProvider._();
 
-/// Whether the native window currently draws a backdrop behind the content.
-final class WindowBlurProvider extends $NotifierProvider<WindowBlur, bool> {
-  /// Whether the native window currently draws a backdrop behind the content.
+/// The opacity the sidebar keeps its own color at over the backdrop the native
+/// window draws behind the content, or null while it draws none.
+final class WindowBlurProvider extends $NotifierProvider<WindowBlur, double?> {
+  /// The opacity the sidebar keeps its own color at over the backdrop the native
+  /// window draws behind the content, or null while it draws none.
   WindowBlurProvider._()
     : super(
         from: null,
@@ -1028,29 +1031,30 @@ final class WindowBlurProvider extends $NotifierProvider<WindowBlur, bool> {
   WindowBlur create() => WindowBlur();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
+  Override overrideWithValue(double? value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
+      providerOverride: $SyncValueProvider<double?>(value),
     );
   }
 }
 
-String _$windowBlurHash() => r'1009d8da62ada83f4afc379063d69413d359821b';
+String _$windowBlurHash() => r'0233223726071e4dd10bcb5875977dc652100e15';
 
-/// Whether the native window currently draws a backdrop behind the content.
+/// The opacity the sidebar keeps its own color at over the backdrop the native
+/// window draws behind the content, or null while it draws none.
 
-abstract class _$WindowBlur extends $Notifier<bool> {
-  bool build();
+abstract class _$WindowBlur extends $Notifier<double?> {
+  double? build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<bool, bool>;
+    final ref = this.ref as $Ref<double?, double?>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
+              AnyNotifier<double?, double?>,
+              double?,
               Object?,
               Object?
             >;
@@ -1429,6 +1433,68 @@ abstract class _$Groups extends $Notifier<List<Group>> {
             as $ClassProviderElement<
               AnyNotifier<List<Group>, List<Group>>,
               List<Group>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
+/// The current profile's own GLOBAL carries `flclashx-override`: global mode
+/// shows that group alone and rule mode leaves it out.
+
+@ProviderFor(GlobalOverride)
+final globalOverrideProvider = GlobalOverrideProvider._();
+
+/// The current profile's own GLOBAL carries `flclashx-override`: global mode
+/// shows that group alone and rule mode leaves it out.
+final class GlobalOverrideProvider
+    extends $NotifierProvider<GlobalOverride, bool> {
+  /// The current profile's own GLOBAL carries `flclashx-override`: global mode
+  /// shows that group alone and rule mode leaves it out.
+  GlobalOverrideProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'globalOverrideProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$globalOverrideHash();
+
+  @$internal
+  @override
+  GlobalOverride create() => GlobalOverride();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$globalOverrideHash() => r'b6dea981a94720fca39fdf688c4a47455f16dd25';
+
+/// The current profile's own GLOBAL carries `flclashx-override`: global mode
+/// shows that group alone and rule mode leaves it out.
+
+abstract class _$GlobalOverride extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
               Object?,
               Object?
             >;

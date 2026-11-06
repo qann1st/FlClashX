@@ -64,7 +64,7 @@ class TrackerInfoItem extends ConsumerWidget {
     final showIcon = ref.watch(
       patchClashConfigProvider.select(
         (state) =>
-            state.findProcessMode == FindProcessMode.always && system.isAndroid,
+            state.findProcessMode != FindProcessMode.off && system.isAndroid,
       ),
     );
     return RecordListItem(
@@ -247,9 +247,10 @@ class TrackerInfoDetailView extends StatelessWidget {
     final appLocalizations = context.appLocalizations;
     final metadata = trackerInfo.metadata;
     return ListView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-      ).copyWith(bottom: 20, top: context.contentTopPadding),
+      padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+        bottom: 20 + context.bottomInset,
+        top: context.sectionsTopPadding,
+      ),
       children: [
         generateSection(
           title: appLocalizations.basicInfo,

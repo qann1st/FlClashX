@@ -538,34 +538,15 @@ func TestInjectTestURLFillsOnlyTheBlanks(t *testing.T) {
 	}
 	injectTestURL(raw)
 
-	if got := raw.ProxyGroup[0]["url"]; got != "https://pinned.test" {
-		t.Errorf("Auto url = %v, want the URL the profile already checks with", got)
+	if got := raw.ProxyGroup[0]["url"]; got != configured {
+		t.Errorf("Auto url = %v, want the host's test URL", got)
 	}
 	if got := raw.ProxyGroup[1]["url"]; got != "https://pinned.test" {
 		t.Errorf("Pinned url = %v, the group's own URL was overwritten", got)
 	}
 	check := raw.ProxyProvider["sub"]["health-check"].(map[string]any)
-	if got := check["url"]; got != "https://pinned.test" {
-		t.Errorf("provider health-check url = %v, want the profile's URL", got)
-	}
-
-	bare := config.DefaultRawConfig()
-	bare.ProxyGroup = []map[string]any{{"name": "Auto", "type": "url-test"}}
-	injectTestURL(bare)
-	if got := bare.ProxyGroup[0]["url"]; got != configured {
-		t.Errorf("url without any in the profile = %v, want the host's", got)
-	}
-
-	split := config.DefaultRawConfig()
-	split.ProxyGroup = []map[string]any{
-		{"name": "A", "type": "url-test", "url": "https://one.test"},
-		{"name": "B", "type": "url-test", "url": "https://two.test"},
-		{"name": "C", "type": "url-test", "url": "https://two.test"},
-		{"name": "D", "type": "url-test"},
-	}
-	injectTestURL(split)
-	if got := split.ProxyGroup[3]["url"]; got != "https://two.test" {
-		t.Errorf("url among several = %v, want the most used one", got)
+	if got := check["url"]; got != configured {
+		t.Errorf("provider health-check url = %v, want the host's test URL", got)
 	}
 }
 
@@ -1076,5 +1057,41 @@ func TestTestDelayStopsQueueingOnceTheTimeoutIsSpent(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("handleTestDelay outlived the timeout it was given, waiting for a slot")
+	}
+}
+
+// applyConfig relies on this to hand mihomo groups that are pinned already.
+func TestPatchSelectGroupPinsGroupsBeforeTheyAreInstalled(t *testing.T) {
+	cfg, err := config.Parse([]byte(`
+proxies:
+  - {name: a, type: direct}
+  - {name: b, type: direct}
+proxy-groups:
+  - {name: auto, type: url-test, proxies: [a, b], url: "http://127.0.0.1:9", lazy: true}
+  - {name: backup, type: fallback, proxies: [a, b], url: "http://127.0.0.1:9", lazy: true}
+rules:
+  - MATCH,auto
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	patchSelectGroup(cfg.Proxies, map[string]string{"auto": "b", "backup": "b"})
+
+	for _, name := range []string{"auto", "backup"} {
+		raw, err := cfg.Proxies[name].MarshalJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var view struct {
+			Fixed string `json:"fixed"`
+			Now   string `json:"now"`
+		}
+		if err := json.Unmarshal(raw, &view); err != nil {
+			t.Fatal(err)
+		}
+		if view.Fixed != "b" || view.Now != "b" {
+			t.Errorf("%s: fixed %q now %q, want the pin b", name, view.Fixed, view.Now)
+		}
 	}
 }

@@ -9,6 +9,7 @@ import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -65,6 +66,17 @@ void main() {
 
       expect(seen.sublist(0, Mode.values.length), Mode.values);
       expect(seen.last, Mode.values.first, reason: 'wraps after the last mode');
+    });
+
+    test('takes the mode over from a subscription that sets it', () {
+      final container = buildContainer();
+      container.listen(appSettingProvider, (_, _) {});
+      container.listen(managedClashKeysProvider, (_, _) {});
+      container.read(managedClashKeysProvider.notifier).set({'clash.mode'});
+
+      container.read(commonActionProvider.notifier).updateMode();
+
+      expect(container.read(appSettingProvider).ownedSettings, {'clash.mode'});
     });
   });
 

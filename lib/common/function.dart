@@ -46,16 +46,6 @@ class Debouncer {
     });
   }
 
-  void flush(dynamic tag) {
-    final timer = _operations.remove(tag);
-    timer?.cancel();
-    final pending = _pending.remove(tag);
-    if (timer == null || pending == null) {
-      return;
-    }
-    _applyAndReport(tag, pending.func, pending.args);
-  }
-
   void cancel(dynamic tag) {
     _operations.remove(tag)?.cancel();
     _pending.remove(tag);
@@ -103,10 +93,6 @@ class Throttler {
       });
     }
     return false;
-  }
-
-  void cancel(dynamic tag) {
-    _operations.remove(tag)?.cancel();
   }
 }
 

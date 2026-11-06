@@ -12,7 +12,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'card.dart';
 import 'common.dart';
 
-const _pinnedHeaderGap = 8.0;
 const _headerInset = 10.0;
 const _headerButtonInset = 4.0;
 const _groupInset = 16.0;
@@ -125,37 +124,13 @@ class _ProxiesListViewState extends ConsumerState<ProxiesListView> {
     final offset = _getGroupOffset(groupName);
     _scrollToMakeVisibleWithPadding(
       containerHeight: max(
-        _controller.position.viewportDimension -
-            context.appBarInset -
-            _pinnedHeaderGap,
+        _controller.position.viewportDimension - context.contentTopPadding,
         0,
       ),
       pixels: pixels,
       start: offset,
       end: offset + listHeaderHeight,
     );
-  }
-
-  void _scrollToGroupSelected(String groupName) {
-    final cardType = ref.read(proxiesListStateProvider).proxyCardType;
-    final proxies = ref
-        .read(proxiesListStateProvider)
-        .groups
-        .getGroup(groupName)
-        ?.all;
-    if (proxies == null) {
-      return;
-    }
-    final rowOffset = selectedRowOffset(
-      proxies: proxies,
-      selectedProxyName: ref.read(selectedProxyNameProvider(groupName)),
-      columns: _columns,
-      rowExtent: getRowExtent(cardType),
-    );
-    if (rowOffset == null) {
-      return;
-    }
-    animateScrollTo(_controller, _getGroupOffset(groupName) + rowOffset);
   }
 
   @override
@@ -212,9 +187,7 @@ class _ProxiesListViewState extends ConsumerState<ProxiesListView> {
                 cardType: cardType,
                 gap: gap,
                 onChange: _handleChange,
-                onScrollToSelected: _scrollToGroupSelected,
               );
-              final barInset = context.appBarInset;
               return CommonScrollBar(
                 controller: _controller,
                 thumbVisibility: true,
@@ -223,7 +196,7 @@ class _ProxiesListViewState extends ConsumerState<ProxiesListView> {
                   controller: _controller,
                   slivers: [
                     PinnedHeaderSliver(
-                      child: SizedBox(height: barInset + _pinnedHeaderGap),
+                      child: SizedBox(height: context.contentTopPadding),
                     ),
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(
@@ -263,9 +236,7 @@ class _ProxiesListViewState extends ConsumerState<ProxiesListView> {
                             ),
                     ),
                     SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 16 + BottomInsetScope.of(context),
-                      ),
+                      child: SizedBox(height: 16 + context.bottomInset),
                     ),
                   ],
                 ),
@@ -296,7 +267,6 @@ class _GroupSliver extends ConsumerStatefulWidget {
     required this.cardType,
     required this.gap,
     required this.onChange,
-    required this.onScrollToSelected,
   });
 
   final Group group;
@@ -304,7 +274,6 @@ class _GroupSliver extends ConsumerStatefulWidget {
   final ProxyCardType cardType;
   final double gap;
   final void Function(String groupName) onChange;
-  final void Function(String groupName) onScrollToSelected;
 
   @override
   ConsumerState<_GroupSliver> createState() => _GroupSliverState();
@@ -489,7 +458,6 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
         enterAnimated: false,
         floating: floating,
         lift: lift,
-        onScrollToSelected: widget.onScrollToSelected,
         key: ValueKey(groupName),
         isExpand: isExpand,
         unfolded: unfolded,
@@ -589,7 +557,6 @@ class ListHeader extends ConsumerWidget {
   final Group group;
 
   final Function(String groupName) onChange;
-  final Function(String groupName) onScrollToSelected;
   final bool isExpand;
 
   /// Whether the rows have settled under the header, squaring its bottom.
@@ -611,7 +578,6 @@ class ListHeader extends ConsumerWidget {
     this.lift = 0,
     required this.group,
     required this.onChange,
-    required this.onScrollToSelected,
     required this.isExpand,
     required this.unfolded,
   });
@@ -641,17 +607,18 @@ class ListHeader extends ConsumerWidget {
               child: Row(
                 children: [
                   _GroupIcon(src: group.icon, name: groupName),
-                  Flexible(child: _GroupSummary(groupName: groupName)),
+                  Flexible(
+                    child: _GroupSummary(
+                      groupName: groupName,
+                      description: group.serverDescription,
+                    ),
+                  ),
                 ],
               ),
             ),
             _GroupActions(
               isExpand: isExpand,
               isDelayTesting: isDelayTesting,
-              description: group.serverDescription,
-              onScrollToSelected: () {
-                onScrollToSelected(groupName);
-              },
               onDelayTest: () {
                 ref
                     .read(proxiesActionProvider.notifier)
@@ -772,9 +739,10 @@ class _GroupIcon extends ConsumerWidget {
 }
 
 class _GroupSummary extends StatelessWidget {
-  const _GroupSummary({required this.groupName});
+  const _GroupSummary({required this.groupName, required this.description});
 
   final String groupName;
+  final String? description;
 
   @override
   Widget build(BuildContext context) {
@@ -789,27 +757,31 @@ class _GroupSummary extends StatelessWidget {
           style: AppTextStyle.callout.of(context, emphasized: true),
         ),
         const SizedBox(height: 2),
-        Flexible(flex: 1, child: _SelectedProxyName(groupName: groupName)),
+        Flexible(
+          flex: 1,
+          child: _GroupSubtitle(groupName: groupName, description: description),
+        ),
       ],
     );
   }
 }
 
-class _SelectedProxyName extends ConsumerWidget {
-  const _SelectedProxyName({required this.groupName});
+class _GroupSubtitle extends ConsumerWidget {
+  const _GroupSubtitle({required this.groupName, required this.description});
 
   final String groupName;
+  final String? description;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final proxyName = ref
-        .watch(selectedProxyNameProvider(groupName))
-        .takeFirstValid([]);
-    if (proxyName.isEmpty) {
+    final subtitle =
+        description ??
+        ref.watch(selectedProxyNameProvider(groupName)).takeFirstValid([]);
+    if (subtitle.isEmpty) {
       return const SizedBox.shrink();
     }
     return EmojiText(
-      proxyName,
+      subtitle,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: AppTextStyle.caption1.of(context, emphasized: true).toLight,
@@ -821,16 +793,12 @@ class _GroupActions extends StatelessWidget {
   const _GroupActions({
     required this.isExpand,
     required this.isDelayTesting,
-    required this.description,
-    required this.onScrollToSelected,
     required this.onDelayTest,
     required this.onToggle,
   });
 
   final bool isExpand;
   final bool isDelayTesting;
-  final String? description;
-  final VoidCallback onScrollToSelected;
   final VoidCallback onDelayTest;
   final VoidCallback onToggle;
 
@@ -840,37 +808,13 @@ class _GroupActions extends StatelessWidget {
       size: TonalButtonSize.compact,
       child: Row(
         children: [
-          if (isExpand)
-            TonalButtonGroup(
-              size: TonalButtonSize.compact,
-              children: [
-                IconButton(
-                  tooltip: context.appLocalizations.scrollToSelected,
-                  onPressed: onScrollToSelected,
-                  iconSize: 19,
-                  icon: const GlyphIcon(AppGlyphs.locate),
-                ),
-                IconButton(
-                  tooltip: context.appLocalizations.delayTest,
-                  onPressed: isDelayTesting ? null : onDelayTest,
-                  icon: isDelayTesting
-                      ? CommonCircleLoading(size: TonalButtonSize.compact.icon)
-                      : const GlyphIcon(AppGlyphs.bolt),
-                ),
-              ],
-            )
-          else if (description case final description?)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 160),
-              child: Text(
-                description,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyle.caption1
-                    .of(context, emphasized: true)
-                    .toLight,
-              ),
-            ),
+          IconButton(
+            tooltip: context.appLocalizations.delayTest,
+            onPressed: isDelayTesting ? null : onDelayTest,
+            icon: isDelayTesting
+                ? CommonCircleLoading(size: TonalButtonSize.compact.icon)
+                : const GlyphIcon(AppGlyphs.bolt),
+          ),
           const SizedBox(width: 6),
           ElasticPress(
             child: IconButton(

@@ -34,8 +34,30 @@ var (
 	_ proxydialer.Tunnel = accountingTunnel{}
 )
 
+// A connection still resolving or dialing out has no tracker yet, so
+// stopping closes these from the client's side too.
+var openInbound sync.Map
+
 func (t accountingTunnel) HandleTCPConn(conn net.Conn, metadata *constant.Metadata) {
-	t.Tunnel.HandleTCPConn(&accountedConn{Conn: conn, metadata: metadata}, metadata)
+	accounted := &accountedConn{Conn: conn, metadata: metadata}
+	openInbound.Store(accounted, struct{}{})
+	defer openInbound.Delete(accounted)
+	// One still in its SOCKS or HTTP handshake when the listeners stopped
+	// arrives after the sweep; registered first, it is either swept or sees
+	// the stop here. TUN connections die with the device, and Android starts
+	// the device before the listeners; probes run whether or not they do.
+	if !isRunning.Load() && metadata.Type != constant.TUN && metadata.Type != constant.INNER {
+		_ = accounted.Close()
+		return
+	}
+	t.Tunnel.HandleTCPConn(accounted, metadata)
+}
+
+func closeOpenInbound() {
+	openInbound.Range(func(conn, _ any) bool {
+		_ = conn.(*accountedConn).Close()
+		return true
+	})
 }
 
 func (t accountingTunnel) HandleUDPPacket(packet constant.UDPPacket, metadata *constant.Metadata) {
@@ -70,7 +92,10 @@ const (
 
 // The tracker that knows the chain is registered once the dial succeeds;
 // bytes seen before then wait in the account until it is.
-const routeLookupAttempts = 64
+const (
+	routeLookupBurst = 64
+	routeLookupGap   = 100 * time.Millisecond
+)
 
 type trafficAccount struct {
 	mu        sync.Mutex
@@ -79,6 +104,7 @@ type trafficAccount struct {
 	route     routeKind
 	trackerID string
 	lookups   int
+	lookedUp  time.Time
 	up, down  int64
 	verified  time.Time
 }
@@ -86,8 +112,7 @@ type trafficAccount struct {
 func (a *trafficAccount) add(up, down int64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.route == routeUnknown && a.lookups < routeLookupAttempts {
-		a.lookups++
+	if a.route == routeUnknown && a.lookupDue() {
 		if tracker := findTracker(a.matches); tracker != nil {
 			a.settle(tracker)
 		}
@@ -99,6 +124,19 @@ func (a *trafficAccount) add(up, down int64) {
 		a.up += up
 		a.down += down
 	}
+}
+
+func (a *trafficAccount) lookupDue() bool {
+	if a.lookups < routeLookupBurst {
+		a.lookups++
+		return true
+	}
+	now := time.Now()
+	if now.Sub(a.lookedUp) < routeLookupGap {
+		return false
+	}
+	a.lookedUp = now
+	return true
 }
 
 func (a *trafficAccount) matches(info *statistic.TrackerInfo) bool {
@@ -248,7 +286,7 @@ func (r *udpRoute) recheck(now time.Time) {
 	}
 	tracker := findTracker(r.matches)
 	if tracker == nil {
-		r.route, r.lookups = routeUnknown, 0
+		r.route, r.lookups, r.lookedUp = routeUnknown, 0, time.Time{}
 		return
 	}
 	r.verified = now

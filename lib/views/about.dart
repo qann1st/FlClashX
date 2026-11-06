@@ -18,36 +18,25 @@ class Person {
   final String? link;
 }
 
-const _contributors = [
+const _forkAuthors = [
   Person(
     avatar: 'assets/images/avatar/pluralplay.jpg',
     name: 'pluralplay',
     link: 'https://github.com/pluralplay',
   ),
+];
+
+const _contributors = [
   Person(
     avatar: 'assets/images/avatar/kastov.jpg',
     name: 'kastov',
     link: 'https://github.com/kastov',
-  ),
-];
-
-const _thanks = [
-  Person(
-    avatar: 'assets/images/avatar/x_kit_.jpg',
-    name: 'x_kit_',
-    link: 'https://github.com/this-xkit',
   ),
   Person(
     avatar: 'assets/images/avatar/katsukibtw.jpg',
     name: 'katsukibtw',
     link: 'https://github.com/katsukibtw',
   ),
-];
-
-const _gratitude = [
-  Person(avatar: 'assets/images/avatar/cool_coala.jpg', name: 'cool_coala'),
-  Person(avatar: 'assets/images/avatar/arpic.jpg', name: 'arpic'),
-  Person(avatar: 'assets/images/avatar/legiz.jpg', name: 'legiz'),
 ];
 
 const _upstreamRepository = 'chen08209/FlClash';
@@ -109,9 +98,10 @@ class AboutView extends ConsumerWidget {
       isLoading: isLoading,
       title: appLocalizations.about,
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-        ).copyWith(top: context.contentTopPadding, bottom: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+          top: context.contentTopPadding,
+          bottom: 32 + context.bottomInset,
+        ),
         children: [
           _AboutHero(
             isCheckingUpdate: isLoading,
@@ -160,16 +150,12 @@ class AboutView extends ConsumerWidget {
             ],
           ),
           generateSection(
+            title: appLocalizations.forkAuthor,
+            items: const [_PeopleRow(people: _forkAuthors)],
+          ),
+          generateSection(
             title: appLocalizations.otherContributors,
             items: const [_PeopleRow(people: _contributors)],
-          ),
-          generateSection(
-            title: appLocalizations.thanks,
-            items: const [_PeopleRow(people: _thanks)],
-          ),
-          generateSection(
-            title: appLocalizations.gratitude,
-            items: const [_PeopleRow(people: _gratitude, size: 44)],
           ),
         ],
       ),
@@ -347,10 +333,11 @@ class _LinkBadge extends StatelessWidget {
 
 /// A row of avatars with names under them; a person with a link opens it.
 class _PeopleRow extends StatelessWidget {
-  const _PeopleRow({required this.people, this.size = 56});
+  const _PeopleRow({required this.people});
+
+  static const _avatarSize = 56.0;
 
   final List<Person> people;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -360,7 +347,8 @@ class _PeopleRow extends StatelessWidget {
         spacing: 16,
         runSpacing: 12,
         children: [
-          for (final person in people) _Avatar(person: person, size: size),
+          for (final person in people)
+            _Avatar(person: person, size: _avatarSize),
         ],
       ),
     );

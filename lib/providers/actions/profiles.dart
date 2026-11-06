@@ -35,11 +35,21 @@ class ProfilesAction extends _$ProfilesAction {
     }
   }
 
-  Future<String> validateConfigWithData(String data) async {
+  Future<String> validateConfigWithData(List<int> data) async {
     return _core.validateConfigWithData(data);
   }
 
-  Future<void> autoUpdateProfiles() async {
+  Future<Set<int>>? _autoUpdating;
+
+  /// A pass still under way is joined: its retries can outlast the timer.
+  Future<Set<int>> autoUpdateProfiles() {
+    return _autoUpdating ??= _autoUpdateProfiles().whenComplete(
+      () => _autoUpdating = null,
+    );
+  }
+
+  Future<Set<int>> _autoUpdateProfiles() async {
+    final refreshed = <int>{};
     for (final id in [
       for (final profile in ref.read(profilesProvider)) profile.id,
     ]) {
@@ -51,22 +61,24 @@ class ProfilesAction extends _$ProfilesAction {
       if (isNotNeedUpdate == false || profile.type != ProfileType.url) {
         continue;
       }
-      try {
-        await updateProfile(profile);
-      } catch (e) {
-        commonPrint.log(compactError(e), logLevel: LogLevel.warning);
+      if (await _updateWithRetry(id)) {
+        refreshed.add(id);
       }
     }
+    return refreshed;
   }
 
   /// The current subscription is read again shortly after start so its
   /// counters and panel headers are fresh; [autoUpdateProfiles] already took
   /// the ones that were due, and a profile with auto update off is left alone.
-  Future<void> refreshCurrentProfileAfterStart() async {
+  Future<void> refreshCurrentProfileAfterStart({
+    Set<int> refreshed = const {},
+  }) async {
     final profile = ref.read(currentProfileProvider);
     if (profile == null ||
         !profile.autoUpdate ||
-        profile.type != ProfileType.url) {
+        profile.type != ProfileType.url ||
+        refreshed.contains(profile.id)) {
       return;
     }
     final due = profile.lastUpdateDate
@@ -75,12 +87,42 @@ class ProfilesAction extends _$ProfilesAction {
     if (due != false) {
       return;
     }
-    try {
-      await updateProfile(profile);
-    } catch (e) {
-      commonPrint.log(compactError(e), logLevel: LogLevel.warning);
+    await _updateWithRetry(profile.id);
+  }
+
+  static const updateRetryDelays = [
+    Duration(seconds: 2),
+    Duration(seconds: 5),
+    Duration(seconds: 15),
+  ];
+
+  /// True once the profile is fresh, by this fetch or one that landed meanwhile.
+  Future<bool> _updateWithRetry(int id) async {
+    final since = ref.read(profilesProvider).getProfile(id)?.lastUpdateDate;
+    for (var attempt = 0; ; attempt++) {
+      final profile = ref.read(profilesProvider).getProfile(id);
+      if (profile == null || !profile.autoUpdate) {
+        return false;
+      }
+      if (profile.lastUpdateDate != since) {
+        return true;
+      }
+      try {
+        await updateProfile(profile);
+        return true;
+      } catch (error) {
+        commonPrint.log(compactError(error), logLevel: LogLevel.warning);
+        if (attempt >= updateRetryDelays.length ||
+            !isTransientNetworkError(error)) {
+          return false;
+        }
+      }
+      await retryWait(updateRetryDelays[attempt]);
     }
   }
+
+  @protected
+  Future<void> retryWait(Duration delay) => Future<void>.delayed(delay);
 
   static const expiryNoticeDays = [3, 2, 1, 0];
 
@@ -108,7 +150,7 @@ class ProfilesAction extends _$ProfilesAction {
           (state) => state.copyWith(
             subscriptionNotices: {
               for (final entry in state.subscriptionNotices.entries)
-                if (entry.key.startsWith('${profile.id}:') &&
+                if (!entry.key.startsWith('${profile.id}:') ||
                     entry.value == expire)
                   entry.key: entry.value,
               key: expire,
@@ -236,6 +278,19 @@ class ProfilesAction extends _$ProfilesAction {
     }
   }
 
+  final _updates = <int, Object>{};
+
+  @visibleForTesting
+  SubscriptionFetch? fetch;
+
+  /// [started] is the profile as the request put it at its start.
+  bool _isCurrentUpdate(Profile started, Object request) {
+    final latest = ref.read(profilesProvider).getProfile(started.id);
+    return _updates[started.id] == request &&
+        latest != null &&
+        latest.fileRevision == started.fileRevision;
+  }
+
   Future<void> updateProfile(
     Profile profile, {
     bool showLoading = false,
@@ -243,20 +298,36 @@ class ProfilesAction extends _$ProfilesAction {
     final operation = showLoading
         ? ref.read(updatingKeysProvider.notifier).start(profile.updatingKey)
         : null;
+    final request = Object();
+    _updates[profile.id] = request;
     try {
       ref.read(profilesProvider.notifier).put(profile);
-      final updated = await profile.update(
-        validate: (path, key) => _core.validateProfile(path, key),
-      );
+      final Profile updated;
+      try {
+        updated = await download(
+          profile,
+          isCurrent: () => _isCurrentUpdate(profile, request),
+        );
+      } on ProfileUpdateSupersededException {
+        return;
+      } catch (_) {
+        if (!_isCurrentUpdate(profile, request)) {
+          return;
+        }
+        rethrow;
+      }
       // The download can take minutes; edits and deletes made meanwhile win.
       final latest = ref.read(profilesProvider).getProfile(profile.id);
       if (latest == null) {
         await clearEffect(profile.id);
         return;
       }
+      if (!_isCurrentUpdate(profile, request)) {
+        return;
+      }
       final newProfile = latest.copyWith(
         label: latest.label.takeFirstValid([updated.label]),
-        url: latest.url == profile.url ? updated.url : latest.url,
+        url: updated.url,
         subscriptionInfo: updated.subscriptionInfo,
         lastUpdateDate: updated.lastUpdateDate,
         providerHeaders: updated.providerHeaders,
@@ -284,6 +355,9 @@ class ProfilesAction extends _$ProfilesAction {
         );
       }
     } finally {
+      if (_updates[profile.id] == request) {
+        _updates.remove(profile.id);
+      }
       if (operation != null) {
         ref
             .read(updatingKeysProvider.notifier)
@@ -456,7 +530,7 @@ class ProfilesAction extends _$ProfilesAction {
     ref.read(currentPageLabelProvider.notifier).value = PageLabel.profiles;
   }
 
-  Future<void> addProfileFromLink(
+  Future<Profile?> addProfileFromLink(
     String link, {
     String? label,
     String ageSecretKey = '',
@@ -473,7 +547,7 @@ class ProfilesAction extends _$ProfilesAction {
                 url: link,
                 sendDeviceHeaders: sendDeviceHeaders,
               ).copyWith(ageSecretKey: ageSecretKey),
-              _download,
+              download,
             ),
       title: currentAppLocalizations.addProfile,
     );
@@ -481,6 +555,7 @@ class ProfilesAction extends _$ProfilesAction {
       putProfile(profile);
       noticeDeviceHeaders(profile, manual: true);
     }
+    return profile;
   }
 
   /// A refusal the panel put in its headers: told on a manual download,
@@ -558,7 +633,7 @@ class ProfilesAction extends _$ProfilesAction {
       ],
       (item) async => putProfile(
         await (item.shareLinks.isEmpty
-            ? _download(item.profile)
+            ? download(item.profile)
             : _fromShareLinks(item.profile, item.shareLinks)),
       ),
       label: (item) => item.shareLinks.firstOrNull ?? item.profile.url,
@@ -567,9 +642,12 @@ class ProfilesAction extends _$ProfilesAction {
     );
   }
 
-  Future<Profile> _download(Profile profile) {
+  @protected
+  Future<Profile> download(Profile profile, {bool Function()? isCurrent}) {
     return profile.update(
       validate: (path, key) => _core.validateProfile(path, key),
+      fetch: fetch,
+      isCurrent: isCurrent,
     );
   }
 

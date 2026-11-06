@@ -12,14 +12,19 @@ const appSwitchSettings = {
   'closeconnections': 'app.closeConnections',
 };
 
+/// Driven by `flclashx-special: hideip`.
+const hideIpSetting = 'app.hideIp';
+
 /// The config keys a subscription takes over and the user may take back.
 const managedClashKeys = {
+  'mode',
   'mixed-port',
   'port',
   'socks-port',
   'redir-port',
   'tproxy-port',
   'allow-lan',
+  'authentication',
   'ipv6',
   'log-level',
   'find-process-mode',
@@ -37,6 +42,9 @@ const managedClashKeys = {
   'geo-update-interval',
   'geox-url',
   'global-ua',
+  'tun.enable',
+  'tun.mtu',
+  'tun.congestion-controller',
   'tun.device',
   'tun.stack',
   'tun.route-address',
@@ -55,6 +63,7 @@ const generalPageKeys = {
   'app.openLogs',
   'app.closeConnections',
   'clash.allow-lan',
+  'clash.authentication',
   'clash.ipv6',
   'clash.find-process-mode',
   'clash.tcp-concurrent',
@@ -64,9 +73,16 @@ const generalPageKeys = {
   'clash.secret',
   'clash.log-level',
   'clash.mixed-port',
+  'clash.port',
+  'clash.socks-port',
+  'clash.redir-port',
+  'clash.tproxy-port',
 };
 
 const networkPageKeys = {
+  'clash.tun.enable',
+  'clash.tun.mtu',
+  'clash.tun.congestion-controller',
   'clash.tun.stack',
   'clash.interface-name',
   'clash.disable-keep-alive',
@@ -128,6 +144,7 @@ PatchClashConfig keepOwnedSettings(
   var next = synced;
   for (final key in owned) {
     next = switch (key) {
+      'clash.mode' => next.copyWith(mode: current.mode),
       'clash.mixed-port' => next.copyWith(mixedPort: current.mixedPort),
       'clash.port' => next.copyWith(port: current.port),
       'clash.socks-port' => next.copyWith(socksPort: current.socksPort),
@@ -174,6 +191,17 @@ PatchClashConfig keepOwnedSettings(
       ),
       'clash.geox-url' => next.copyWith(geoXUrl: current.geoXUrl),
       'clash.global-ua' => next.copyWith(globalUa: current.globalUa),
+      'clash.tun.enable' => next.copyWith(
+        tun: next.tun.copyWith(enable: current.tun.enable),
+      ),
+      'clash.tun.mtu' => next.copyWith(
+        tun: next.tun.copyWith(mtu: current.tun.mtu),
+      ),
+      'clash.tun.congestion-controller' => next.copyWith(
+        tun: next.tun.copyWith(
+          congestionController: current.tun.congestionController,
+        ),
+      ),
       'clash.tun.device' => next.copyWith(
         tun: next.tun.copyWith(device: current.tun.device),
       ),

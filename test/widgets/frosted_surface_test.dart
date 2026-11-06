@@ -60,7 +60,7 @@ void main() {
     await pump(tester, glass: true, quality: LiquidGlassQuality.ultra);
 
     final pane = tester.widget<LiquidGlass>(find.byType(LiquidGlass));
-    expect(pane.corners, radius);
+    expect(pane.borderRadius, radius);
     expect(pane.style.tint.a, moreOrLessEquals(0.45));
   });
 

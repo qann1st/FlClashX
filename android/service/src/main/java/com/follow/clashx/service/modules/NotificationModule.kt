@@ -5,9 +5,7 @@ import android.app.Service
 import android.app.Service.STOP_FOREGROUND_REMOVE
 import android.content.Intent
 import android.os.Build
-import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import androidx.core.content.getSystemService
 import com.follow.clashx.common.Components
 import com.follow.clashx.common.GlobalState
 import com.follow.clashx.common.QuickAction
@@ -16,35 +14,14 @@ import com.follow.clashx.common.quickIntent
 import com.follow.clashx.common.receiveBroadcastFlow
 import com.follow.clashx.common.startForeground
 import com.follow.clashx.common.toPendingIntent
-import com.follow.clashx.core.Core
 import com.follow.clashx.service.R
 import com.follow.clashx.service.ServiceConfig
 import com.follow.clashx.service.models.NotificationParams
-import com.follow.clashx.service.models.getSpeedTrafficText
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-
-private data class ExtendedNotificationParams(
-    val title: String,
-    val stopText: String,
-    val showStopAction: Boolean,
-    val contentText: String,
-)
-
-private val NotificationParams.extended: ExtendedNotificationParams
-    get() = ExtendedNotificationParams(
-        title,
-        stopText,
-        showStopAction,
-        if (appVisible) Core.getSpeedTrafficText(onlyStatisticsProxy) else "",
-    )
 
 internal class NotificationModule(
     private val service: Service,
@@ -52,51 +29,19 @@ internal class NotificationModule(
 ) : ServiceModule {
     override fun start() {
         service.ensureNotificationChannel()
-        update(ServiceConfig.notificationParams.value.extended)
+        update(ServiceConfig.notificationParams.value)
         scope.launch {
             // Some ROMs, vivo's among them, drop updates posted behind the
-            // keyguard, so unlocking restarts the loop to post once more.
-            // SystemUI, an app, sends USER_PRESENT, which a receiver that is
-            // not exported never gets; all three actions are protected.
-            val screenOn = service.receiveBroadcastFlow(exported = true) {
-                addAction(Intent.ACTION_SCREEN_ON)
-                addAction(Intent.ACTION_SCREEN_OFF)
+            // keyguard, so unlocking posts once more. SystemUI, an app, sends
+            // USER_PRESENT, which a receiver that is not exported never gets;
+            // the action is protected.
+            val unlocked = service.receiveBroadcastFlow(exported = true) {
                 addAction(Intent.ACTION_USER_PRESENT)
-            }.map { intent ->
-                intent.action != Intent.ACTION_SCREEN_OFF
-            }.onStart {
-                emit(isScreenOn())
-            }
-            // The speed ticks only while the app itself is on screen; hidden,
-            // the notification stays still so the phone can sleep.
-            val appVisible = ServiceConfig.notificationParams
-                .map { it.appVisible }
-                .distinctUntilChanged()
-            combine(screenOn, appVisible) { on, visible -> on && visible }
-                .distinctUntilChanged()
-                .collectLatest { live ->
-                    if (!live) {
-                        update(ServiceConfig.notificationParams.value.extended)
-                        return@collectLatest
-                    }
-                combine(
-                    flow {
-                        while (true) {
-                            delay(1_000)
-                            emit(Unit)
-                        }
-                    },
-                    ServiceConfig.notificationParams,
-                ) { _, params ->
-                    params.extended
-                }.distinctUntilChanged()
-                    .collect(::update)
-            }
+            }.map { }.onStart { emit(Unit) }
+            combine(unlocked, ServiceConfig.notificationParams) { _, params -> params }
+                .collect(::update)
         }
     }
-
-    private fun isScreenOn() =
-        service.getSystemService<PowerManager>()?.isInteractive ?: true
 
     private val notificationBuilder: NotificationCompat.Builder by lazy {
         val intent = Intent().setComponent(Components.mainActivity)
@@ -121,11 +66,10 @@ internal class NotificationModule(
 
     private val stopIntent by lazy { QuickAction.STOP.quickIntent.toPendingIntent }
 
-    private fun update(params: ExtendedNotificationParams) {
+    private fun update(params: NotificationParams) {
         service.startForeground(
             with(notificationBuilder) {
                 setContentTitle(params.title)
-                setContentText(params.contentText)
                 clearActions()
                 if (params.showStopAction) {
                     addAction(0, params.stopText, stopIntent)

@@ -76,6 +76,7 @@ dependencies:
   setup:
     path: plugins/setup
   flutter_local_notifications: ^22.3.2
+  qr: ^4.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -104,7 +105,7 @@ flutter:
     - assets/images/services/
     - assets/ca/ca-certificates.crt
     - path: assets/images/tray/unix/
-      platforms: [ linux ]
+      platforms: [ linux, macos ]
     - path: assets/images/tray/macos/
       platforms: [ macos ]
     - path: assets/images/tray/windows/

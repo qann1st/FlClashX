@@ -15,6 +15,7 @@ class App {
   late MethodChannel methodChannel;
   Function()? onExit;
   Function()? onPackagesChanged;
+  void Function(VpnRefusal refusal)? onVpnPermissionDenied;
   final floatingKeyboard = ValueNotifier(false);
 
   App._internal() {
@@ -29,6 +30,11 @@ class App {
           onPackagesChanged?.call();
         case 'floatingImeChanged':
           floatingKeyboard.value = call.arguments as bool;
+        case 'vpnPermissionDenied':
+          final refusal = VpnRefusal.values.asNameMap()[call.arguments];
+          if (refusal != null) {
+            onVpnPermissionDenied?.call(refusal);
+          }
         default:
           throw MissingPluginException();
       }
@@ -67,6 +73,15 @@ class App {
   Future<bool> requestInstalledAppsPermission() async {
     return await methodChannel.invokeMethod<bool>(
           'requestInstalledAppsPermission',
+        ) ??
+        false;
+  }
+
+  /// Android 17 drops traffic between the app and the local network until the
+  /// user grants this; earlier versions answer true.
+  Future<bool> requestLocalNetworkPermission() async {
+    return await methodChannel.invokeMethod<bool>(
+          'requestLocalNetworkPermission',
         ) ??
         false;
   }
@@ -158,6 +173,10 @@ class App {
       );
       return false;
     }
+  }
+
+  Future<bool?> openVpnSettings() async {
+    return methodChannel.invokeMethod<bool>('openVpnSettings');
   }
 
   Future<AppExitInfo?> getLastExitInfo() async {

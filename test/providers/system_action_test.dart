@@ -7,11 +7,13 @@ import 'package:fl_clash/models/config.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/actions/system_exit.dart';
 import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
 
 import '../helpers/preferences.dart';
+import '../helpers/test_profiles.dart';
 
 class TestSystemAction extends SystemAction {
   final List<String> calls = [];
@@ -69,11 +71,11 @@ class _GeometryWindowPort implements WindowPort {
   }
 
   @override
-  Future<bool> setBlur({
+  Future<double?> setBlur({
     required bool enabled,
     required Brightness brightness,
     required Color tint,
-  }) async => false;
+  }) async => null;
 
   @override
   Future<void> close() async {}
@@ -273,7 +275,10 @@ void main() {
       await action.persist();
 
       expect(container.read(windowSettingProvider), geometry);
-      expect((await preferences.getConfig())?.windowProps, geometry);
+      expect(
+        Config.fromJson((await preferences.getConfigMap())!).windowProps,
+        geometry,
+      );
     },
   );
 
@@ -302,7 +307,10 @@ void main() {
       container.read(systemActionProvider.notifier);
       await action.persist();
 
-      expect((await preferences.getConfig())?.windowProps, current);
+      expect(
+        Config.fromJson((await preferences.getConfigMap())!).windowProps,
+        current,
+      );
     },
   );
 
@@ -310,7 +318,9 @@ void main() {
     late ProviderContainer container;
 
     setUp(() {
-      container = ProviderContainer();
+      container = ProviderContainer(
+        overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      );
       globalState.container = container;
     });
 
@@ -330,14 +340,6 @@ void main() {
       container.read(systemActionProvider.notifier).updateSystemProxy();
 
       expect(container.read(networkSettingProvider).systemProxy, !before);
-    });
-
-    test('updateAutoLaunch flips the auto launch flag', () {
-      final before = container.read(appSettingProvider).autoLaunch;
-
-      container.read(systemActionProvider.notifier).updateAutoLaunch();
-
-      expect(container.read(appSettingProvider).autoLaunch, !before);
     });
   });
 }

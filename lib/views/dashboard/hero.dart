@@ -21,6 +21,7 @@ import 'widgets/widgets.dart';
 const heroMaxWidth = 520.0;
 
 const _logoSize = 96.0;
+const _inlineLogoSize = 56.0;
 const _flagSize = 52.0;
 const _connectHeight = 56.0;
 const _gap = 12.0;
@@ -56,7 +57,7 @@ class _HeroDashboardState extends ConsumerState<HeroDashboard> {
       16,
       MediaQuery.paddingOf(context).top + 8,
       16,
-      16 + BottomInsetScope.of(context),
+      16 + context.bottomInset,
     );
     if (profile == null) {
       return Padding(
@@ -82,20 +83,29 @@ class _HeroDashboardState extends ConsumerState<HeroDashboard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _ServiceLogo(url: headers.serviceLogo),
-                    const SizedBox(height: 14),
-                    Center(
-                      child: EmojiText(
-                        headers.serviceName ?? appName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyle.title2.of(
-                          context,
-                          emphasized: true,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      spacing: 12,
+                      children: [
+                        _ServiceLogo(
+                          url: headers.serviceLogo,
+                          size: _inlineLogoSize,
+                          radius: AppRadius.md,
                         ),
-                      ),
+                        Flexible(
+                          child: EmojiText(
+                            headers.serviceName ?? appName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyle.title2.of(
+                              context,
+                              emphasized: true,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     const AnnouncementCard(),
                     if (ref.watch(announcementProvider) != null)
                       const SizedBox(height: _gap),
@@ -137,10 +147,12 @@ class _EmptyHero extends StatelessWidget {
         const SizedBox(height: 24),
         SizedBox(
           height: _connectHeight,
-          child: FilledButton.icon(
-            onPressed: () => showAddProfilePage(context),
-            icon: const GlyphIcon(AppGlyphs.add, fill: 1),
-            label: Text(appLocalizations.addProfile),
+          child: AddProfileMenu(
+            builder: (open) => FilledButton.icon(
+              onPressed: open,
+              icon: const GlyphIcon(AppGlyphs.add, fill: 1),
+              label: Text(appLocalizations.addProfile),
+            ),
           ),
         ),
       ],
@@ -150,17 +162,23 @@ class _EmptyHero extends StatelessWidget {
 
 /// The panel's logo, png or svg, else the app's own icon.
 class _ServiceLogo extends ConsumerWidget {
-  const _ServiceLogo({this.url});
+  const _ServiceLogo({
+    this.url,
+    this.size = _logoSize,
+    this.radius = AppRadius.xxl,
+  });
 
   final String? url;
+  final double size;
+  final BorderRadius radius;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final url = this.url;
     final fallback = Image.asset(
       'assets/images/icon.png',
-      width: _logoSize,
-      height: _logoSize,
+      width: size,
+      height: size,
       fit: BoxFit.cover,
     );
     final path = url == null
@@ -171,22 +189,22 @@ class _ServiceLogo extends ConsumerWidget {
         : url.toLowerCase().endsWith('.svg')
         ? SvgPicture.file(
             File(path),
-            width: _logoSize,
-            height: _logoSize,
+            width: size,
+            height: size,
             fit: BoxFit.cover,
             placeholderBuilder: (_) => fallback,
           )
         : Image.file(
             File(path),
-            width: _logoSize,
-            height: _logoSize,
+            width: size,
+            height: size,
             fit: BoxFit.cover,
             errorBuilder: (_, _, _) => fallback,
           );
     return Center(
       child: ClipRSuperellipse(
-        borderRadius: AppRadius.xxl,
-        child: SizedBox.square(dimension: _logoSize, child: logo),
+        borderRadius: radius,
+        child: SizedBox.square(dimension: size, child: logo),
       ),
     );
   }

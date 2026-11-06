@@ -68,6 +68,9 @@ internal interface AppGateway {
     fun prepareVpn(enable: Boolean, callback: (Boolean) -> Unit)
 
     fun cancelVpnPreparation(callback: (Boolean) -> Unit)
+
+    /** Says why the start was refused, unless [isCurrent] no longer holds by then. */
+    fun explainVpnRefusal(isCurrent: () -> Boolean)
 }
 
 internal object AndroidServiceStateHost : ServiceStateHost {
@@ -132,6 +135,9 @@ internal object AndroidServiceStateHost : ServiceStateHost {
 
             override fun cancelVpnPreparation(callback: (Boolean) -> Unit) =
                 plugin.cancelVpnPreparation(callback)
+
+            override fun explainVpnRefusal(isCurrent: () -> Boolean) =
+                plugin.explainVpnRefusal(isCurrent)
         }
     }
 

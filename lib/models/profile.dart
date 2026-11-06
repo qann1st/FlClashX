@@ -149,13 +149,9 @@ extension ProfilesExt on List<Profile> {
 }
 
 extension ProfileExtension on Profile {
-  bool get realAutoUpdate => type == ProfileType.url && autoUpdate;
-
   String get realLabel => label.takeFirstValid([defaultLabel]);
 
   String get defaultLabel => url.webUri?.host ?? id.toString();
-
-  String get fileName => '$id.yaml';
 
   String get exportFileName {
     final label = realLabel;
@@ -167,6 +163,23 @@ extension ProfileExtension on Profile {
   }
 
   String get updatingKey => 'profile_$id';
+
+  /// The database keeps [lastUpdateDate] only to the second.
+  ({
+    String url,
+    String ageSecretKey,
+    bool sendDeviceHeaders,
+    int? lastUpdateSeconds,
+  })
+  get fileRevision => (
+    url: url,
+    ageSecretKey: ageSecretKey,
+    sendDeviceHeaders: sendDeviceHeaders,
+    lastUpdateSeconds: switch (lastUpdateDate) {
+      final date? => date.millisecondsSinceEpoch ~/ 1000,
+      null => null,
+    },
+  );
 
   Future<Profile?> checkAndUpdateAndCopy({
     required ValidateConfig validate,
@@ -201,6 +214,7 @@ extension ProfileExtension on Profile {
     required ValidateConfig validate,
     SubscriptionFetch? fetch,
     DeviceHeaders? deviceHeaders,
+    bool Function()? isCurrent,
   }) async {
     fetch ??= request.getFileResponseForUrl;
     final sent = sendDeviceHeaders
@@ -215,7 +229,10 @@ extension ProfileExtension on Profile {
         fetch,
         sent,
         downloadTimeoutDuration,
+        isCurrent,
       );
+    } on ProfileUpdateSupersededException {
+      rethrow;
     } catch (error, trace) {
       firstError = error;
       firstTrace = trace;
@@ -237,6 +254,7 @@ extension ProfileExtension on Profile {
           fetch,
           sent,
           fallbackTimeoutDuration,
+          isCurrent,
         );
         commonPrint.log(
           'subscription served by ${fallback.host}'
@@ -245,6 +263,8 @@ extension ProfileExtension on Profile {
         return failure == HostFailure.hard
             ? updated.copyWith(url: fallback.toString())
             : updated;
+      } on ProfileUpdateSupersededException {
+        rethrow;
       } catch (error) {
         commonPrint.log(
           'fallback ${fallback.host} failed: ${compactError(error)}',
@@ -261,6 +281,7 @@ extension ProfileExtension on Profile {
     SubscriptionFetch fetch,
     Map<String, String> headers,
     Duration timeout,
+    bool Function()? isCurrent,
   ) async {
     final response = await fetch(url, timeout: timeout, headers: headers);
     final disposition = response.headers.value('content-disposition');
@@ -279,23 +300,32 @@ extension ProfileExtension on Profile {
     ).saveFile(
       decompressUnlabeled(response.data ?? Uint8List(0)),
       validate: validate,
+      isCurrent: isCurrent,
     );
   }
 
+  /// The publishing rename is sync, so nothing runs between [isCurrent] and it.
   Future<Profile> saveFile(
     Uint8List bytes, {
     required ValidateConfig validate,
+    bool Function()? isCurrent,
   }) async {
-    final path = await appPath.tempFilePath;
-    final tempFile = File(path);
-    await tempFile.safeWriteAsBytes(bytes);
-    final message = await validate(path, ageSecretKey);
-    if (message.isNotEmpty) {
-      throw MessageException(message);
+    final target = await _getFile(false);
+    final staging = File('${target.path}.$uniqueId.tmp');
+    try {
+      await staging.safeWriteAsBytes(bytes);
+      final message = await validate(staging.path, ageSecretKey);
+      if (message.isNotEmpty) {
+        throw MessageException(message);
+      }
+      if (isCurrent != null && !isCurrent()) {
+        throw const ProfileUpdateSupersededException();
+      }
+      staging.renameSync(target.path);
+    } catch (_) {
+      await staging.safeDelete();
+      rethrow;
     }
-    final mFile = await file;
-    await tempFile.copy(mFile.path);
-    await tempFile.safeDelete();
     return copyWith(lastUpdateDate: DateTime.now());
   }
 }

@@ -6,9 +6,11 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/window.dart';
 import 'package:fl_clash/bootstrap.dart';
 import 'package:fl_clash/common/system_dns.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/manager/hotkey_manager.dart';
 import 'package:fl_clash/manager/manager.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -88,29 +90,14 @@ class ApplicationState extends ConsumerState<Application> {
   void _initLink() {
     linkManager.initAppLinksListen((url) async {
       unawaited(window?.show());
-      final message = currentAppLocalizations.createProfileFromUrlTip(url);
-      final parts = message.split(url);
-      final res = await dialogs.showMessage(
-        title: currentAppLocalizations.addProfile,
-        message: TextSpan(
-          children: [
-            TextSpan(text: parts.first),
-            TextSpan(
-              text: url,
-              style: TextStyle(
-                color: context.colorScheme.primary,
-                decoration: TextDecoration.underline,
-                decorationColor: context.colorScheme.primary,
-              ),
-            ),
-            if (parts.length > 1) TextSpan(text: parts.last),
-          ],
-        ),
-      );
-      if (res != true) return;
-      unawaited(
-        ref.read(profilesActionProvider.notifier).addProfileFromLink(url),
-      );
+      final profile = await ref
+          .read(profilesActionProvider.notifier)
+          .addProfileFromLink(url);
+      if (profile != null) {
+        dialogs.showNotifier(
+          currentAppLocalizations.profileAddedTip(profile.realLabel),
+        );
+      }
     });
   }
 
@@ -134,6 +121,14 @@ class ApplicationState extends ConsumerState<Application> {
     final hasVpn = results.contains(ConnectivityResult.vpn);
     if (_preHasVpn == hasVpn) {
       ref.read(routeTrackerProvider.notifier).bumpHostEpoch();
+      // Android's NetworkObserver tells the Core about a new network itself.
+      if (system.isDesktop) {
+        debouncer.call(
+          FunctionTag.clearDnsCache,
+          ref.read(coreActionProvider.notifier).clearDnsCacheOnNetworkChange,
+          duration: const Duration(milliseconds: 200),
+        );
+      }
     }
     _preHasVpn = hasVpn;
   }

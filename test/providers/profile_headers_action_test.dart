@@ -121,6 +121,38 @@ void main() {
     expect(setting.autoCheckUpdate, isTrue);
   });
 
+  test('the hideip special hides the IP and locks its switch', () async {
+    await select(_profile(1, special: 'hideip'));
+
+    expect(container.read(appSettingProvider).hideIp, isTrue);
+    expect(container.read(settingLockedProvider(hideIpSetting)), isTrue);
+  });
+
+  test('an IP switch the user took over is left to the user', () async {
+    container
+        .read(appSettingProvider.notifier)
+        .update(
+          (state) =>
+              state.copyWith(hideIp: false, ownedSettings: {hideIpSetting}),
+        );
+
+    await select(_profile(1, special: 'hideip'));
+
+    expect(container.read(appSettingProvider).hideIp, isFalse);
+    expect(container.read(settingLockedProvider(hideIpSetting)), isFalse);
+    expect(container.read(settingReleasableProvider(hideIpSetting)), isTrue);
+  });
+
+  test('without the hideip special the IP switch stays the user\'s', () async {
+    await select(_profile(1, special: 'noglobal'));
+
+    expect(container.read(appSettingProvider).hideIp, isFalse);
+    expect(
+      container.read(managedSettingsProvider),
+      isNot(contains(hideIpSetting)),
+    );
+  });
+
   test('the header picks the style when its profile is switched to', () async {
     await select(_profile(1, view: 'app.board:extended'));
     expect(style(), ThemeStyle.enhanced);
@@ -151,6 +183,74 @@ void main() {
         updatedAt: first.add(const Duration(hours: 1)),
       ),
     );
+    expect(style(), ThemeStyle.enhanced);
+  });
+
+  test('a change between updates leaves the edited dashboard alone', () async {
+    final first = DateTime(2026, 10, 19, 10);
+    final profile = _profile(
+      1,
+      widgets: 'announcement,outboundMode',
+      updatedAt: first,
+    );
+    await select(profile);
+    container
+        .read(appSettingProvider.notifier)
+        .update(
+          (state) =>
+              state.copyWith(dashboardWidgets: [DashboardWidget.outboundMode]),
+        );
+
+    await put(profile.copyWith(currentGroupName: GroupName.GLOBAL.name));
+    expect(container.read(appSettingProvider).dashboardWidgets, [
+      DashboardWidget.outboundMode,
+    ]);
+
+    await put(
+      profile.copyWith(lastUpdateDate: first.add(const Duration(hours: 1))),
+    );
+    expect(container.read(appSettingProvider).dashboardWidgets, [
+      DashboardWidget.announcement,
+      DashboardWidget.outboundMode,
+    ]);
+  });
+
+  test('an update applied before a restart is not applied again', () async {
+    final updatedAt = DateTime(2026, 10, 19, 10, 0, 0, 750);
+    container
+        .read(appSettingProvider.notifier)
+        .update(
+          (state) => state.copyWith(
+            appliedHeadersUpdate: profileHeadersUpdateOf(
+              _profile(1, updatedAt: updatedAt),
+            ),
+          ),
+        );
+
+    await select(
+      _profile(
+        1,
+        view: 'app.board:extended',
+        updatedAt: DateTime(2026, 10, 19, 10),
+      ),
+    );
+
+    expect(style(), ThemeStyle.original);
+  });
+
+  test('a profile restored after the last was deleted applies again', () async {
+    final profile = _profile(
+      1,
+      view: 'app.board:extended',
+      updatedAt: DateTime(2026, 10, 19, 10),
+    );
+    await select(profile);
+    container.read(currentProfileIdProvider.notifier).value = null;
+    await settle();
+    setStyle(ThemeStyle.original);
+
+    await select(profile);
+
     expect(style(), ThemeStyle.enhanced);
   });
 

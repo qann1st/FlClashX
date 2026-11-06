@@ -161,17 +161,18 @@ class Bootstrap {
 
   ProviderContainer get _container => globalState.container;
 
+  /// Runs after the start requests [_initApp] awaits. Those return once the
+  /// Core, or the Android service, takes the command, so a route still being
+  /// adopted is left to the retry inside the profile action.
   Future<void> _refreshProfilesAfterStart() async {
     final profiles = _container.read(profilesActionProvider.notifier);
-    await profiles.autoUpdateProfiles();
-    await Future<void>.delayed(const Duration(seconds: 1));
-    await profiles.refreshCurrentProfileAfterStart();
+    final refreshed = await profiles.autoUpdateProfiles();
+    await profiles.refreshCurrentProfileAfterStart(refreshed: refreshed);
     await profiles.noticeSubscriptionExpiries();
   }
 
   Future<void> _initApp() async {
     unawaited(_container.read(systemActionProvider.notifier).updateTray());
-    unawaited(_refreshProfilesAfterStart());
     unawaited(_container.read(commonActionProvider.notifier).autoCheckUpdate());
     unawaited(
       autoLaunch?.updateStatus(_container.read(appSettingProvider).autoLaunch),
@@ -193,6 +194,7 @@ class Bootstrap {
       await _container.read(setupActionProvider.notifier).initStatus();
     }
     _container.read(initProvider.notifier).value = true;
+    unawaited(_refreshProfilesAfterStart());
     unawaited(_container.read(resourcesActionProvider.notifier).autoUpdate());
     await bootGuard.markRunning();
     unawaited(_container.read(locationPermissionsProvider.notifier).refresh());
@@ -203,16 +205,14 @@ class Bootstrap {
       case BootRecovery.none:
         return;
       case BootRecovery.skipAutoSetup:
-        await dialogs.showMessage(
+        await dialogs.showAlert(
           title: currentAppLocalizations.launchInterrupted,
-          cancelable: false,
           dismissible: false,
           message: TextSpan(text: currentAppLocalizations.launchInterruptedTip),
         );
       case BootRecovery.clearProfile:
-        await dialogs.showMessage(
+        await dialogs.showAlert(
           title: currentAppLocalizations.crashDetected,
-          cancelable: false,
           dismissible: false,
           message: TextSpan(
             text: currentAppLocalizations.crashDetectedTip(_failedProfileLabel),
@@ -244,6 +244,12 @@ class Bootstrap {
     await _container.read(systemActionProvider.notifier).handleExit(false);
   }
 
+  /// Unattended desktop installs, such as a container nobody watches, accept
+  /// up front: the core only starts after the disclaimer is accepted.
+  bool get _isDisclaimerAcceptedByEnvironment =>
+      system.isDesktop &&
+      Platform.environment['FLCLASH_ACCEPT_DISCLAIMER'] == '1';
+
   /// Android's exit only finishes the activity, so Dart keeps running after
   /// [SystemAction.handleExit] returns and must not go on to start the app.
   Future<bool> _handlerDisclaimer() async {
@@ -253,7 +259,8 @@ class Bootstrap {
     if (acceptedVersion >= disclaimerVersion) {
       return true;
     }
-    final isDisclaimerAccepted = await requestDisclaimerConsent();
+    final isDisclaimerAccepted =
+        _isDisclaimerAcceptedByEnvironment || await requestDisclaimerConsent();
     if (!isDisclaimerAccepted) {
       await _container.read(systemActionProvider.notifier).handleExit();
       return false;

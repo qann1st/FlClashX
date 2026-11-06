@@ -33,22 +33,61 @@ const
 var
   IsUpgrade: Boolean;
   PreviousVersion: String;
+  HelperHeld: Boolean;
 
 procedure SHChangeNotify(wEventId: Integer; uFlags: Integer; dwItem1: Integer; dwItem2: Integer); external 'SHChangeNotify@shell32.dll stdcall';
 
-procedure KillProcesses;
+function RunHidden(const Filename, Params: String): Integer;
 var
-  Processes: TArrayOfString;
-  i: Integer;
   ResultCode: Integer;
 begin
-  Processes := ['{{EXECUTABLE_NAME}}', 'FlClashCore.exe', HelperService + '.exe'];
-  for i := 0 to GetArrayLength(Processes)-1 do
-    Exec('taskkill', '/im ' + Processes[i], '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  ResultCode := -1;
+  Exec(Filename, Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Result := ResultCode;
+end;
+
+procedure KillProcess(const Name: String);
+begin
+  RunHidden('taskkill.exe', '/f /t /im ' + Name);
+end;
+
+// The client goes first so it cannot bring the Helper back, and the Helper is
+// disabled before it stops because the SCM restarts a killed Helper in 5 s.
+procedure ShutDownApp;
+begin
+  KillProcess('{{EXECUTABLE_NAME}}');
+  HelperHeld := RunHidden('sc.exe', 'config "' + HelperService + '" start= disabled') = 0;
+  RunHidden('net.exe', 'stop "' + HelperService + '"');
+  KillProcess(HelperService + '.exe');
+  KillProcess('FlClashCore.exe');
   Sleep(1000);
-  for i := 0 to GetArrayLength(Processes)-1 do
-    Exec('taskkill', '/f /im ' + Processes[i], '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Sleep(1000);
+end;
+
+// Killing the app skips its exit path, which is what turns the system proxy
+// off; the executable clears a proxy left on a port nothing listens on. The
+// proxy is a per-user setting, so Setup runs it as the user who started it,
+// which the uninstaller cannot.
+procedure ClearStaleProxy;
+var
+  AppPath: String;
+  ResultCode: Integer;
+begin
+  AppPath := ExpandConstant('{app}\{{EXECUTABLE_NAME}}');
+  if not FileExists(AppPath) then
+    Exit;
+  if IsUninstaller then
+    Exec(AppPath, '--clear-stale-proxy', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+  else
+    ExecAsOriginalUser(AppPath, '--clear-stale-proxy', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+procedure ReleaseHelper;
+begin
+  if not HelperHeld then
+    Exit;
+  HelperHeld := False;
+  RunHidden('sc.exe', 'config "' + HelperService + '" start= auto');
+  RunHidden('sc.exe', 'start "' + HelperService + '"');
 end;
 
 function IsAppInstalled(): Boolean;
@@ -79,16 +118,22 @@ begin
 end;
 
 function InitializeSetup(): Boolean;
-var
-  ResultCode: Integer;
 begin
   IsUpgrade := IsAppInstalled();
   if IsUpgrade then
     PreviousVersion := GetInstalledVersion();
-  Exec('sc.exe', 'stop "' + HelperService + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Sleep(1000);
-  KillProcesses;
   Result := True;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  ShutDownApp;
+  Result := '';
+end;
+
+procedure DeinitializeSetup();
+begin
+  ReleaseHelper;
 end;
 
 procedure InitializeWizard();
@@ -130,32 +175,23 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
-    Sleep(500);
-    try
-      Exec('sc.exe', 'start "' + HelperService + '"', '', SW_HIDE, ewNoWait, ResultCode);
-    except
-    end;
+    ClearStaleProxy;
+    ReleaseHelper;
   end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  ResultCode: Integer;
 begin
   case CurUninstallStep of
     usUninstall:
     begin
-      Exec('sc.exe', 'stop "' + HelperService + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-      Sleep(1000);
-      KillProcesses;
-      Exec('sc.exe', 'delete "' + HelperService + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-      Sleep(500);
+      ShutDownApp;
+      ClearStaleProxy;
+      RunHidden('sc.exe', 'delete "' + HelperService + '"');
     end;
     usPostUninstall:
     begin

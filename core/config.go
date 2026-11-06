@@ -3,14 +3,18 @@ package core
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/inbound"
+	"github.com/metacubex/mihomo/common/convert"
+	"github.com/metacubex/mihomo/common/yaml"
 	"github.com/metacubex/mihomo/component/age"
 	"github.com/metacubex/mihomo/component/auth"
 	"github.com/metacubex/mihomo/component/dialer"
@@ -70,6 +74,29 @@ func handleGetConfig(path string) (*config.RawConfig, error) {
 	return unmarshalRawConfig(buf)
 }
 
+func handleGetProxyDefinition(name string) (map[string]any, error) {
+	raw, err := handleGetConfig(runningConfigPath())
+	if err != nil {
+		return nil, err
+	}
+	if proxy := lookupProxy(name); proxy != nil {
+		if pdName := proxy.ProxyInfo().ProviderName; pdName != "" {
+			pd, running := tunnel.Providers()[pdName]
+			mapping, declared := raw.ProxyProvider[pdName]
+			if !running || !declared {
+				return nil, nil
+			}
+			return providerProxyMapping(pd.Proxies(), mapping, name)
+		}
+	}
+	for _, mapping := range raw.Proxy {
+		if mapping["name"] == name {
+			return mapping, nil
+		}
+	}
+	return nil, nil
+}
+
 func handleValidateConfig(path string) error {
 	_, err := handleGetConfig(path)
 	return err
@@ -116,8 +143,113 @@ func withPlatformLimits(cfg *config.Config) *config.Config {
 	return cfg
 }
 
+// Replays adapter/provider's override: its field writes, then the name's prefix
+// and suffix. A proxy-name rewrite or override-expr cannot be replayed, so such
+// a provider yields no definition; its filters hold through the built proxies.
+var overriddenProxyKeys = []string{
+	"tfo",
+	"mptcp",
+	"udp",
+	"udp-over-tcp",
+	"up",
+	"down",
+	"dialer-proxy",
+	"skip-cert-verify",
+	"name-cert-verify",
+	"interface-name",
+	"routing-mark",
+	"ip-version",
+}
+
+func providerProxyMapping(
+	built []constant.Proxy,
+	mapping map[string]any,
+	name string,
+) (map[string]any, error) {
+	if !slices.ContainsFunc(built, func(proxy constant.Proxy) bool {
+		return proxy.Name() == name
+	}) {
+		return nil, nil
+	}
+	override, _ := mapping["override"].(map[string]any)
+	if override["proxy-name"] != nil || override["override-expr"] != nil {
+		return nil, nil
+	}
+	sources, err := providerRawProxies(mapping)
+	if err != nil {
+		return nil, err
+	}
+	prefix, _ := override["additional-prefix"].(string)
+	suffix, _ := override["additional-suffix"].(string)
+	for _, item := range sources {
+		source, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		rawName, _ := source["name"].(string)
+		if prefix+rawName+suffix != name {
+			continue
+		}
+		definition := maps.Clone(source)
+		for _, key := range overriddenProxyKeys {
+			if value, set := override[key]; set {
+				definition[key] = value
+			}
+		}
+		definition["name"] = name
+		return definition, nil
+	}
+	return nil, nil
+}
+
+// A provider's proxies sit in its inline payload or the file mihomo keeps for
+// it, found as adapter/provider does: the declared path, else the URL's hash.
+func providerRawProxies(mapping map[string]any) ([]any, error) {
+	if mapping["type"] == "inline" {
+		payload, _ := mapping["payload"].([]any)
+		return payload, nil
+	}
+	var path string
+	if declared, _ := mapping["path"].(string); declared != "" {
+		path = constant.Path.Resolve(declared)
+	} else if url, _ := mapping["url"].(string); url != "" {
+		path = constant.Path.GetPathByHash("proxies", url)
+	}
+	if path == "" || !constant.Path.IsSafePath(path) {
+		return nil, nil
+	}
+	buf, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if secretKey, _ := mapping["age-secret-key"].(string); secretKey != "" {
+		if buf, err = age.DecryptBytes(buf, secretKey); err != nil {
+			return nil, err
+		}
+	}
+	var file struct {
+		Proxies []any `yaml:"proxies"`
+	}
+	if err := yaml.Unmarshal(buf, &file); err == nil {
+		return file.Proxies, nil
+	}
+	converted, err := convert.ConvertsV2Ray(buf)
+	if err != nil {
+		return nil, err
+	}
+	proxies := make([]any, len(converted))
+	for index, proxy := range converted {
+		proxies[index] = proxy
+	}
+	return proxies, nil
+}
+
+func runningConfigPath() string {
+	return filepath.Join(constant.Path.HomeDir(), "config.yaml")
+}
+
 func loadSetupConfig(params *SetupParams) (*config.Config, error) {
-	path := filepath.Join(constant.Path.HomeDir(), "config.yaml")
+	path := runningConfigPath()
 	if params.Base != nil {
 		return loadConfigWithBase(params.Base, path)
 	}
@@ -148,10 +280,14 @@ func applyConfig(params *SetupParams) error {
 		cfg = fallback
 	}
 
+	// Pinned before mihomo installs the groups, so no read sees one without
+	// its pick, and again after, as ForceSet also drops what URLTest cached
+	// while its providers were still empty.
+	patchSelectGroup(cfg.Proxies, params.SelectedMap)
 	currentConfig = cfg
 	hub.ApplyConfig(mihomoConfig(cfg))
 	afterApply(cfg)
-	patchSelectGroup(params.SelectedMap)
+	patchSelectGroup(cfg.Proxies, params.SelectedMap)
 	bumpRouteEpoch()
 	updateListeners(cfg)
 	reconcileGeoUpdater()
@@ -224,10 +360,11 @@ func updateConfig(params *UpdateParams) error {
 		general.UnifiedDelay = *params.UnifiedDelay
 		adapter.UnifiedDelay.Store(general.UnifiedDelay)
 	}
-	// IPv6 belongs with mode: turning it on moves a direct dial to another exit address.
-	routeChanged := false
+	routeChange := routeUnchanged
 	if params.Mode != nil {
-		routeChanged = routeChanged || general.Mode != *params.Mode
+		if general.Mode != *params.Mode {
+			routeChange = routeMoved
+		}
 		general.Mode = *params.Mode
 		tunnel.SetMode(general.Mode)
 	}
@@ -235,8 +372,12 @@ func updateConfig(params *UpdateParams) error {
 		general.LogLevel = *params.LogLevel
 		log.SetLevel(general.LogLevel)
 	}
+	// Turning IPv6 on moves a direct dial to another exit address while the
+	// route it takes stays the same.
 	if params.IPv6 != nil {
-		routeChanged = routeChanged || general.IPv6 != *params.IPv6
+		if general.IPv6 != *params.IPv6 {
+			routeChange = routeReset
+		}
 		general.IPv6 = *params.IPv6
 		resolver.DisableIPv6 = !general.IPv6
 	}
@@ -252,8 +393,8 @@ func updateConfig(params *UpdateParams) error {
 		setGeoResourceUrl(geoType, link)
 	}
 	syncGeoUpdater(params.GeoAutoUpdate, params.GeoUpdateInterval)
-	if routeChanged {
-		bumpRouteEpoch()
+	if routeChange != routeUnchanged {
+		changeRoute(routeChange)
 	}
 	return nil
 }

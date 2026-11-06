@@ -57,6 +57,7 @@ abstract class TrayState with _$TrayState {
     required List<Group> groups,
     required Map<String, String> selectedMap,
     required bool showTrayTitle,
+    @Default(true) bool monochromeTrayIcon,
     required bool safeMode,
     @Default(false) bool menuBarMode,
     @Default({}) Map<HotAction, HotKeyAction> hotKeys,
@@ -189,9 +190,7 @@ abstract class SharedState with _$SharedState {
     required String localNetworkTip,
     required String currentProfileName,
     required String stopText,
-    required bool onlyStatisticsProxy,
     @Default(true) bool showStopAction,
-    @Default(true) bool appVisible,
   }) = _SharedState;
 
   factory SharedState.fromJson(Map<String, Object?> json) =>

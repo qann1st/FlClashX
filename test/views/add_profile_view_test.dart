@@ -20,7 +20,7 @@ class _RecordingProfilesAction extends ProfilesAction {
   final deviceHeaderChoices = <bool>[];
 
   @override
-  Future<void> addProfileFromLink(
+  Future<Profile?> addProfileFromLink(
     String link, {
     String? label,
     String ageSecretKey = '',
@@ -29,6 +29,7 @@ class _RecordingProfilesAction extends ProfilesAction {
     singles.add(link);
     ageSecretKeys.add(ageSecretKey);
     deviceHeaderChoices.add(sendDeviceHeaders);
+    return null;
   }
 
   @override
@@ -65,26 +66,33 @@ ProviderContainer _containerFor(
   return container;
 }
 
-void main() {
-  testWidgets('lists the QR code, file, link, and custom entries', (
-    tester,
-  ) async {
-    final container = _containerFor(tester);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: TestApp(
-          child: Scaffold(
-            body: Builder(
-              builder: (context) =>
-                  AddProfileView(context: context, origin: context),
+Future<void> _openMenu(WidgetTester tester, ProviderContainer container) async {
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: TestApp(
+        child: Scaffold(
+          body: Center(
+            child: AddProfileMenu(
+              builder: (open) =>
+                  FilledButton(onPressed: open, child: const Text('add')),
             ),
           ),
         ),
       ),
-    );
-    await tester.pumpAndSettle();
+    ),
+  );
+  await tester.tap(find.text('add'));
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets('offers the QR code, file, link, and custom entries', (
+    tester,
+  ) async {
+    final container = _containerFor(tester);
+
+    await _openMenu(tester, container);
 
     final l10n = currentAppLocalizations;
     expect(find.text(l10n.qrcode), findsOne);
@@ -104,20 +112,7 @@ void main() {
       profiles: [Profile.normal(url: 'https://example.com/old')],
     );
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: TestApp(
-          child: Scaffold(
-            body: Builder(
-              builder: (context) =>
-                  AddProfileView(context: context, origin: context),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _openMenu(tester, container);
 
     final l10n = currentAppLocalizations;
     await tester.tap(find.text(l10n.link));
@@ -142,20 +137,7 @@ void main() {
     final action = _RecordingProfilesAction();
     final container = _containerFor(tester, profilesAction: action);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: TestApp(
-          child: Scaffold(
-            body: Builder(
-              builder: (context) =>
-                  AddProfileView(context: context, origin: context),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _openMenu(tester, container);
 
     final l10n = currentAppLocalizations;
     await tester.tap(find.text(l10n.link));
@@ -178,20 +160,7 @@ void main() {
     final action = _RecordingProfilesAction();
     final container = _containerFor(tester, profilesAction: action);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: TestApp(
-          child: Scaffold(
-            body: Builder(
-              builder: (context) =>
-                  AddProfileView(context: context, origin: context),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _openMenu(tester, container);
 
     final l10n = currentAppLocalizations;
     await tester.tap(find.text(l10n.link));
@@ -214,20 +183,7 @@ void main() {
     final action = _RecordingProfilesAction();
     final container = _containerFor(tester, profilesAction: action);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: TestApp(
-          child: Scaffold(
-            body: Builder(
-              builder: (context) =>
-                  AddProfileView(context: context, origin: context),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _openMenu(tester, container);
 
     final l10n = currentAppLocalizations;
     await tester.tap(find.text(l10n.link));
@@ -249,20 +205,7 @@ void main() {
     final action = _RecordingProfilesAction();
     final container = _containerFor(tester, profilesAction: action);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: TestApp(
-          child: Scaffold(
-            body: Builder(
-              builder: (context) =>
-                  AddProfileView(context: context, origin: context),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _openMenu(tester, container);
 
     final l10n = currentAppLocalizations;
     await tester.tap(find.text(l10n.link));

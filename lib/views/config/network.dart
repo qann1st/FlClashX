@@ -80,6 +80,7 @@ class TUNItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, ref) {
     return ConfigToggleItem(
+      managedKey: 'clash.tun.enable',
       title: (l) => l.tun,
       selector: patchClashConfigProvider.select((state) => state.tun.enable),
       onChanged: _tunWriter(
@@ -360,6 +361,7 @@ class _NumberItem extends ConsumerWidget {
 List<Widget> tunItems({required bool isMipsStack}) {
   return [
     _NumberItem(
+      managedKey: 'clash.tun.mtu',
       title: (l) => 'MTU',
       min: minTunMtu,
       max: maxTunMtu,
@@ -368,6 +370,7 @@ List<Widget> tunItems({required bool isMipsStack}) {
     ),
     if (isMipsStack)
       ConfigOptionsItem<String>(
+        managedKey: 'clash.tun.congestion-controller',
         title: (l) => l.congestionController,
         options: congestionControllers,
         textBuilder: (value) => value,
@@ -605,9 +608,10 @@ class NetworkListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-      ).copyWith(top: context.contentTopPadding, bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+        top: context.sectionsTopPadding,
+        bottom: 16 + context.bottomInset,
+      ),
       children: [
         const ManagedSettingsHint(keys: networkPageKeys),
         if (system.isAndroid) const VpnSections(),

@@ -8,8 +8,6 @@ extension PackageInfoExtension on PackageInfo {
   String get displayVersion =>
       appVersionDefine.isNotEmpty ? appVersionDefine : version;
 
-  String get ua => uaWith(coreVersionDefine);
-
   /// `FlClashX/v<app> core/Prizrak-Core/v<core> Platform/<os>`; the core token
   /// is left out until a version is known.
   String uaWith(String coreVersion) => [

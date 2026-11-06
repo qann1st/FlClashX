@@ -5,9 +5,29 @@ import 'package:test/test.dart';
 void main() {
   test('only the keys a subscription may take over count as managed', () {
     expect(
-      managedClashKeysOf(['mixed-port', 'tun.stack', 'dns', 'proxies', 'mode']),
-      {'clash.mixed-port', 'clash.tun.stack'},
+      managedClashKeysOf([
+        'mixed-port',
+        'tun.stack',
+        'tun.enable',
+        'dns',
+        'proxies',
+        'mode',
+      ]),
+      {'clash.mixed-port', 'clash.tun.stack', 'clash.tun.enable', 'clash.mode'},
     );
+  });
+
+  test('an owned mode and tun switch keep what the user chose', () {
+    const mine = PatchClashConfig(mode: Mode.global, tun: Tun(enable: false));
+    const synced = PatchClashConfig(tun: Tun(enable: true));
+
+    final kept = keepOwnedSettings(mine, synced, {
+      'clash.mode',
+      'clash.tun.enable',
+    });
+
+    expect(kept.mode, Mode.global);
+    expect(kept.tun.enable, isFalse);
   });
 
   test('owned settings keep the value the user chose through a sync', () {

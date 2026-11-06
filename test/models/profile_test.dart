@@ -127,12 +127,12 @@ void main() {
 
       expect(profile.type, ProfileType.custom);
       expect(profile.url, isEmpty);
-      expect(profile.realAutoUpdate, false);
+      expect(profile.autoUpdate, isFalse);
     });
   });
 
   group('ProfileExtension', () {
-    test('derives auto update, label, filename, and updating key', () {
+    test('derives label, filename, and updating key', () {
       const fileProfile = Profile(
         id: 7,
         autoUpdateDuration: defaultUpdateDuration,
@@ -147,13 +147,11 @@ void main() {
       );
 
       expect(fileProfile.type, ProfileType.file);
-      expect(fileProfile.realAutoUpdate, false);
       expect(fileProfile.realLabel, '7');
-      expect(fileProfile.fileName, '7.yaml');
       expect(fileProfile.updatingKey, 'profile_7');
 
       expect(urlProfile.type, ProfileType.url);
-      expect(urlProfile.realAutoUpdate, true);
+
       expect(urlProfile.realLabel, 'Remote');
       expect(urlProfile.copyWith(label: '').realLabel, 'example.com');
 

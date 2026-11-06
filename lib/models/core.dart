@@ -39,6 +39,7 @@ abstract class ProfileBase with _$ProfileBase {
 
     /// The keys the file names itself, top level and `tun.*`.
     @Default([]) List<String> present,
+    @Default(false) @JsonKey(name: 'global-override') bool globalOverride,
   }) = _ProfileBase;
 
   factory ProfileBase.fromJson(Map<String, dynamic> json) =>
@@ -164,12 +165,45 @@ abstract class ChangeProxyResult with _$ChangeProxyResult {
 abstract class RouteSnapshot with _$RouteSnapshot {
   const factory RouteSnapshot({
     @JsonKey(name: 'core-epoch') @Default(0) int coreEpoch,
-    @JsonKey(name: 'picks-version') @Default(0) int picksVersion,
-    @Default({}) Map<String, String> picks,
+    @JsonKey(name: 'route-version') @Default(0) int routeVersion,
   }) = _RouteSnapshot;
 
   factory RouteSnapshot.fromJson(Map<String, Object?> json) =>
       _$RouteSnapshotFromJson(json);
+}
+
+/// [exit] is the Core's name for where a connection left, only compared whole.
+@freezed
+abstract class RouteHit with _$RouteHit {
+  const factory RouteHit({
+    @Default('') String host,
+    @Default('') String proxy,
+    @Default('') String exit,
+  }) = _RouteHit;
+
+  factory RouteHit.fromJson(Map<String, Object?> json) =>
+      _$RouteHitFromJson(json);
+}
+
+@freezed
+abstract class CheckRoutesParams with _$CheckRoutesParams {
+  const factory CheckRoutesParams({@Default([]) List<List<RouteHit>> routes}) =
+      _CheckRoutesParams;
+
+  factory CheckRoutesParams.fromJson(Map<String, Object?> json) =>
+      _$CheckRoutesParamsFromJson(json);
+}
+
+@freezed
+abstract class RouteCheck with _$RouteCheck {
+  const factory RouteCheck({
+    @JsonKey(name: 'core-epoch') @Default(0) int coreEpoch,
+    @JsonKey(name: 'route-version') @Default(0) int routeVersion,
+    @Default([]) List<bool> held,
+  }) = _RouteCheck;
+
+  factory RouteCheck.fromJson(Map<String, Object?> json) =>
+      _$RouteCheckFromJson(json);
 }
 
 @freezed
@@ -187,38 +221,6 @@ abstract class Delay with _$Delay {
       _Delay;
 
   factory Delay.fromJson(Map<String, Object?> json) => _$DelayFromJson(json);
-}
-
-@freezed
-abstract class ProbeParams with _$ProbeParams {
-  const factory ProbeParams({
-    required String url,
-    @JsonKey(name: 'proxy-name') @Default('') String proxyName,
-    @Default({}) Map<String, String> headers,
-    required int timeout,
-    @JsonKey(name: 'max-body') @Default(0) int maxBody,
-  }) = _ProbeParams;
-
-  factory ProbeParams.fromJson(Map<String, Object?> json) =>
-      _$ProbeParamsFromJson(json);
-}
-
-@freezed
-abstract class ProbeResult with _$ProbeResult {
-  const factory ProbeResult({
-    @JsonKey(name: 'status-code') @Default(0) int statusCode,
-    @Default(0) int delay,
-    @Default('') String body,
-    @Default('') String url,
-    @Default([]) List<String> chains,
-    @Default('') String rule,
-    @JsonKey(name: 'rule-payload') @Default('') String rulePayload,
-    String? error,
-    String? message,
-  }) = _ProbeResult;
-
-  factory ProbeResult.fromJson(Map<String, Object?> json) =>
-      _$ProbeResultFromJson(json);
 }
 
 @freezed
@@ -242,7 +244,9 @@ abstract class OutboundIpResult with _$OutboundIpResult {
     @Default([]) List<String> chains,
     String? error,
     @JsonKey(name: 'core-epoch') @Default(0) int coreEpoch,
-    @JsonKey(name: 'picks-version') @Default(0) int picksVersion,
+    @JsonKey(name: 'route-version') @Default(0) int routeVersion,
+    @Default([]) List<RouteHit> hits,
+    @JsonKey(name: 'node-hits') @Default([]) List<RouteHit> nodeHits,
   }) = _OutboundIpResult;
 
   factory OutboundIpResult.fromJson(Map<String, Object?> json) =>
@@ -271,7 +275,8 @@ abstract class ServiceCheckItem with _$ServiceCheckItem {
     @Default([]) List<String> chains,
     @JsonKey(name: 'checked-at') @Default(0) int checkedAt,
     @JsonKey(name: 'core-epoch') @Default(0) int coreEpoch,
-    @JsonKey(name: 'picks-version') @Default(0) int picksVersion,
+    @JsonKey(name: 'route-version') @Default(0) int routeVersion,
+    @Default([]) List<RouteHit> hits,
   }) = _ServiceCheckItem;
 
   factory ServiceCheckItem.fromJson(Map<String, Object?> json) =>

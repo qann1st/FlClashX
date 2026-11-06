@@ -49,6 +49,7 @@ class SystemAction extends _$SystemAction {
     }
     await Future.wait([
       ?saveOperation,
+      drainDatabaseWrites(),
       fileLogger.dispose(),
       bootGuard.markClosed(),
       if (systemDnsCoordinator != null) systemDnsCoordinator!.shutdown(),
@@ -120,7 +121,12 @@ class SystemAction extends _$SystemAction {
     await windowPort?.toggle();
   }
 
+  /// From the tray or a hotkey, which have nowhere to ask before taking the
+  /// switch over from the subscription.
   void updateTun() {
+    ref
+        .read(managedSettingsActionProvider.notifier)
+        .takeOverIfLocked('clash.tun.enable');
     ref
         .read(patchClashConfigProvider.notifier)
         .update((state) => state.copyWith.tun(enable: !state.tun.enable));
@@ -139,12 +145,6 @@ class SystemAction extends _$SystemAction {
     await Clipboard.setData(
       ClipboardData(text: proxyEnvCommand(port, isWindows: system.isWindows)),
     );
-  }
-
-  void updateAutoLaunch() {
-    ref
-        .read(appSettingProvider.notifier)
-        .update((state) => state.copyWith(autoLaunch: !state.autoLaunch));
   }
 
   Future<void> updateTray() async {

@@ -8,6 +8,7 @@ import (
 	"github.com/metacubex/http"
 	"io"
 	"net"
+	"slices"
 	"sync"
 	"time"
 
@@ -37,9 +38,7 @@ var (
 )
 
 type probeRoute struct {
-	chains      []string
-	rule        string
-	rulePayload string
+	chains []string
 }
 
 // probeDialer opens one connection per dial, either pinned to a proxy or
@@ -49,11 +48,12 @@ type probeRoute struct {
 type probeDialer struct {
 	proxy constant.Proxy
 
-	mu   sync.Mutex
-	last *routedConn
+	mu    sync.Mutex
+	last  *routedConn
+	dials []*routedConn
 }
 
-func (d *probeDialer) dial(ctx context.Context, _ string, address string) (net.Conn, error) {
+func probeMetadata(address string) (*constant.Metadata, error) {
 	metadata := &constant.Metadata{
 		NetWork: constant.TCP,
 		Type:    constant.INNER,
@@ -63,23 +63,34 @@ func (d *probeDialer) dial(ctx context.Context, _ string, address string) (net.C
 	if err := metadata.SetRemoteAddress(address); err != nil {
 		return nil, err
 	}
+	return metadata, nil
+}
+
+func (d *probeDialer) dial(ctx context.Context, _ string, address string) (net.Conn, error) {
+	metadata, err := probeMetadata(address)
+	if err != nil {
+		return nil, err
+	}
+	attempt := d.track(address)
 	if d.proxy != nil {
 		conn, err := d.proxy.DialContext(ctx, metadata)
 		if err != nil {
 			return nil, err
 		}
-		d.remember(&routedConn{route: &probeRoute{chains: conn.Chains()}})
+		attempt.settle(&probeRoute{chains: conn.Chains()})
+		d.remember(attempt)
 		return conn, nil
 	}
 	if err := awaitTunnel(ctx); err != nil {
 		return nil, err
 	}
 	local, remote := N.Pipe()
-	routed := &routedConn{Conn: local, metadata: metadata}
-	pendingProbeRoutes.Store(metadata, routed)
+	attempt.Conn = local
+	attempt.metadata = metadata
+	pendingProbeRoutes.Store(metadata, attempt)
 	go trafficTunnel.HandleTCPConn(remote, metadata)
-	d.remember(routed)
-	return routed, nil
+	d.remember(attempt)
+	return attempt, nil
 }
 
 // Applying a config suspends the tunnel before the route epoch moves, so a
@@ -96,10 +107,70 @@ func awaitTunnel(ctx context.Context) error {
 	return nil
 }
 
+func (d *probeDialer) track(address string) *routedConn {
+	attempt := &routedConn{address: address}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.dials = append(d.dials, attempt)
+	return attempt
+}
+
 func (d *probeDialer) remember(conn *routedConn) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.last = conn
+}
+
+// A connection that never reached the tracker, a failed one, is matched
+// again for where it would have left.
+func (d *probeDialer) hits(proxyName string) []RouteHit {
+	d.mu.Lock()
+	dials := slices.Clone(d.dials)
+	d.mu.Unlock()
+	var hits []RouteHit
+	for _, dial := range dials {
+		hit := RouteHit{Host: dial.address, Proxy: proxyName}
+		if route := dial.resolve(); route != nil {
+			hit.Exit = exitOfChains(route.chains)
+		} else {
+			hit.Exit = resolveExit(dial.address, proxyName)
+		}
+		hits = withHit(hits, hit)
+	}
+	return hits
+}
+
+func withHit(hits []RouteHit, hit RouteHit) []RouteHit {
+	for index := range hits {
+		if hits[index].Host == hit.Host && hits[index].Proxy == hit.Proxy {
+			hits[index] = hit
+			return hits
+		}
+	}
+	return append(hits, hit)
+}
+
+// hitRecorder gathers the hits of every request one answer is made from.
+type hitRecorder struct {
+	mu   sync.Mutex
+	hits []RouteHit
+}
+
+func (r *hitRecorder) add(hits []RouteHit) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, hit := range hits {
+		r.hits = withHit(r.hits, hit)
+	}
+}
+
+func (r *hitRecorder) list() []RouteHit {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.hits)
 }
 
 func (d *probeDialer) route() *probeRoute {
@@ -117,6 +188,7 @@ func (d *probeDialer) route() *probeRoute {
 type routedConn struct {
 	net.Conn
 	metadata *constant.Metadata
+	address  string
 
 	mu    sync.Mutex
 	route *probeRoute
@@ -160,9 +232,7 @@ func notifyProbeRoute(tracker statistic.Tracker) {
 		return
 	}
 	pending.(*routedConn).settle(&probeRoute{
-		chains:      append([]string(nil), info.Chain...),
-		rule:        info.Rule,
-		rulePayload: info.RulePayload,
+		chains: append([]string(nil), info.Chain...),
 	})
 }
 
@@ -192,23 +262,14 @@ type probeRequest struct {
 
 	// until sees the latest chunk and probeScanOverlap bytes before it.
 	until func(tail string) bool
-}
 
-func handleProbe(params *ProbeParams) *ProbeResult {
-	return runProbe(context.Background(), probeRequest{
-		method:    http.MethodGet,
-		url:       params.Url,
-		proxyName: params.ProxyName,
-		headers:   params.Headers,
-		timeout:   timeoutFromMillis(params.Timeout, defaultProbeTimeout),
-		maxBody:   params.MaxBody,
-	})
+	recorder *hitRecorder
 }
 
 // runProbe returns nil when the request never got a slot before its deadline.
 func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	result := &ProbeResult{Url: req.url, Chains: []string{}}
-	result.CoreEpoch, result.PicksVersion = routeStamp()
+	result.CoreEpoch, result.RouteVersion = routeStamp()
 	fail := func(err error) *ProbeResult {
 		result.Error = probeErrorKind(err)
 		result.Message = err.Error()
@@ -219,9 +280,15 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	if req.proxyName != "" {
 		dialer.proxy = lookupProxy(req.proxyName)
 		if dialer.proxy == nil {
+			result.hits = []RouteHit{{Proxy: req.proxyName}}
+			req.recorder.add(result.hits)
 			return fail(fmt.Errorf("proxy %q is not part of the applied config", req.proxyName))
 		}
 	}
+	defer func() {
+		result.hits = dialer.hits(req.proxyName)
+		req.recorder.add(result.hits)
+	}()
 	tlsConfig, err := ca.GetTLSConfig(ca.Option{})
 	if err != nil {
 		return fail(err)
@@ -284,8 +351,6 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	result.Url = response.Request.URL.String()
 	if route := dialer.route(); route != nil {
 		result.Chains = route.chains
-		result.Rule = route.rule
-		result.RulePayload = route.rulePayload
 	}
 	if req.maxBody > 0 {
 		result.Body = readProbeBody(response.Body, req.maxBody, req.until)

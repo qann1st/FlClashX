@@ -13,7 +13,6 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 class Request {
   late final Dio dio;
   late final Dio _clashDio;
-  String? userAgent;
 
   ProviderReader? _read;
 

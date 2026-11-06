@@ -23,6 +23,11 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
 
   int _generation = 0;
 
+  /// What the last synced file named: only those keys fall back to the app
+  /// default when the next file leaves them out, so a value the user set
+  /// for a key no file names stays.
+  Set<String> _named = const {};
+
   @override
   void build() {
     ref.listen(
@@ -38,13 +43,15 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
 
   Future<void> apply(ProfileSettingsSource source) async {
     final id = source.id;
+    final generation = ++_generation;
     if (id == null ||
         source.type == ProfileType.custom ||
         source.extendType == ExtendType.script) {
+      _named = const {};
       ref.read(managedClashKeysProvider.notifier).set(const {});
+      ref.read(globalOverrideProvider.notifier).value = false;
       return;
     }
-    final generation = ++_generation;
     final ProfileBase base;
     try {
       base = (await _core.getProfileBase(id)).base;
@@ -59,18 +66,34 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
       return;
     }
     final modes = ref.read(availableModesProvider);
-    final owned = ref.read(appSettingProvider).ownedSettings;
+    final named = base.present.toSet();
+    final kept = {
+      ...ref.read(appSettingProvider).ownedSettings,
+      for (final key in managedClashKeys)
+        if (!named.contains(key) && !_named.contains(key)) clashSettingKey(key),
+    };
+    _named = named;
     ref
         .read(managedClashKeysProvider.notifier)
         .set(managedClashKeysOf(base.present));
+    ref.read(globalOverrideProvider.notifier).value = base.globalOverride;
     ref
         .read(patchClashConfigProvider.notifier)
         .update(
           (state) => keepOwnedSettings(
             state,
             syncProfileSettings(state, base.config, base.present, modes: modes),
-            owned,
+            kept,
           ),
         );
+    if (!kept.contains(clashSettingKey('authentication'))) {
+      ref
+          .read(networkSettingProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              authentication: authenticationFrom(base.config['authentication']),
+            ),
+          );
+    }
   }
 }

@@ -33,12 +33,13 @@ func handleGetProfileBase(path string) (*ProfileBase, error) {
 		return nil, err
 	}
 	base := &ProfileBase{
-		Digest:      hex.EncodeToString(digest[:]),
-		MatchRules:  []string{},
-		Proxies:     len(raw.Proxy),
-		ProxyGroups: len(raw.ProxyGroup),
-		Rules:       len(raw.Rule),
-		Present:     presentKeys(buf),
+		Digest:         hex.EncodeToString(digest[:]),
+		MatchRules:     []string{},
+		Proxies:        len(raw.Proxy),
+		ProxyGroups:    len(raw.ProxyGroup),
+		Rules:          len(raw.Rule),
+		Present:        presentKeys(buf),
+		GlobalOverride: globalOverride(raw.ProxyGroup),
 	}
 	for _, rule := range raw.Rule {
 		if isMatchRule(rule) {
@@ -48,6 +49,22 @@ func handleGetProfileBase(path string) (*ProfileBase, error) {
 	raw.Proxy, raw.ProxyGroup, raw.Rule, raw.SubRules = nil, nil, nil, nil
 	base.Config = raw
 	return base, nil
+}
+
+func globalOverride(groups []map[string]any) bool {
+	for _, group := range groups {
+		if group["name"] != globalProxyName {
+			continue
+		}
+		switch flag := group["flclashx-override"].(type) {
+		case bool:
+			return flag
+		case string:
+			return strings.EqualFold(strings.TrimSpace(flag), "true")
+		}
+		return false
+	}
+	return false
 }
 
 func handleGetProfileOutbounds(path string) (*ProfileOutbounds, error) {

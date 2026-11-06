@@ -179,7 +179,7 @@ final class TrayStateProvider
   }
 }
 
-String _$trayStateHash() => r'04c21928b51dfcbcd54fbaa26d8c326e9f5e186b';
+String _$trayStateHash() => r'339d29d0720413cd6025876faad9508322d0bb8f';
 
 /// Measured delays of the proxies the tray lists, by group and then proxy
 /// name. Resolved like a proxy card, so a nested group shows its selection.
@@ -437,7 +437,7 @@ final class SharedStateProvider
   }
 }
 
-String _$sharedStateHash() => r'bdd52391511538dea359e01fae58276e6bfc8277';
+String _$sharedStateHash() => r'5846421731e6f6572eb9c99ccf20371ecdf68d7a';
 
 @ProviderFor(vpnRouteAddress)
 final vpnRouteAddressProvider = VpnRouteAddressProvider._();
@@ -808,7 +808,7 @@ final class WindowBlurRequestProvider
   }
 }
 
-String _$windowBlurRequestHash() => r'e22ea22957373c5b864e3fb80af56a2d08646666';
+String _$windowBlurRequestHash() => r'90b7a731689db7fa39d979866c428843b1073cf8';
 
 @ProviderFor(currentBrightness)
 final currentBrightnessProvider = CurrentBrightnessProvider._();
@@ -947,7 +947,7 @@ final class ManagedSettingsProvider
   }
 }
 
-String _$managedSettingsHash() => r'cebcc2846380e5d3b43fecddaa59ff52234bfb48';
+String _$managedSettingsHash() => r'379040e4fabaaf5fda571757e4b660fb6eb16b83';
 
 @ProviderFor(settingOwned)
 final settingOwnedProvider = SettingOwnedFamily._();
@@ -2079,7 +2079,7 @@ final class CurrentGroupsStateProvider
 }
 
 String _$currentGroupsStateHash() =>
-    r'd4ea3c3271a77d8bd791f94c697cc94a41fff38f';
+    r'b334885e3b790e3c5f70bf05addff9d98cb93178';
 
 @ProviderFor(proxyState)
 final proxyStateProvider = ProxyStateProvider._();
@@ -2120,7 +2120,7 @@ final class ProxyStateProvider
   }
 }
 
-String _$proxyStateHash() => r'76a71ab5da07dca9aeb351282c5c03ab222d0760';
+String _$proxyStateHash() => r'cc5539f122cd5fec2f9b094310e519f11c1682ae';
 
 /// Watching the delay map instead would drop nodes one probe at a time, and
 /// reading it on any other rebuild would drop them whenever something
@@ -3717,13 +3717,15 @@ final class PanelBackgroundProvider
 String _$panelBackgroundHash() => r'3f1316cda2b0ff9ae4335b05c8693d0346f48c54';
 
 /// The backdrop picture from the disk cache, fetched once per url and
-/// served from there afterwards, offline included.
+/// served from there afterwards, offline included. A fetch that fails, as one
+/// does while a profile switch restarts the Core's listener, is retried.
 
 @ProviderFor(panelBackdropImage)
 final panelBackdropImageProvider = PanelBackdropImageProvider._();
 
 /// The backdrop picture from the disk cache, fetched once per url and
-/// served from there afterwards, offline included.
+/// served from there afterwards, offline included. A fetch that fails, as one
+/// does while a profile switch restarts the Core's listener, is retried.
 
 final class PanelBackdropImageProvider
     extends
@@ -3736,7 +3738,8 @@ final class PanelBackdropImageProvider
         $FutureModifier<ImageProvider<Object>?>,
         $FutureProvider<ImageProvider<Object>?> {
   /// The backdrop picture from the disk cache, fetched once per url and
-  /// served from there afterwards, offline included.
+  /// served from there afterwards, offline included. A fetch that fails, as one
+  /// does while a profile switch restarts the Core's listener, is retried.
   PanelBackdropImageProvider._()
     : super(
         from: null,
@@ -3764,7 +3767,7 @@ final class PanelBackdropImageProvider
 }
 
 String _$panelBackdropImageHash() =>
-    r'4f9a56161af7a418e1f91265f4c1b6408cf47069';
+    r'95f84637742e4e488a298c973bd39e7ca1cf78b0';
 
 /// Where the panel's logo lies on disk, kept as its backdrop is so it shows
 /// at launch without the network.
@@ -3823,7 +3826,7 @@ final class PanelLogoPathProvider
   }
 }
 
-String _$panelLogoPathHash() => r'f0abc719953a175b52c83a760a19270e036f16a9';
+String _$panelLogoPathHash() => r'cdaa6f7459c2ee355372e2a82918d1f2a232b243';
 
 /// Where the panel's logo lies on disk, kept as its backdrop is so it shows
 /// at launch without the network.

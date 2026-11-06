@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/core/controller.dart';
@@ -89,17 +90,91 @@ void main() {
     },
   );
 
-  test('a subscription naming nothing puts the settings back', () async {
+  test('a key no file names keeps what the user set', () async {
     container
         .read(patchClashConfigProvider.notifier)
-        .update((state) => state.copyWith(mixedPort: 1080, ipv6: true));
+        .update((state) => state.copyWith(mixedPort: 1080, socksPort: 7891));
     answer({}, []);
 
     await select(_profile(1));
+    await select(_profile(1, updatedAt: DateTime(2026, 10, 28)));
 
-    expect(settings().mixedPort, defaultMixedPort);
-    expect(settings().ipv6, isTrue);
+    expect(settings().mixedPort, 1080);
+    expect(settings().socksPort, 7891);
   });
+
+  test(
+    'a key the last file named falls back once the next leaves it out',
+    () async {
+      answer({'socks-port': 7891}, ['socks-port']);
+      await select(_profile(1));
+      expect(settings().socksPort, 7891);
+
+      answer({}, []);
+      await select(_profile(2));
+
+      expect(settings().socksPort, const PatchClashConfig().socksPort);
+    },
+  );
+
+  test('an edit under a custom profile outlives the file before it', () async {
+    answer({'socks-port': 7891}, ['socks-port']);
+    await select(_profile(1));
+    await select(_profile(2, type: ProfileType.custom));
+    container
+        .read(patchClashConfigProvider.notifier)
+        .update((state) => state.copyWith(socksPort: 1234));
+
+    answer({}, []);
+    await select(_profile(3));
+
+    expect(settings().socksPort, 1234);
+  });
+
+  test(
+    'every update sets the mode and tun again until the user takes them',
+    () async {
+      container.listen(appSettingProvider, (_, _) {});
+      answer(
+        {
+          'mode': 'rule',
+          'tun': {'enable': true},
+        },
+        ['mode', 'tun', 'tun.enable'],
+      );
+      await select(_profile(1));
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              mode: Mode.global,
+              tun: state.tun.copyWith(enable: false),
+            ),
+          );
+      await select(_profile(1, updatedAt: DateTime(2026, 10, 28)));
+      expect(settings().mode, Mode.rule);
+      expect(settings().tun.enable, isTrue);
+
+      container
+          .read(appSettingProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              ownedSettings: {'clash.mode', 'clash.tun.enable'},
+            ),
+          );
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              mode: Mode.global,
+              tun: state.tun.copyWith(enable: false),
+            ),
+          );
+      await select(_profile(1, updatedAt: DateTime(2026, 10, 29)));
+      expect(settings().mode, Mode.global);
+      expect(settings().tun.enable, isFalse);
+    },
+  );
 
   test(
     'an owned key stays while the rest follows, and is listed as managed',
@@ -147,6 +222,38 @@ void main() {
     verify(() => core.getProfileBase(any())).called(2);
   });
 
+  test('the file\'s GLOBAL override follows the current profile', () async {
+    container.listen(globalOverrideProvider, (_, _) {});
+    when(() => core.getProfileBase(any())).thenAnswer(
+      (_) async =>
+          const ProfileBase(config: {}, digest: 'd', globalOverride: true),
+    );
+
+    await select(_profile(1));
+    expect(container.read(globalOverrideProvider), isTrue);
+
+    await select(_profile(2, type: ProfileType.custom));
+    expect(container.read(globalOverrideProvider), isFalse);
+  });
+
+  test(
+    'a read still pending when a custom profile is chosen is dropped',
+    () async {
+      container.listen(globalOverrideProvider, (_, _) {});
+      final pending = Completer<ProfileBase>();
+      when(() => core.getProfileBase(any())).thenAnswer((_) => pending.future);
+
+      await select(_profile(1));
+      await select(_profile(2, type: ProfileType.custom));
+      pending.complete(
+        const ProfileBase(config: {}, digest: 'd', globalOverride: true),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(globalOverrideProvider), isFalse);
+    },
+  );
+
   test('a custom or scripted profile leaves the settings alone', () async {
     container
         .read(patchClashConfigProvider.notifier)
@@ -172,4 +279,52 @@ void main() {
 
     expect(settings().mixedPort, 1080);
   });
+
+  test(
+    'the authentication a file names fills the account until taken',
+    () async {
+      container.listen(appSettingProvider, (_, _) {});
+      container.listen(networkSettingProvider, (_, _) {});
+      AuthenticationProps auth() =>
+          container.read(networkSettingProvider).authentication;
+      answer(
+        {
+          'authentication': ['panel:secret'],
+        },
+        ['authentication'],
+      );
+
+      await select(_profile(1));
+      expect(
+        auth(),
+        const AuthenticationProps(
+          enable: true,
+          username: 'panel',
+          password: 'secret',
+        ),
+      );
+      expect(
+        container.read(managedSettingsProvider),
+        contains('clash.authentication'),
+      );
+
+      container
+          .read(appSettingProvider.notifier)
+          .update(
+            (state) => state.copyWith(ownedSettings: {'clash.authentication'}),
+          );
+      container
+          .read(networkSettingProvider.notifier)
+          .update((state) => state.copyWith.authentication(username: 'mine'));
+      await select(_profile(1, updatedAt: DateTime(2026, 10, 31)));
+      expect(auth().username, 'mine');
+
+      container
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(ownedSettings: {}));
+      answer({}, []);
+      await select(_profile(2));
+      expect(auth(), const AuthenticationProps());
+    },
+  );
 }

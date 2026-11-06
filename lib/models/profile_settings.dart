@@ -3,6 +3,24 @@ import 'package:fl_clash/common/cidr.dart';
 import 'package:fl_clash/enum/enum.dart';
 
 import 'clash_config.dart';
+import 'config.dart';
+
+/// mihomo takes a list of `user:pass` entries; the app keeps one account, the
+/// first, and an empty or unreadable list leaves authentication off.
+AuthenticationProps authenticationFrom(Object? value) {
+  final entries = value is List ? value.whereType<String>() : const <String>[];
+  for (final entry in entries) {
+    final colon = entry.indexOf(':');
+    if (colon > 0) {
+      return AuthenticationProps(
+        enable: true,
+        username: entry.substring(0, colon),
+        password: entry.substring(colon + 1),
+      );
+    }
+  }
+  return const AuthenticationProps();
+}
 
 /// [current] with the keys below taken from [config], the decoded profile,
 /// where [present] names them, and reset to the app default where it does
@@ -44,6 +62,8 @@ PatchClashConfig syncProfileSettings(
     tun: current.tun.copyWith(
       device: defaults.tun.device,
       stack: defaults.tun.stack,
+      mtu: defaults.tun.mtu,
+      congestionController: defaults.tun.congestionController,
       includePackage: defaults.tun.includePackage,
       excludePackage: defaults.tun.excludePackage,
       routeAddress: defaults.tun.routeAddress,
@@ -97,13 +117,9 @@ PatchClashConfig syncProfileSettings(
   if (mode != null && modes.contains(mode)) {
     next = next.copyWith(mode: mode);
   }
-  final findProcess = read<String>('find-process-mode')?.toLowerCase();
+  final findProcess = enumNamed('find-process-mode', FindProcessMode.values);
   if (findProcess != null) {
-    next = next.copyWith(
-      findProcessMode: findProcess == 'off'
-          ? FindProcessMode.off
-          : FindProcessMode.always,
-    );
+    next = next.copyWith(findProcessMode: findProcess);
   }
   final interfaceName = read<String>('interface-name');
   if (interfaceName != null) {
@@ -143,6 +159,8 @@ PatchClashConfig syncProfileSettings(
   )?.whereType<String>().map((item) => item.trim()).where(valid).toList();
 
   final tunDevice = read<String>('tun.device');
+  final mtu = read<num>('tun.mtu')?.toInt();
+  final congestion = read<String>('tun.congestion-controller')?.toLowerCase();
   next = next.copyWith(
     tun: next.tun.copyWith(
       enable: read<bool>('tun.enable') ?? next.tun.enable,
@@ -150,6 +168,13 @@ PatchClashConfig syncProfileSettings(
           ? next.tun.device
           : tunDevice,
       stack: enumNamed('tun.stack', TunStack.values) ?? next.tun.stack,
+      mtu: mtu != null && mtu >= minTunMtu && mtu <= maxTunMtu
+          ? mtu
+          : next.tun.mtu,
+      congestionController:
+          congestion != null && congestionControllers.contains(congestion)
+          ? congestion
+          : next.tun.congestionController,
       includePackage:
           strings('tun.include-package', (name) => name.isNotEmpty) ??
           next.tun.includePackage,

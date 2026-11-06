@@ -4,7 +4,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/ui/ui.dart' show TonalButtonGroup;
+import 'package:fl_clash/ui/context.dart';
 import 'package:fl_clash/views/proxies/card.dart';
 import 'package:fl_clash/views/proxies/list.dart';
 import 'package:fl_clash/views/views.dart';
@@ -17,11 +17,11 @@ import '../helpers/test_app.dart';
 import '../helpers/test_profiles.dart';
 
 void main() {
+  setUpAll(() => registerFallbackValue(Duration.zero));
   proxiesBarTests();
   proxyDescriptionTests();
-  testWidgets('a folded group shows its description, never its type', (
-    tester,
-  ) async {
+  testWidgets('a group description takes the place of the location it '
+      'picked, which shows only without one', (tester) async {
     tester.view.physicalSize = const Size(500, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -40,7 +40,21 @@ void main() {
         serverDescription: 'Fastest',
         all: [Proxy(name: 'Proxy 1', type: 'ss')],
       ),
+      const Group(
+        name: 'Manual',
+        type: GroupType.Selector,
+        hidden: false,
+        now: 'Proxy 2',
+        all: [Proxy(name: 'Proxy 2', type: 'ss')],
+      ),
     ];
+    Finder inHeader(String groupName, String text) => find.descendant(
+      of: find.ancestor(
+        of: find.text(groupName),
+        matching: find.byType(ListHeader),
+      ),
+      matching: find.text(text),
+    );
     final container = ProviderContainer(
       overrides: [
         profilesProvider.overrideWith(() => TestProfiles([profile])),
@@ -67,12 +81,15 @@ void main() {
         .read(proxiesStyleSettingProvider.notifier)
         .update((state) => state.copyWith(type: ProxiesType.list));
     await tester.pumpAndSettle();
-    expect(find.text('Fastest'), findsNothing);
+    expect(inHeader('Auto', 'Fastest'), findsOneWidget);
+    expect(inHeader('Auto', 'Proxy 1'), findsNothing);
+    expect(inHeader('Manual', 'Proxy 2'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Collapse'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Fastest'), findsOneWidget);
+    expect(inHeader('Auto', 'Fastest'), findsOneWidget);
+    expect(inHeader('Auto', 'Proxy 1'), findsNothing);
     expect(find.text(GroupType.URLTest.name), findsNothing);
   });
 
@@ -126,12 +143,15 @@ void main() {
     await tester.pump();
 
     final barBottom = tester.getRect(find.byType(AppBar)).bottom;
-    expect(tester.getRect(find.byType(ListHeader)).top, barBottom + 8);
+    final contentTop = tester
+        .element(find.byType(ListHeader))
+        .contentTopPadding;
+    expect(tester.getRect(find.byType(ListHeader)).top, contentTop);
 
     await tester.drag(find.byType(ProxyCard).first, const Offset(0, -300));
     await tester.pump();
 
-    expect(tester.getRect(find.byType(ListHeader)).top, barBottom + 8);
+    expect(tester.getRect(find.byType(ListHeader)).top, contentTop);
     expect(
       find
           .byType(ProxyCard)
@@ -206,12 +226,11 @@ void main() {
     position.jumpTo(position.maxScrollExtent - 1000);
     await tester.pump();
 
-    final barBottom = tester.getRect(find.byType(AppBar)).bottom;
     final far = find.ancestor(
       of: find.text('Far'),
       matching: find.byType(ListHeader),
     );
-    expect(tester.getRect(far).top, barBottom + 8);
+    expect(tester.getRect(far).top, tester.element(far).contentTopPadding);
     expect(find.text('G0', skipOffstage: false), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -273,6 +292,74 @@ void proxyDescriptionTests() {
     expect(find.text('Amsterdam, 10 Gbit', findRichText: true), findsOneWidget);
     expect(find.text('ss', findRichText: true), findsOneWidget);
   });
+
+  testWidgets('a nested group with a description hides the host it picked', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(500, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final profile = Profile.normal().copyWith(
+      currentGroupName: 'Selector',
+      unfoldSet: {'Selector'},
+    );
+    final groups = [
+      const Group(
+        name: 'Selector',
+        type: GroupType.Selector,
+        hidden: false,
+        now: 'Auto',
+        all: [
+          Proxy(name: 'Auto', type: 'URLTest', serverDescription: 'Best spot'),
+          Proxy(name: 'Plain', type: 'URLTest'),
+        ],
+      ),
+      const Group(
+        name: 'Auto',
+        type: GroupType.URLTest,
+        hidden: false,
+        now: 'HK-01',
+        all: [Proxy(name: 'HK-01', type: 'ss')],
+      ),
+      const Group(
+        name: 'Plain',
+        type: GroupType.URLTest,
+        hidden: false,
+        now: 'JP-01',
+        all: [Proxy(name: 'JP-01', type: 'ss')],
+      ),
+    ];
+    final container = ProviderContainer(
+      overrides: [
+        profilesProvider.overrideWith(() => TestProfiles([profile])),
+        currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+        currentGroupsStateProvider.overrideWithValue(
+          GroupsState(value: groups.take(1).toList()),
+        ),
+        groupsProvider.overrideWithValue(groups),
+      ],
+    );
+    addTearDown(container.dispose);
+    globalState.container = container;
+    container
+        .read(viewSizeProvider.notifier)
+        .update((_) => const Size(500, 1000));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TestApp(child: ProxiesView()),
+      ),
+    );
+    container
+        .read(proxiesStyleSettingProvider.notifier)
+        .update((state) => state.copyWith(type: ProxiesType.list));
+    await tester.pump();
+
+    expect(find.text('Best spot', findRichText: true), findsOneWidget);
+    expect(find.textContaining('HK-01', findRichText: true), findsNothing);
+    expect(find.text('JP-01', findRichText: true), findsOneWidget);
+  });
 }
 
 void proxiesBarTests() {
@@ -284,7 +371,7 @@ void proxiesBarTests() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final core = _MockCore();
-    when(() => core.asyncTestDelay(any(), any())).thenAnswer(
+    when(() => core.asyncTestDelay(any(), any(), any())).thenAnswer(
       (invocation) async => Delay(
         url: invocation.positionalArguments[0] as String,
         name: invocation.positionalArguments[1] as String,
@@ -352,8 +439,8 @@ void proxiesBarTests() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
-    verify(() => core.asyncTestDelay(any(), 'P1')).called(1);
-    verify(() => core.asyncTestDelay(any(), 'P2')).called(1);
+    verify(() => core.asyncTestDelay(any(), 'P1', any())).called(1);
+    verify(() => core.asyncTestDelay(any(), 'P2', any())).called(1);
     expect(tester.takeException(), isNull);
   });
 
@@ -412,8 +499,6 @@ void proxiesBarTests() {
     );
     await tester.pump();
 
-    expect(find.byType(TonalButtonGroup), findsOneWidget);
-    expect(find.byTooltip('More'), findsOneWidget);
     await tester.tap(find.byTooltip('Expand all groups'));
     await tester.pumpAndSettle();
     expect(container.read(unfoldSetProvider), {'Hidden', 'Selector', 'Auto'});

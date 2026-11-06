@@ -11,6 +11,7 @@ import com.follow.clashx.common.GlobalState
 import com.follow.clashx.common.intent
 import com.follow.clashx.core.Core
 import com.follow.clashx.service.ManagedService
+import com.follow.clashx.service.NetworkObserver
 import com.follow.clashx.service.ProxyService
 import com.follow.clashx.service.ServiceConfig
 import com.follow.clashx.service.VpnService
@@ -57,6 +58,7 @@ object ServiceController {
         initParams: String,
         setupParams: String,
     ): Result<String> = runCatching {
+        NetworkObserver.start()
         suspendCancellableCoroutine { continuation ->
             Core.quickSetup(initParams, setupParams) { result ->
                 continuation.resume(result.orEmpty())

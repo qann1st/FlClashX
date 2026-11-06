@@ -15,7 +15,7 @@ const _sharedState = SharedState(
   localNetworkTip: 'local',
   currentProfileName: 'profile',
   stopText: 'stopped',
-  onlyStatisticsProxy: true,
+  showStopAction: false,
 );
 
 void main() {
@@ -26,6 +26,18 @@ void main() {
   setUp(() async {
     await mockPreferences();
     store = await SharedPreferences.getInstance();
+  });
+
+  group('applied config md5', () {
+    test('round-trips a written md5 and forgets a cleared one', () async {
+      expect(await preferences.getAppliedConfigMd5(), isNull);
+
+      await preferences.saveAppliedConfigMd5('abc');
+      expect(await preferences.getAppliedConfigMd5(), 'abc');
+
+      await preferences.saveAppliedConfigMd5(null);
+      expect(store.containsKey(appliedConfigMd5Key), isFalse);
+    });
   });
 
   group('version', () {
@@ -41,11 +53,11 @@ void main() {
   });
 
   group('config', () {
-    test('getConfig returns null when nothing is stored', () async {
-      expect(await preferences.getConfig(), isNull);
+    test('getConfigMap returns null when nothing is stored', () async {
+      expect(await preferences.getConfigMap(), isNull);
     });
 
-    test('saveConfig then getConfig round-trips the model', () async {
+    test('saveConfig then getConfigMap round-trips the model', () async {
       const config = Config(
         themeProps: defaultThemeProps,
         currentProfileId: 42,
@@ -53,10 +65,9 @@ void main() {
       );
 
       expect(await preferences.saveConfig(config), isTrue);
-      final restored = await preferences.getConfig();
+      final restored = Config.fromJson((await preferences.getConfigMap())!);
 
-      expect(restored, isNotNull);
-      expect(restored!.currentProfileId, 42);
+      expect(restored.currentProfileId, 42);
       expect(restored.excludeSSIDs, ['home']);
     });
 
@@ -119,7 +130,7 @@ void main() {
     await preferences.clearPreferences();
 
     expect(await preferences.getVersion(), 0);
-    expect(await preferences.getConfig(), isNull);
+    expect(await preferences.getConfigMap(), isNull);
   });
 
   test('isInit resolves true once shared preferences are available', () async {

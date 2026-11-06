@@ -58,6 +58,7 @@ TrayState trayState(Ref ref) {
         autoLaunch: state.autoLaunch,
         showTrayTitle: state.showTrayTitle,
         menuBarMode: state.menuBarMode,
+        monochromeTrayIcon: state.monochromeTrayIcon,
       ),
     ),
   );
@@ -79,6 +80,7 @@ TrayState trayState(Ref ref) {
     selectedMap: selectedMap,
     showTrayTitle: appSetting.showTrayTitle,
     menuBarMode: appSetting.menuBarMode,
+    monochromeTrayIcon: appSetting.monochromeTrayIcon,
     safeMode: safeMode,
     hotKeys: hotKeys,
     globalModeAllowed: ref.watch(globalModeAllowedProvider),
@@ -190,7 +192,6 @@ SharedState sharedState(Ref ref) {
   final appSetting = ref.watch(
     appSettingProvider.select(
       (state) => (
-        onlyStatisticsProxy: state.onlyStatisticsProxy,
         showStopAction: state.showNotificationStopAction,
         testUrl: state.testUrl,
         checkCertificate: state.checkCertificate,
@@ -199,13 +200,10 @@ SharedState sharedState(Ref ref) {
   );
   final currentProfileName = currentProfile.label;
   final selectedMap = currentProfile.selectedMap;
-  final onlyStatisticsProxy = appSetting.onlyStatisticsProxy;
   final testUrl = appSetting.testUrl;
   return SharedState(
     currentProfileName: currentProfileName,
-    onlyStatisticsProxy: onlyStatisticsProxy,
     showStopAction: appSetting.showStopAction,
-    appVisible: ref.watch(appVisibleProvider),
     stopText: currentAppLocalizations.stop,
     stopTip: currentAppLocalizations.stopVpn,
     startTip: currentAppLocalizations.startVpn,

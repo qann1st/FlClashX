@@ -163,11 +163,7 @@ class _AccessViewState extends ConsumerState<AccessView>
   }
 
   Future<void> _handleBack() async {
-    final appLocalizations = context.appLocalizations;
-    final res = await dialogs.showMessage(
-      title: appLocalizations.tip,
-      message: TextSpan(text: appLocalizations.saveChanges),
-    );
+    final res = await dialogs.showSaveChanges();
     if (res == null) {
       return;
     }
@@ -186,16 +182,12 @@ class _AccessViewState extends ConsumerState<AccessView>
     if (packages.isEmpty) {
       return accessControl;
     }
-    final viewPackageNames = packages
-        .whereVisible(
-          isFilterSystemApp: accessControl.isFilterSystemApp,
-          isFilterNonInternetApp: accessControl.isFilterNonInternetApp,
-        )
+    final installedPackageNames = packages
         .map((item) => item.packageName)
         .toSet();
     return accessControl.copyWithNewList(
       accessControl.currentList
-          .where((item) => viewPackageNames.contains(item))
+          .where((item) => installedPackageNames.contains(item))
           .toList()
         ..sort(),
     );
@@ -233,6 +225,27 @@ class _AccessViewState extends ConsumerState<AccessView>
     });
   }
 
+  void _smartSelect() {
+    final names = ref.read(packagesProvider).map((item) => item.packageName);
+    if (names.isEmpty) {
+      return;
+    }
+    ref
+        .read(accessControlStateProvider.notifier)
+        .update(
+          (state) => state.copyWith(
+            acceptList: [
+              for (final name in names)
+                if (!isRussianPackage(name)) name,
+            ],
+            rejectList: [
+              for (final name in names)
+                if (isRussianPackage(name)) name,
+            ],
+          ),
+        );
+  }
+
   List<CommonPopupMenuItem> _buildMenuItems(
     BuildContext context, {
     required bool enable,
@@ -264,6 +277,11 @@ class _AccessViewState extends ConsumerState<AccessView>
         glyph: AppGlyphs.moreCircle,
         label: appLocalizations.action,
         subItems: [
+          CommonPopupMenuItem(
+            glyph: AppGlyphs.sparkle,
+            label: appLocalizations.intelligentSelected,
+            onPressed: _smartSelect,
+          ),
           CommonPopupMenuItem(
             glyph: AppGlyphs.copy,
             label: appLocalizations.clipboardExport,
@@ -302,7 +320,10 @@ class _AccessViewState extends ConsumerState<AccessView>
             controller: _controller,
             child: ListView.builder(
               controller: _controller,
-              padding: EdgeInsets.only(bottom: BottomInsetScope.of(context)),
+              padding: EdgeInsets.only(
+                top: context.contentTopPadding,
+                bottom: context.bottomInset,
+              ),
               scrollCacheExtent: arrivalScrollCacheExtent(routeSettled),
               itemCount: packages.length,
               itemExtent: 72,
@@ -339,66 +360,6 @@ class _AccessViewState extends ConsumerState<AccessView>
     );
   }
 
-  Widget _buildBannerBar({
-    required bool enable,
-    required AccessControlMode mode,
-    required int count,
-  }) {
-    final appLocalizations = context.appLocalizations;
-    final level = context.raisedSurfaceLevel;
-    final backgroundColor = level.colorOf(context.colorScheme);
-    if (!enable) {
-      return MaterialBanner(
-        backgroundColor: backgroundColor,
-        dividerColor: Colors.transparent,
-        leading: GlyphIcon(AppGlyphs.info, color: context.colorScheme.outline),
-        content: Text(
-          appLocalizations.accessControlDisabledDesc,
-          style: TextStyle(color: context.colorScheme.onSurfaceVariant),
-        ),
-        actions: [
-          SurfaceScope(
-            level: level,
-            child: TonalButton(
-              size: TonalButtonSize.compact,
-              label: appLocalizations.turnOn,
-              onPressed: () => _handleEnable(true),
-            ),
-          ),
-        ],
-      );
-    }
-    final describe = mode == AccessControlMode.acceptSelected
-        ? appLocalizations.accessControlAllowDesc
-        : appLocalizations.accessControlNotAllowDesc;
-    final textStyle = AppTextStyle.subheadline
-        .of(context, emphasized: true)
-        .copyWith(color: context.colorScheme.onPrimary);
-    return MaterialBanner(
-      backgroundColor: backgroundColor,
-      dividerColor: Colors.transparent,
-      content: Text(describe),
-      actions: [
-        Card.filled(
-          color: context.colorScheme.primary,
-          elevation: 0,
-          shape: AppShape.md,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(appLocalizations.selected, style: textStyle),
-                const SizedBox(width: 4),
-                Flexible(child: Text('$count', style: textStyle)),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   void _onSearch(String value) {
     ref.read(queryProvider(QueryTag.access).notifier).value = value;
     _pinList();
@@ -419,7 +380,6 @@ class _AccessViewState extends ConsumerState<AccessView>
         )
         .whereMatches(query, (package) => [package.label, package.packageName])
         .toList();
-    final mode = accessControl.mode;
     final currentList = accessControl.currentList;
     final viewPackageNameList = viewPackages.map((e) => e.packageName).toList();
     final valueList = currentList.intersection(viewPackageNameList);
@@ -452,6 +412,7 @@ class _AccessViewState extends ConsumerState<AccessView>
         isLoading: isLoading,
         searchState: AppBarSearchState(onSearch: _onSearch),
         searchActions: [?selectAllAction],
+        searchInBar: true,
         title: context.appLocalizations.appAccessControl,
         confirmationAction: hasChanges
             ? IconButtonData(
@@ -460,40 +421,89 @@ class _AccessViewState extends ConsumerState<AccessView>
                 tooltip: context.appLocalizations.save,
               )
             : null,
-        menuItems: [
-          ..._buildMenuItems(context, enable: accessControl.enable),
-          if (selectAllAction != null)
-            CommonPopupMenuItem(
-              glyph: selectAllAction.glyph,
-              label: selectAllAction.tooltip!,
-              onPressed: selectAllAction.onPressed,
+        iconActions: [?selectAllAction],
+        menuItems: _buildMenuItems(context, enable: accessControl.enable),
+        body: AppBarClearance(
+          child: needsInstalledAppsPermission
+              ? _buildInstalledAppsPermissionStatus()
+              : FloatingFootBar(
+                  bar: _AccessStatus(
+                    accessControl: accessControl,
+                    selectedCount: valueList.length,
+                    onEnable: () => _handleEnable(true),
+                  ),
+                  body: DisabledMask(
+                    status: !accessControl.enable,
+                    child: _buildContent(
+                      packages: viewPackages,
+                      selected: valueList.toSet(),
+                      isSearching: query.isNotEmpty,
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccessStatus extends StatelessWidget {
+  const _AccessStatus({
+    required this.accessControl,
+    required this.selectedCount,
+    required this.onEnable,
+  });
+
+  final AccessControlProps accessControl;
+  final int selectedCount;
+  final VoidCallback onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    final appLocalizations = context.appLocalizations;
+    final colorScheme = context.colorScheme;
+    final enabled = accessControl.enable;
+    final description = enabled
+        ? switch (accessControl.mode) {
+            AccessControlMode.acceptSelected =>
+              appLocalizations.accessControlAllowDesc,
+            AccessControlMode.rejectSelected =>
+              appLocalizations.accessControlNotAllowDesc,
+          }
+        : appLocalizations.accessControlDisabledDesc;
+    return Padding(
+      padding: EdgeInsetsDirectional.fromSTEB(16, 6, enabled ? 16 : 8, 6),
+      child: Row(
+        spacing: 12,
+        children: [
+          GlyphIcon(
+            enabled ? AppGlyphs.appsList : AppGlyphs.info,
+            size: 20,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          Expanded(
+            child: Text(
+              description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyle.footnote
+                  .of(context)
+                  .copyWith(color: colorScheme.onSurface),
+            ),
+          ),
+          if (enabled)
+            TonalChip(
+              label: appLocalizations.accessControlSelectedCount(selectedCount),
+              color: colorScheme.primary.opacity15,
+              foregroundColor: colorScheme.primary,
+            )
+          else
+            TonalButton(
+              size: TonalButtonSize.compact,
+              label: appLocalizations.turnOn,
+              onPressed: onEnable,
             ),
         ],
-        body: AppBarClearance(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildBannerBar(
-                enable: accessControl.enable,
-                mode: mode,
-                count: valueList.length,
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: needsInstalledAppsPermission
-                    ? _buildInstalledAppsPermissionStatus()
-                    : DisabledMask(
-                        status: !accessControl.enable,
-                        child: _buildContent(
-                          packages: viewPackages,
-                          selected: valueList.toSet(),
-                          isSearching: query.isNotEmpty,
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -546,9 +556,10 @@ class AccessControlPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-      ).copyWith(top: context.contentTopPadding, bottom: 32),
+      padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+        top: context.contentTopPadding,
+        bottom: 32 + context.bottomInset,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

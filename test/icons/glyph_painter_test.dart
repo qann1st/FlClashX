@@ -18,7 +18,6 @@ final _glyphs = {
   'dns': AppGlyphs.dns,
   'resources': AppGlyphs.resources,
   'logs': AppGlyphs.logs,
-  'tools': AppGlyphs.tools,
   'target': AppGlyphs.target,
   'arrowBack': AppGlyphs.arrowBack,
   'chevronBack': AppGlyphs.chevronBack,
@@ -41,9 +40,9 @@ final _glyphs = {
   'remove': AppGlyphs.remove,
   'addCircle': AppGlyphs.addCircle,
   'removeCircle': AppGlyphs.removeCircle,
+  'clearField': AppGlyphs.clearField,
   'close': AppGlyphs.close,
   'check': AppGlyphs.check,
-  'checkDouble': AppGlyphs.checkDouble,
   'checkCircle': AppGlyphs.checkCircle,
   'block': AppGlyphs.block,
   'info': AppGlyphs.info,
@@ -87,12 +86,10 @@ final _glyphs = {
   'lock': AppGlyphs.lock,
   'lockOpen': AppGlyphs.lockOpen,
   'key': AppGlyphs.key,
-  'password': AppGlyphs.password,
   'account': AppGlyphs.account,
   'sparkle': AppGlyphs.sparkle,
   'bolt': AppGlyphs.bolt,
   'locate': AppGlyphs.locate,
-  'star': AppGlyphs.star,
   'puzzle': AppGlyphs.puzzle,
   'customize': AppGlyphs.customize,
   'layers': AppGlyphs.layers,
@@ -203,17 +200,24 @@ void main() {
     expect(_alphaAt(filled, 12, 13.1), greaterThan(0));
   });
 
+  test('a solid line grows with the lines as the glyph fills', () async {
+    const dot = Glyph([
+      GlyphCircle(12, 12, 2, role: GlyphRole.line, solid: true),
+    ]);
+    final outline = await _render(dot, 0);
+    final filled = await _render(dot, 1);
+
+    expect(_alphaAt(outline, 12, 14.2), 0);
+    expect(_alphaAt(filled, 12, 14.2), greaterThan(0));
+  });
+
   for (final MapEntry(key: name, value: glyph) in _glyphs.entries) {
     test('$name fills into a different shape than its outline', () async {
       final outline = await _render(glyph, 0);
       final filled = await _render(glyph, 1);
 
       expect(outline.any((channel) => channel != 0), isTrue);
-      if (glyph.shapes.any((shape) => !shape.solid)) {
-        expect(filled, isNot(outline));
-      } else {
-        expect(filled, outline, reason: 'solid shapes are already filled');
-      }
+      expect(filled, isNot(outline));
     });
 
     test('$name shows no detail midway', () async {

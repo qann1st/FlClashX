@@ -15,32 +15,33 @@ import (
 type CoreMethod string
 
 const (
-	messageMethod                  CoreMethod = "message"
-	initClashMethod                CoreMethod = "initClash"
-	getIsInitMethod                CoreMethod = "getIsInit"
-	forceGcMethod                  CoreMethod = "forceGc"
-	shutdownMethod                 CoreMethod = "shutdown"
-	validateConfigMethod           CoreMethod = "validateConfig"
-	decryptConfigMethod            CoreMethod = "decryptConfig"
-	validateProxiesMethod          CoreMethod = "validateProxies"
-	validateFiltersMethod          CoreMethod = "validateFilters"
-	convertProxiesMethod           CoreMethod = "convertProxies"
-	encodeShareLinksMethod         CoreMethod = "encodeShareLinks"
-	decodeShareLinksMethod         CoreMethod = "decodeShareLinks"
-	updateConfigMethod             CoreMethod = "updateConfig"
-	getProxiesMethod               CoreMethod = "getProxies"
-	changeProxyMethod              CoreMethod = "changeProxy"
-	getTrafficMethod               CoreMethod = "getTraffic"
-	getTotalTrafficMethod          CoreMethod = "getTotalTraffic"
-	resetTrafficMethod             CoreMethod = "resetTraffic"
-	asyncTestDelayMethod           CoreMethod = "asyncTestDelay"
-	probeMethod                    CoreMethod = "probe"
+	messageMethod          CoreMethod = "message"
+	initClashMethod        CoreMethod = "initClash"
+	getIsInitMethod        CoreMethod = "getIsInit"
+	forceGcMethod          CoreMethod = "forceGc"
+	shutdownMethod         CoreMethod = "shutdown"
+	validateConfigMethod   CoreMethod = "validateConfig"
+	decryptConfigMethod    CoreMethod = "decryptConfig"
+	validateProxiesMethod  CoreMethod = "validateProxies"
+	validateFiltersMethod  CoreMethod = "validateFilters"
+	convertProxiesMethod   CoreMethod = "convertProxies"
+	encodeShareLinksMethod CoreMethod = "encodeShareLinks"
+	decodeShareLinksMethod CoreMethod = "decodeShareLinks"
+	updateConfigMethod     CoreMethod = "updateConfig"
+	getProxiesMethod       CoreMethod = "getProxies"
+	changeProxyMethod      CoreMethod = "changeProxy"
+	getTrafficMethod       CoreMethod = "getTraffic"
+	getTotalTrafficMethod  CoreMethod = "getTotalTraffic"
+	resetTrafficMethod     CoreMethod = "resetTraffic"
+	asyncTestDelayMethod   CoreMethod = "asyncTestDelay"
+
 	outboundIpMethod               CoreMethod = "outboundIp"
 	serviceCheckMethod             CoreMethod = "serviceCheck"
 	getConnectionsMethod           CoreMethod = "getConnections"
 	getConnectionCountMethod       CoreMethod = "getConnectionCount"
 	closeConnectionsMethod         CoreMethod = "closeConnections"
 	resetConnectionsMethod         CoreMethod = "resetConnections"
+	clearDnsCacheMethod            CoreMethod = "clearDnsCache"
 	closeConnectionMethod          CoreMethod = "closeConnection"
 	getExternalProvidersMethod     CoreMethod = "getExternalProviders"
 	getExternalProviderMethod      CoreMethod = "getExternalProvider"
@@ -60,11 +61,13 @@ const (
 	getConfigMethod                CoreMethod = "getConfig"
 	getProfileBaseMethod           CoreMethod = "getProfileBase"
 	getProfileOutboundsMethod      CoreMethod = "getProfileOutbounds"
+	getProxyDefinitionMethod       CoreMethod = "getProxyDefinition"
 	buildProfileMethod             CoreMethod = "buildProfile"
 	dumpRuleSetMethod              CoreMethod = "dumpRuleSet"
 	compileRuleSetMethod           CoreMethod = "compileRuleSet"
 	clearEffectMethod              CoreMethod = "clearEffect"
 	watchRouteMethod               CoreMethod = "watchRoute"
+	checkRoutesMethod              CoreMethod = "checkRoutes"
 )
 
 type MessageType string
@@ -120,6 +123,8 @@ type ProfileBase struct {
 	// config fills every other one with a default the host must not take
 	// for the profile's word.
 	Present []string `json:"present"`
+	// The profile's own GLOBAL group carries `flclashx-override: true`.
+	GlobalOverride bool `json:"global-override"`
 }
 
 type ProfileOutbounds struct {
@@ -184,9 +189,8 @@ type ChangeProxyResult struct {
 }
 
 type RouteState struct {
-	CoreEpoch    uint64            `json:"core-epoch"`
-	PicksVersion uint64            `json:"picks-version"`
-	Picks        map[string]string `json:"picks"`
+	CoreEpoch    uint64 `json:"core-epoch"`
+	RouteVersion uint64 `json:"route-version"`
 }
 
 type TestDelayParams struct {
@@ -201,32 +205,22 @@ type Delay struct {
 	Value int32  `json:"value"`
 }
 
-type ProbeParams struct {
-	Url       string            `json:"url"`
-	ProxyName string            `json:"proxy-name"`
-	Headers   map[string]string `json:"headers"`
-	Timeout   int64             `json:"timeout"`
-	MaxBody   int64             `json:"max-body"`
-}
-
 type ProbeResult struct {
-	StatusCode  int      `json:"status-code"`
-	Delay       int64    `json:"delay"`
-	Body        string   `json:"body"`
-	Url         string   `json:"url"`
-	Chains      []string `json:"chains"`
-	Rule        string   `json:"rule"`
-	RulePayload string   `json:"rule-payload"`
-	Error       string   `json:"error,omitempty"`
-	Message     string   `json:"message,omitempty"`
+	StatusCode int      `json:"status-code"`
+	Delay      int64    `json:"delay"`
+	Body       string   `json:"body"`
+	Url        string   `json:"url"`
+	Chains     []string `json:"chains"`
+
+	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 
 	CoreEpoch    uint64 `json:"core-epoch"`
-	PicksVersion uint64 `json:"picks-version"`
+	RouteVersion uint64 `json:"route-version"`
 
-	// Unexported, so it never reaches Dart: only the in-core checks read
-	// response headers, and ProbeResult is the shape the Dart side decodes.
 	header    http.Header
 	lowerBody string
+	hits      []RouteHit
 }
 
 type Traffic struct {
@@ -261,6 +255,7 @@ type nodeView struct {
 	Name              string `json:"name"`
 	Type              string `json:"type"`
 	ServerDescription string `json:"serverDescription,omitempty"`
+	ProviderName      string `json:"provider-name,omitempty"`
 }
 
 type GeoUpdateStatus struct {

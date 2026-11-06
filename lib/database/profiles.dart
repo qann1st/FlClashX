@@ -107,11 +107,13 @@ class ProfilesDao extends DatabaseAccessor<Database> with _$ProfilesDaoMixin {
     );
   }
 
-  Future<void> setAll(Iterable<Profile> profiles) async {
-    await batch((b) async {
-      setAllWithBatch(b, profiles);
-    });
-  }
+  /// The order [query] reads profiles back in.
+  static int compare(Profile a, Profile b) => switch ((a.order, b.order)) {
+    (final x?, final y?) when x != y => x.compareTo(y),
+    (null, _?) => 1,
+    (_?, null) => -1,
+    _ => a.id.compareTo(b.id),
+  };
 
   Future<void> putAll<T extends Table, D extends DataClass>(
     Iterable<Insertable<D>> items,
@@ -143,8 +145,6 @@ class ProfilesDao extends DatabaseAccessor<Database> with _$ProfilesDaoMixin {
   Future<Profile?> get(int id) => profiles
       .readable((row) => row.toProfile(), where: (t) => t.id.equals(id))
       .getSingleOrNull();
-
-  Selectable<String> fileNames() => ids().map((id) => '$id.yaml');
 
   void setAllWithBatch(Batch batch, Iterable<Profile> profiles) {
     final List<ProfilesCompanion> items = [];

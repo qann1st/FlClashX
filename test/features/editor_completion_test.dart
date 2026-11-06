@@ -247,12 +247,6 @@ void main() {
         ),
         ['https://dns.google/dns-query'],
       );
-      expect(
-        _labels(
-          _complete('name: a\ntype: vless\nfl|', schema: EditorSchema.proxy),
-        ),
-        ['flow'],
-      );
     });
 
     test('falls back to document words where the schema has no keys', () {

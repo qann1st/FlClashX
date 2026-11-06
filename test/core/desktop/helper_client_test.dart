@@ -129,9 +129,7 @@ void main() {
 
     final response = await client.stop(_sessionId);
 
-    expect(response.sessionId, _sessionId);
     expect(response.stopped, isTrue);
-    expect(response.reason, isNull);
   });
 
   test('stop rejects an unknown unconfirmed reason', () async {

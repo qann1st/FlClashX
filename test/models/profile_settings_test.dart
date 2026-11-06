@@ -107,7 +107,7 @@ void main() {
     expect(synced.ipv6, isTrue);
     expect(synced.mode, Mode.direct);
     expect(synced.logLevel, LogLevel.warning);
-    expect(synced.findProcessMode, FindProcessMode.always);
+    expect(synced.findProcessMode, FindProcessMode.strict);
     expect(synced.interfaceNameMode, InterfaceNameMode.custom);
     expect(synced.interfaceName, 'eth0');
     expect(synced.routingMark, 255);
@@ -184,14 +184,12 @@ void main() {
     final tuned = _tuned.copyWith(
       dnsOverrideKeys: {DnsOverrideKey.nameserver},
       hosts: {'a.example': '10.0.0.1'},
-      tun: _tuned.tun.copyWith(mtu: 1500),
     );
 
     final synced = syncProfileSettings(tuned, const {}, const []);
 
     expect(synced.dnsOverrideKeys, {DnsOverrideKey.nameserver});
     expect(synced.hosts, {'a.example': '10.0.0.1'});
-    expect(synced.tun.mtu, 1500);
   });
 
   test(
@@ -236,5 +234,55 @@ void main() {
     final dropped = syncProfileSettings(synced, const {}, const []);
     expect(dropped.tun.routeAddress, isEmpty);
     expect(dropped.tun.routeExcludeAddress, isEmpty);
+  });
+
+  test('the file sets the tun mtu and congestion control it names', () {
+    final synced = syncProfileSettings(
+      _tuned,
+      const {
+        'tun': {'mtu': 1500, 'congestion-controller': 'BBR'},
+      },
+      const ['tun', 'tun.mtu', 'tun.congestion-controller'],
+    );
+
+    expect(synced.tun.mtu, 1500);
+    expect(synced.tun.congestionController, 'bbr');
+
+    final invalid = syncProfileSettings(
+      _tuned,
+      const {
+        'tun': {'mtu': 100, 'congestion-controller': 'vegas'},
+      },
+      const ['tun', 'tun.mtu', 'tun.congestion-controller'],
+    );
+
+    expect(invalid.tun.mtu, defaultTunMtu);
+    expect(invalid.tun.congestionController, defaultCongestionController);
+  });
+
+  test('the first user:pass entry turns authentication on', () {
+    expect(
+      authenticationFrom(['alice:s3:cret', 'bob:pw']),
+      const AuthenticationProps(
+        enable: true,
+        username: 'alice',
+        password: 's3:cret',
+      ),
+    );
+    expect(
+      authenticationFrom([':nouser', 'bob:pw']),
+      const AuthenticationProps(enable: true, username: 'bob', password: 'pw'),
+    );
+    expect(
+      authenticationFrom([' alice : secret ']),
+      const AuthenticationProps(
+        enable: true,
+        username: ' alice ',
+        password: ' secret ',
+      ),
+    );
+    expect(authenticationFrom(<String>[]), const AuthenticationProps());
+    expect(authenticationFrom(null), const AuthenticationProps());
+    expect(authenticationFrom('alice:pw'), const AuthenticationProps());
   });
 }

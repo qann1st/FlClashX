@@ -91,8 +91,4 @@ object Core {
     fun startListener() = Mobile.startListener()
 
     fun stopListener() = Mobile.stopListener()
-
-    fun getTraffic(onlyStatisticsProxy: Boolean): String = Mobile.getTraffic(onlyStatisticsProxy)
-
-    fun getTotalTraffic(onlyStatisticsProxy: Boolean): String = Mobile.getTotalTraffic(onlyStatisticsProxy)
 }

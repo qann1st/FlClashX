@@ -51,7 +51,9 @@ func handleStartListener() bool {
 	isRunning.Store(true)
 	updateListeners(currentConfig)
 	resolver.ResetConnection()
-	refreshRoute()
+	// A probe already out left before the TUN routes and over the DNS
+	// connections just dropped, so its answer must not stand for this route.
+	bumpRouteEpoch()
 	return true
 }
 
@@ -60,6 +62,10 @@ func handleStopListener() bool {
 	defer configMu.Unlock()
 	isRunning.Store(false)
 	stopListeners()
+	// A closed listener only turns new connections away; those it already
+	// accepted would keep going through the proxy.
+	handleCloseConnections()
+	closeOpenInbound()
 	resolver.ResetConnection()
 	return true
 }

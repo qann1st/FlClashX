@@ -67,6 +67,23 @@ class TestUrlItem extends ConsumerWidget {
   }
 }
 
+class DelayTestTimeoutItem extends ConsumerWidget {
+  const DelayTestTimeoutItem({super.key});
+
+  @override
+  Widget build(BuildContext context, ref) {
+    return ConfigOptionsItem<int>(
+      title: (l) => l.delayTestTimeout,
+      options: delayTestTimeoutOptions,
+      textBuilder: (value) => '$value ms',
+      selector: appSettingProvider.select((state) => state.delayTestTimeout),
+      onChanged: (ref, value) => ref
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(delayTestTimeout: value)),
+    );
+  }
+}
+
 class PortItem extends ConsumerWidget {
   const PortItem({super.key});
 
@@ -83,15 +100,12 @@ class PortItem extends ConsumerWidget {
     final mixedPort = ref.watch(
       patchClashConfigProvider.select((state) => state.mixedPort),
     );
-    return ManagedSetting(
-      settingKey: 'clash.mixed-port',
-      child: ListItem(
-        title: Text(appLocalizations.port),
-        subtitle: Text('$mixedPort'),
-        onTap: () {
-          handleShowPortForm(context);
-        },
-      ),
+    return ListItem(
+      title: Text(appLocalizations.port),
+      subtitle: Text('$mixedPort'),
+      onTap: () {
+        handleShowPortForm(context);
+      },
     );
   }
 }
@@ -121,6 +135,9 @@ class HostsItem extends ConsumerWidget {
         subtitleBuilder: (item) => Text(item.value),
       ),
       onChanged: (value) {
+        if (value is! Map<String, String>) {
+          return;
+        }
         ref
             .read(patchClashConfigProvider.notifier)
             .update((state) => state.copyWith(hosts: value));
@@ -136,6 +153,7 @@ class AuthenticationItem extends ConsumerWidget {
   Widget build(BuildContext context, ref) {
     return ConfigToggleItem(
       title: (l) => l.authentication,
+      managedKey: 'clash.authentication',
       selector: networkSettingProvider.select(
         (state) => state.authentication.enable,
       ),
@@ -162,6 +180,7 @@ class AuthenticationAccountItem extends ConsumerWidget {
     return ConfigTextItem(
       title: (l) => l.account,
       maxLength: TextInputLimits.userName,
+      managedKey: 'clash.authentication',
       selector: networkSettingProvider.select(
         (state) => state.authentication.username,
       ),
@@ -183,6 +202,7 @@ class AuthenticationPasswordItem extends ConsumerWidget {
     return ConfigTextItem(
       title: (l) => l.password,
       maxLength: TextInputLimits.password,
+      managedKey: 'clash.authentication',
       selector: networkSettingProvider.select(
         (state) => state.authentication.password,
       ),
@@ -409,6 +429,7 @@ class GeneralView extends ConsumerWidget {
   List<Widget> _connectionItems() {
     return [
       const TestUrlItem(),
+      const DelayTestTimeoutItem(),
       _clashToggle(
         title: (l) => l.unifiedDelay,
         managedKey: 'clash.unified-delay',
@@ -421,13 +442,17 @@ class GeneralView extends ConsumerWidget {
         select: (state) => state.tcpConcurrent,
         update: (state, value) => state.copyWith(tcpConcurrent: value),
       ),
-      _clashToggle(
+      ConfigOptionsItem<FindProcessMode>(
         title: (l) => l.findProcessMode,
         managedKey: 'clash.find-process-mode',
-        select: (state) => state.findProcessMode == FindProcessMode.always,
-        update: (state, value) => state.copyWith(
-          findProcessMode: value ? FindProcessMode.always : FindProcessMode.off,
+        options: FindProcessMode.values,
+        textBuilder: (mode) => mode.label,
+        selector: patchClashConfigProvider.select(
+          (state) => state.findProcessMode,
         ),
+        onChanged: (ref, value) => ref
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith(findProcessMode: value)),
       ),
       _appSettingToggle(
         title: (l) => l.autoCloseConnections,
@@ -519,9 +544,10 @@ class GeneralView extends ConsumerWidget {
     return BaseScaffold(
       title: appLocalizations.general,
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-        ).copyWith(top: context.appBarInset, bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+          top: context.sectionsTopPadding,
+          bottom: 16 + context.bottomInset,
+        ),
         children: [
           const ManagedSettingsHint(keys: generalPageKeys),
           generateSection(

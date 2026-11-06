@@ -15,9 +15,10 @@ class _DelayTestTarget {
 typedef _DelayTestBatch = ({List<Proxy> proxies, String? testUrl});
 
 class _DelayTestJob {
-  _DelayTestJob(Iterable<String> keys) : held = keys.toSet();
+  _DelayTestJob(Iterable<String> keys, this.timeout) : held = keys.toSet();
 
   final Set<String> held;
+  final Duration timeout;
   final Set<String> startedOnDispatch = {};
   bool cancelled = false;
 }
@@ -39,6 +40,10 @@ class ProxiesAction extends _$ProxiesAction {
   Timer? _delayFlushTimer;
 
   final Map<String, String> _pendingSelectedRollback = {};
+
+  final Map<String, int> _changingGroups = {};
+
+  var _settledChanges = 0;
 
   @override
   void build() {
@@ -112,8 +117,12 @@ class ProxiesAction extends _$ProxiesAction {
   }
 
   Future<void> updateGroups() async {
+    var asked = const <String, String>{};
+    var settled = _settledChanges;
+    final profileId = ref.read(currentProfileIdProvider);
+    final pushes = ref.read(setupActionProvider.notifier).pushes;
     try {
-      ref.read(groupsProvider.notifier).value = await retry(
+      final groups = await retry<List<Group>>(
         task: () async {
           final sortType = ref.read(
             proxiesStyleSettingProvider.select((state) => state.sortType),
@@ -125,6 +134,8 @@ class ProxiesAction extends _$ProxiesAction {
           final selectedMap = ref.read(
             currentProfileProvider.select((state) => state?.selectedMap ?? {}),
           );
+          asked = selectedMap;
+          settled = _settledChanges;
           try {
             return await _core.getProxiesGroups(
               selectedMap: selectedMap,
@@ -142,6 +153,14 @@ class ProxiesAction extends _$ProxiesAction {
         },
         retryIf: (res) => res.isEmpty,
       );
+      ref.read(groupsProvider.notifier).value = groups;
+      await _dropLostPins(
+        groups,
+        asked,
+        settled: settled,
+        profileId: profileId,
+        pushes: pushes,
+      );
     } catch (e) {
       // The Core failure path already runs inside the retry task above; a
       // throw here only means ref.read hit a disposed container or the
@@ -150,6 +169,37 @@ class ProxiesAction extends _$ProxiesAction {
         'updateGroups failed: $e',
         logLevel: coreFailureLogLevel(e),
       );
+    }
+  }
+
+  /// mihomo forgets a Fallback pin once its node fails a check. A read that
+  /// overlapped a push, a profile switch or a pick of the user's proves nothing.
+  Future<void> _dropLostPins(
+    List<Group> groups,
+    Map<String, String> asked, {
+    required int settled,
+    required int? profileId,
+    required int pushes,
+  }) async {
+    final setup = ref.read(setupActionProvider.notifier);
+    if (!await setup.inputsApplied() ||
+        pushes != setup.pushes ||
+        settled != _settledChanges ||
+        profileId != ref.read(currentProfileIdProvider)) {
+      return;
+    }
+    final profilesAction = ref.read(profilesActionProvider.notifier);
+    for (final group in groups) {
+      final pin = asked[group.name] ?? '';
+      if (!group.type.isComputedSelected ||
+          group.fixed != '' ||
+          pin.isEmpty ||
+          _pendingSelectedRollback.containsKey(group.name) ||
+          _changingGroups.containsKey(group.name) ||
+          _currentSelectedName(group.name) != pin) {
+        continue;
+      }
+      profilesAction.updateCurrentSelectedMap(group.name, '');
     }
   }
 
@@ -195,6 +245,7 @@ class ProxiesAction extends _$ProxiesAction {
         _currentSelectedName(groupName);
     profilesAction.updateCurrentSelectedMap(groupName, proxyName);
     final ChangeProxyResult result;
+    _changingGroups.update(groupName, (count) => count + 1, ifAbsent: () => 1);
     try {
       result = await _core.changeProxy(
         ChangeProxyParams(groupName: groupName, proxyName: proxyName),
@@ -213,6 +264,11 @@ class ProxiesAction extends _$ProxiesAction {
         level: MessageLevel.error,
       );
       return;
+    } finally {
+      if (_changingGroups.update(groupName, (count) => count - 1) == 0) {
+        _changingGroups.remove(groupName);
+      }
+      _settledChanges++;
     }
     if (!result.changed) {
       return;
@@ -292,6 +348,37 @@ class ProxiesAction extends _$ProxiesAction {
             .stop(provider.updatingKey, operation);
       }
     }
+  }
+
+  Future<void> addToLocalProxies(String proxyName) async {
+    final appLocalizations = currentAppLocalizations;
+    final definition = await _core.getProxyDefinition(proxyName);
+    if (definition == null) {
+      throw MessageException(
+        appLocalizations.customIssueMissingProxies(proxyName),
+      );
+    }
+    final (proxies, groupNames) = await (
+      database.customProxiesDao.query().get(),
+      database.proxyGroupsDao.names().get(),
+    ).wait;
+    final (:name, :added) = importProxy(
+      definition,
+      existing: [for (final proxy in proxies) proxy.definition],
+      groupNames: groupNames.toSet(),
+    );
+    if (added == null) {
+      dialogs.showNotifier(appLocalizations.alreadyInLocalProxies(name));
+      return;
+    }
+    final order = indexing.generateKeyBetween(
+      proxies.map((proxy) => proxy.order).nonNulls.lastOrNull,
+      null,
+    );
+    await database.customProxies.put(
+      CustomProxy.fromDefinition(added).copyWith(order: order).toCompanion(),
+    );
+    dialogs.showNotifier(appLocalizations.addedToLocalProxies(name));
   }
 
   Future<void> proxyDelayTest(Proxy proxy, [String? testUrl]) {
@@ -399,7 +486,10 @@ class ProxiesAction extends _$ProxiesAction {
       return;
     }
     final pending = ref.read(pendingDelayTestsProvider.notifier);
-    final job = _DelayTestJob(targets.map((target) => target.key));
+    final job = _DelayTestJob(
+      targets.map((target) => target.key),
+      Duration(milliseconds: ref.read(appSettingProvider).delayTestTimeout),
+    );
     _delayTestJobs.add(job);
     // TaskPool.run starts a task synchronously while it has an idle slot.
     job.startedOnDispatch.addAll(
@@ -435,7 +525,11 @@ class ProxiesAction extends _$ProxiesAction {
       _scheduleDelayFlush();
     }
     try {
-      final delay = await _core.getDelay(target.testUrl, target.proxyName);
+      final delay = await _core.getDelay(
+        target.testUrl,
+        target.proxyName,
+        job.timeout,
+      );
       if (delay != null && !job.cancelled) {
         setDelay(delay);
       }

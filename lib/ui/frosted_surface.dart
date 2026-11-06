@@ -42,7 +42,7 @@ class FrostedSurface extends StatelessWidget {
     final opacity = this.opacity ?? LiquidGlassStyle.frostOpacity(quality);
     return LiquidGlass(
       style: LiquidGlassStyle.frost(color, quality, opacity: opacity),
-      corners: radius,
+      borderRadius: radius,
       shadows: shadows,
       child: FrostScope(
         surface: color,

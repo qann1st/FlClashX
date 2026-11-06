@@ -158,6 +158,35 @@ void main() {
     ]);
   });
 
+  testWidgets('a notice for one profile keeps the records of the others', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+    final l10n = currentAppLocalizations;
+    final first = _profile(left: const Duration(days: 1, hours: 3));
+    final second = _profile(left: const Duration(days: 2, hours: 3), id: 2);
+    Iterable<String> recorded() =>
+        container.read(appSettingProvider).subscriptionNotices.keys;
+
+    await action().noticeSubscriptionExpiry(first);
+    await action().noticeSubscriptionExpiry(second);
+    await action().noticeSubscriptionExpiry(first);
+    await action().noticeSubscriptionExpiry(second);
+
+    expect(notifications.shown.map((n) => n.body), [
+      l10n.subscriptionExpiresInDays(1),
+      l10n.subscriptionExpiresInDays(2),
+    ]);
+    expect(recorded(), unorderedEquals(['1:1', '2:2']));
+
+    await action().noticeSubscriptionExpiry(
+      _profile(left: const Duration(hours: 5)),
+    );
+
+    expect(notifications.shown.last.body, l10n.subscriptionExpiresToday);
+    expect(recorded(), unorderedEquals(['1:0', '2:2']));
+  });
+
   testWidgets('an expired plan says so, without a link to renew', (
     tester,
   ) async {

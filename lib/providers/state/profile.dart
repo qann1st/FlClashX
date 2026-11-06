@@ -49,7 +49,8 @@ PanelBackground? panelBackground(Ref ref) {
 }
 
 /// The backdrop picture from the disk cache, fetched once per url and
-/// served from there afterwards, offline included.
+/// served from there afterwards, offline included. A fetch that fails, as one
+/// does while a profile switch restarts the Core's listener, is retried.
 @riverpod
 Future<ImageProvider?> panelBackdropImage(Ref ref) async {
   final background = ref.watch(panelBackgroundProvider);
@@ -61,7 +62,7 @@ Future<ImageProvider?> panelBackdropImage(Ref ref) async {
     return FileImage(file);
   } catch (error) {
     commonPrint.log('backdrop ${background.url} unavailable: $error');
-    return null;
+    rethrow;
   }
 }
 
@@ -73,7 +74,7 @@ Future<String?> panelLogoPath(Ref ref, String url) async {
     return (await DefaultCacheManager().getSingleFile(url)).path;
   } catch (error) {
     commonPrint.log('logo $url unavailable: $error');
-    return null;
+    rethrow;
   }
 }
 

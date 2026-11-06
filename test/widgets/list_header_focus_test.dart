@@ -157,10 +157,6 @@ void main() {
     await tester.pump();
     expect(focusedHeaderActionIndex(), 1);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await tester.pump();
-    expect(focusedHeaderActionIndex(), 2);
-
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpWidget(const SizedBox());
     await tester.pump();
@@ -179,13 +175,17 @@ void main() {
     await tester.pump();
     expect(focusedHeaderActionIndex(), 0);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
-    expect(focusedHeaderActionIndex(), 2);
+    expect(focusedHeaderActionIndex(), 1);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pump();
-    expect(focusedHeaderActionIndex(), 0);
+    expect(focusedHeaderActionIndex(), 1);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(focusedHeaderActionIndex(), 1);
 
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpWidget(const SizedBox());

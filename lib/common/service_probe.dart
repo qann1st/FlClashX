@@ -81,7 +81,8 @@ class ServiceCheck {
     this.region,
     this.checkedAt,
     this.coreEpoch = 0,
-    this.picksVersion = 0,
+    this.routeVersion = 0,
+    this.hits = const [],
   });
 
   factory ServiceCheck.of(ServiceCheckItem item) {
@@ -94,7 +95,8 @@ class ServiceCheck {
           ? DateTime.fromMillisecondsSinceEpoch(item.checkedAt)
           : null,
       coreEpoch: item.coreEpoch,
-      picksVersion: item.picksVersion,
+      routeVersion: item.routeVersion,
+      hits: item.hits,
     );
   }
 
@@ -104,7 +106,8 @@ class ServiceCheck {
   final String? region;
   final DateTime? checkedAt;
   final int coreEpoch;
-  final int picksVersion;
+  final int routeVersion;
+  final List<RouteHit> hits;
 
   String? get node => chains.firstOrNull;
 
@@ -117,7 +120,8 @@ class ServiceCheck {
       other.region == region &&
       other.checkedAt == checkedAt &&
       other.coreEpoch == coreEpoch &&
-      other.picksVersion == picksVersion;
+      other.routeVersion == routeVersion &&
+      listEquals(other.hits, hits);
 
   @override
   int get hashCode => Object.hash(
@@ -127,7 +131,8 @@ class ServiceCheck {
     region,
     checkedAt,
     coreEpoch,
-    picksVersion,
+    routeVersion,
+    Object.hashAll(hits),
   );
 
   @override
@@ -160,15 +165,13 @@ IpInfo Function(String) _json(IpInfo Function(Map<String, dynamic>) parse) {
   return (body) => parse(jsonDecode(body) as Map<String, dynamic>);
 }
 
+/// None behind Cloudflare: where it is throttled, a direct lookup stalls on
+/// those until the timeout.
 final Map<String, IpInfo Function(String)> ipInfoSources = {
-  'https://www.cloudflare.com/cdn-cgi/trace': IpInfo.fromCloudflareTrace,
-  'https://api.ip.sb/geoip': _json(IpInfo.fromIpSbJson),
-  'https://ipinfo.io/json': _json(IpInfo.fromIpInfoIoJson),
-  'https://ipwho.is': _json(IpInfo.fromIpWhoIsJson),
   'http://ip-api.com/json': _json(IpInfo.fromIpAPIJson),
-  'https://get.geojs.io/v1/ip/geo.json': _json(IpInfo.fromGeoJsJson),
-  'https://api.country.is': _json(IpInfo.fromCountryIsJson),
+  'https://ipinfo.io/json': _json(IpInfo.fromIpInfoJson),
   'https://api.ipquery.io/?format=json': _json(IpInfo.fromIpQueryJson),
+  'https://api.seeip.org/geoip': _json(IpInfo.fromSeeIpJson),
   'https://ident.me/json': _json(IpInfo.fromIdentMeJson),
 };
 

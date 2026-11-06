@@ -94,6 +94,38 @@ void main() {
     );
   });
 
+  test('an overriding GLOBAL is alone in global mode and out of rule mode', () {
+    container
+        .read(groupsProvider.notifier)
+        .update(
+          (_) => [
+            const Group(
+              name: 'Service',
+              type: GroupType.Selector,
+              hidden: false,
+            ),
+            Group(
+              name: GroupName.GLOBAL.name,
+              type: GroupType.Selector,
+              hidden: false,
+            ),
+          ],
+        );
+    container.read(globalOverrideProvider.notifier).value = true;
+    List<String> shown(Mode mode) {
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith(mode: mode));
+      return [
+        for (final group in container.read(currentGroupsStateProvider).value)
+          group.name,
+      ];
+    }
+
+    expect(shown(Mode.rule), ['Service']);
+    expect(shown(Mode.global), [GroupName.GLOBAL.name]);
+  });
+
   test('group derivation ignores a change of selection only', () {
     Group group(String now, String nestedNow) => Group(
       name: 'Visible',
@@ -506,6 +538,7 @@ void main() {
     container
         .read(runTimeProvider.notifier)
         .update((_) => DateTime(2026).millisecondsSinceEpoch);
+    container.read(coreStatusProvider.notifier).value = CoreStatus.connected;
     container
         .read(networkSettingProvider.notifier)
         .update(

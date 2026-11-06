@@ -1,28 +1,30 @@
 part of '../action.dart';
 
-/// What the current profile's panel asks of the settings, stamped with the
-/// update that said it, so every refresh says it again.
 typedef ProfileHeaderSettings = ({
-  int? id,
-  DateTime? updatedAt,
   ViewRequest? view,
   List<DashboardWidget>? widgets,
   Set<String>? switches,
   bool globalModeAllowed,
+  bool hideIp,
 });
 
 ProfileHeaderSettings profileHeaderSettingsOf(Profile? profile) {
   final headers = profile?.headers;
   return (
-    id: profile?.id,
-    updatedAt: profile?.lastUpdateDate,
     view: headers?.view,
     widgets: headers?.dashboardWidgets,
     switches: headers?.appSwitches,
     globalModeAllowed: headers?.globalModeAllowed ?? true,
+    hideIp: headers?.hideIp ?? false,
   );
 }
 
+String? profileHeadersUpdateOf(Profile? profile) => switch (profile) {
+  null => null,
+  final profile => '${profile.id}@${profile.fileRevision.lastUpdateSeconds}',
+};
+
+/// Lands once per update of, or switch to, a profile; edits in between stay.
 @Riverpod(keepAlive: true)
 class ProfileHeadersAction extends _$ProfileHeadersAction {
   int _generation = 0;
@@ -30,23 +32,29 @@ class ProfileHeadersAction extends _$ProfileHeadersAction {
   @override
   void build() {
     ref.listen(
-      currentProfileProvider.select(profileHeaderSettingsOf),
-      (_, next) => _applyLater(next),
+      currentProfileProvider.select(profileHeadersUpdateOf),
+      (_, _) => _applyLater(),
     );
-    _applyLater(null);
+    _applyLater();
   }
 
   /// Settings may not change inside the flush that reported the profile, so
   /// the latest request is applied once that flush has ended.
-  void _applyLater(ProfileHeaderSettings? settings) {
+  void _applyLater() {
     final generation = ++_generation;
     scheduleMicrotask(() {
       if (generation != _generation || !ref.mounted) {
         return;
       }
-      apply(
-        settings ?? profileHeaderSettingsOf(ref.read(currentProfileProvider)),
-      );
+      final profile = ref.read(currentProfileProvider);
+      final update = profileHeadersUpdateOf(profile);
+      if (update == ref.read(appSettingProvider).appliedHeadersUpdate) {
+        return;
+      }
+      apply(profileHeaderSettingsOf(profile));
+      ref
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(appliedHeadersUpdate: update));
     });
   }
 
@@ -127,6 +135,11 @@ class ProfileHeadersAction extends _$ProfileHeadersAction {
                   said('closeconnections') ?? state.closeConnections,
             ),
           );
+    }
+    if (settings.hideIp && !owned.contains(hideIpSetting)) {
+      ref
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(hideIp: true));
     }
     if (!settings.globalModeAllowed &&
         ref.read(patchClashConfigProvider).mode == Mode.global) {

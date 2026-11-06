@@ -24,6 +24,7 @@ class _Adapter implements HttpClientAdapter {
 
   final Map<String, _Reply> replies;
   final requested = <Uri>[];
+  final cancelled = <Uri>[];
 
   @override
   Future<ResponseBody> fetch(
@@ -46,6 +47,7 @@ class _Adapter implements HttpClientAdapter {
       if (completer.isCompleted) {
         return;
       }
+      cancelled.add(options.uri);
       timer.cancel();
       completer.completeError(
         DioException.requestCancelled(
@@ -231,5 +233,19 @@ void main() {
       IpQualitySourceStatus.timeout,
       timeout: const Duration(milliseconds: 100),
     );
+  });
+
+  test('a request that outlived its timeout ends with the lookup', () async {
+    final lookup = _lookup({
+      _host: _ok({
+        'ip': _ip,
+        'org': 'AS64500 Example',
+      }, const Duration(milliseconds: 300)),
+    }, timeout: const Duration(milliseconds: 100));
+
+    await expectLater(lookup.result, throwsA(isA<IpQualityLookupException>()));
+    await pumpEventQueue();
+
+    expect(lookup.adapter.cancelled.map((uri) => uri.host), [_host]);
   });
 }

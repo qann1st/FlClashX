@@ -172,6 +172,26 @@ void main() {
     expect(await saved(updated), 'proxies: [] # new');
   });
 
+  test('a download no longer current stops short of the file', () async {
+    final fetch = _Fetcher({_primary: _answer('old'), _moved: _answer('new')});
+    final before = profile();
+    await (await before.file).writeAsString('proxies: [] # kept');
+
+    await expectLater(
+      before.update(validate: valid, fetch: fetch.call, isCurrent: () => false),
+      throwsA(isA<ProfileUpdateSupersededException>()),
+    );
+
+    expect(fetch.calls, hasLength(1));
+    expect(await saved(before), 'proxies: [] # kept');
+    final file = await before.file;
+    final siblings = await file.parent
+        .list()
+        .where((entity) => entity.path.startsWith(file.path))
+        .toList();
+    expect(siblings.map((entity) => entity.path), [file.path]);
+  });
+
   test('the first error is reported when no fallback answers either', () async {
     final fetch = _Fetcher({
       _primary: _status(_primary, 503),

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 
 enum class RunState {
@@ -47,6 +48,8 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
     private val startPreparationLock = Mutex()
     private val mutableRunState = MutableStateFlow(RunState.STOPPED)
     private val arbiter = RunIntentArbiter()
+    private val restartsRequested = AtomicLong()
+    private var restartsServed = 0L
 
     @Volatile
     private var sharedState = SharedState()
@@ -131,6 +134,13 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
     fun requestStop(): Deferred<Boolean> {
         val request = createRequest(running = false)
         return host.scope.async { stop(request) }
+    }
+
+    // An owed restart outlives its request, so a start that overtakes it cannot adopt the old run.
+    fun requestRestart(): Deferred<Boolean> {
+        restartsRequested.incrementAndGet()
+        val outcome = launchStart(createRequest(running = true))
+        return host.scope.async { outcome.await() == StartOutcome.STARTED }
     }
 
     fun syncSharedState(state: SharedState) {
@@ -241,16 +251,28 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
         val options = sharedState.vpnOptions ?: return false
         if (!prepareVpn(options)) {
-            if (host.app() == null && isCurrent(request)) {
-                host.showToast(VPN_PERMISSION_MESSAGE)
+            if (isCurrent(request)) {
+                val app = host.app()
+                if (app == null) {
+                    host.showToast(VPN_PERMISSION_MESSAGE)
+                } else {
+                    app.explainVpnRefusal { arbiter.isLatestRequest(request) }
+                }
             }
             return false
         }
         return transitionLock.withLock {
+            val restarts = restartsRequested.get()
             when {
                 !isCurrent(request) -> false
-                host.runtime?.vpn == options.enable -> true
+                restarts == restartsServed && host.runtime?.vpn == options.enable -> true
                 else -> transitioning(RunState.STARTING) {
+                    if (restarts != restartsServed) {
+                        restartsServed = restarts
+                        if (host.runtime != null) {
+                            stopService()
+                        }
+                    }
                     host.startService(withLocalNetworkFallback(options)) && isCurrent(request)
                 }
             }
@@ -375,9 +397,7 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         fun notificationParams(state: SharedState): NotificationParams = NotificationParams(
             title = state.currentProfileName,
             stopText = state.stopText,
-            onlyStatisticsProxy = state.onlyStatisticsProxy,
             showStopAction = state.showStopAction,
-            appVisible = state.appVisible,
         )
     }
 }

@@ -64,7 +64,7 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
     );
     if (res != true) return;
     unawaited(
-      dialogs.showMessage(
+      dialogs.showAlert(
         title: title,
         message: TextSpan(text: successMessage),
       ),
@@ -153,9 +153,10 @@ class _BackupAndRestoreState extends ConsumerState<BackupAndRestore>
       isLoading: isLoading,
       title: appLocalizations.backupAndRestore,
       body: ListView(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-        ).copyWith(top: context.appBarInset, bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+          top: context.sectionsTopPadding,
+          bottom: 16 + context.bottomInset,
+        ),
         children: [
           generateSection(
             title: appLocalizations.remote,
@@ -475,7 +476,8 @@ class _WebDAVFormState extends ConsumerState<WebDAVForm> {
             ),
           ],
         ),
-        if (widget.dav != null)
+        if (widget.dav != null) ...[
+          const ListSectionGap(),
           generateSection(
             items: [
               FormRow(
@@ -485,6 +487,7 @@ class _WebDAVFormState extends ConsumerState<WebDAVForm> {
               ),
             ],
           ),
+        ],
       ],
     );
   }

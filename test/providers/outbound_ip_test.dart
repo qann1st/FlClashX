@@ -13,11 +13,11 @@ import 'package:riverpod/riverpod.dart';
 class _MockCore extends Mock implements CoreHandlerInterface {}
 
 const _answer = OutboundIpResult(
-  url: 'https://www.cloudflare.com/cdn-cgi/trace',
-  body: 'ip=2.2.2.2\nloc=US\n',
+  url: 'http://ip-api.com/json',
+  body: '{"query":"2.2.2.2","countryCode":"US"}',
   chains: ['HK-01'],
   coreEpoch: 1,
-  picksVersion: 1,
+  routeVersion: 1,
 );
 
 void main() {
@@ -33,7 +33,7 @@ void main() {
         routeTrackerProvider.overrideWithBuild(
           (_, _) => RouteState(
             coreEpoch: 1,
-            picksVersion: 1,
+            routeVersion: 1,
             hostEpoch: 1,
             proxied: proxied,
             synced: true,
@@ -90,7 +90,11 @@ void main() {
 
     expect((await asked()).proxyName, 'HK-01');
     expect(
-      container.read(outboundIpProbeProvider).valueOf('HK-01')?.countryCode,
+      container
+          .read(outboundIpProbeProvider)
+          .entryOf('HK-01')
+          .value
+          ?.countryCode,
       'US',
     );
   });
@@ -98,11 +102,15 @@ void main() {
   test('the routed answer fills in the node it left through', () async {
     when(() => core.outboundIp(any())).thenAnswer(
       (_) async => const OutboundIpResult(
-        url: 'https://www.cloudflare.com/cdn-cgi/trace',
-        body: 'ip=2.2.2.2\nloc=US\n',
-        chains: ['HK-01', 'Proxy'],
+        url: 'http://ip-api.com/json',
+        body: '{"query":"2.2.2.2","countryCode":"US"}',
+        chains: ['HK-01', 'Balance', 'Proxy'],
         coreEpoch: 1,
-        picksVersion: 1,
+        routeVersion: 1,
+        hits: [RouteHit(host: 'ip-api.com:80', exit: 'Balance')],
+        nodeHits: [
+          RouteHit(host: 'ip-api.com:80', proxy: 'HK-01', exit: 'HK-01'),
+        ],
       ),
     );
     final container = build();
@@ -117,6 +125,9 @@ void main() {
     final entry = container.read(outboundIpProbeProvider).entryOf('HK-01');
     expect(entry.phase, ProbePhase.fresh);
     expect(entry.value?.ip, '2.2.2.2');
+    expect(entry.stamp?.hits, const [
+      RouteHit(host: 'ip-api.com:80', proxy: 'HK-01', exit: 'HK-01'),
+    ]);
   });
 
   test('a Core error is a failure until it is refreshed', () async {
@@ -124,7 +135,7 @@ void main() {
       (_) async => const OutboundIpResult(
         error: 'timeout',
         coreEpoch: 1,
-        picksVersion: 1,
+        routeVersion: 1,
       ),
     );
     final container = build();

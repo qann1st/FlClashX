@@ -87,7 +87,6 @@ enum EditorSchema {
   dns(_dns, 'dns'),
   ntp(_ntp, 'ntp'),
   sniffer(_sniffer, 'sniffer'),
-  proxy(_proxy),
   proxyGroup(_customProxyGroup, 'proxy-groups'),
   rules(_rules),
   shareLinks(_str),

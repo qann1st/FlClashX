@@ -14,10 +14,10 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:flutter_test/flutter_test.dart';
 
 /// Every notifier in `lib/providers/database.dart` writes optimistically: the
-/// in-memory state is mutated first and the row is persisted afterwards through
-/// [withRollback], which restores the pre-mutation snapshot when the write
-/// fails. These tests drive the real drift schema on an in-memory executor so
-/// both halves — the optimistic value and the rollback — are observable.
+/// in-memory state is mutated first and the row is persisted afterwards, and
+/// the pre-mutation snapshot comes back when the write fails. These tests
+/// drive the real drift schema on an in-memory executor so both halves — the
+/// optimistic value and the rollback — are observable.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const profileId = 1;
@@ -73,39 +73,6 @@ void main() {
   /// what lets a test observe the rolled-back state rather than an error state.
   Future<void> breakTable(String table) =>
       testDatabase.customStatement('DROP TABLE $table');
-
-  group('withRollback', () {
-    test('rolls back with snapshot and rethrows async errors', () async {
-      final error = StateError('write failed');
-      final previous = [1, 2, 3];
-      List<int>? rolledBack;
-
-      await expectLater(
-        withRollback(
-          snapshot: previous,
-          action: () async {
-            throw error;
-          },
-          rollback: (value) => rolledBack = value,
-        ),
-        throwsA(same(error)),
-      );
-
-      expect(rolledBack, previous);
-    });
-
-    test('does not roll back when action succeeds', () async {
-      var rollbackCalled = false;
-
-      await withRollback(
-        snapshot: [1, 2, 3],
-        action: () async {},
-        rollback: (_) => rollbackCalled = true,
-      );
-
-      expect(rollbackCalled, false);
-    });
-  });
 
   group('Profiles', () {
     late Profiles notifier;
@@ -166,6 +133,49 @@ void main() {
       rows.add([profile(1, label: 'Mine'), profile(2, label: 'Theirs')]);
       await pumpEventQueue();
       expect(scoped.read(profilesProvider).map((item) => item.id), [1, 2]);
+    });
+
+    test('a drain waits for an edit the user already sees to land', () async {
+      final landing = Completer<void>();
+      final held = testDatabase.transaction(() => landing.future);
+      notifier.put(profile(1, label: 'Mine'));
+      expect(read().single.label, 'Mine');
+
+      var drained = false;
+      final drain = drainDatabaseWrites().then((_) => drained = true);
+      await pumpEventQueue();
+      expect(drained, isFalse);
+
+      landing.complete();
+      await held;
+      await drain;
+      final rows = await testDatabase.profilesDao.query().get();
+      expect(rows.single.label, 'Mine');
+    });
+
+    test('a new profile sorts last before and after its write lands', () async {
+      notifier.put(profile(1, label: 'First'));
+      await pumpEventQueue();
+
+      notifier.put(profile(2, label: 'Second'));
+      expect(read().map((item) => item.id), [1, 2]);
+
+      await pumpEventQueue();
+      expect(read().map((item) => item.id), [1, 2]);
+    });
+
+    test('a new profile takes its place in the query order at once', () async {
+      notifier.put(profile(3, label: 'Third'));
+      await pumpEventQueue();
+      notifier.reorder(read());
+      await pumpEventQueue();
+
+      notifier.put(profile(2, label: 'Second'));
+      notifier.put(profile(1, label: 'First'));
+      expect(read().map((item) => item.id), [3, 1, 2]);
+
+      await pumpEventQueue();
+      expect(read().map((item) => item.id), [3, 1, 2]);
     });
 
     test('put falls back to the id when the profile has no label', () async {
@@ -280,7 +290,7 @@ void main() {
       final failure = captureWriteFailure(
         () => notifier.put(profile(2, label: 'Lost')),
       );
-      expect(read().map((item) => item.id), [2, 1], reason: 'optimistic');
+      expect(read().map((item) => item.id), [1, 2], reason: 'optimistic');
 
       await failure;
       expect(read().map((item) => item.id), [1], reason: 'rolled back');
@@ -1236,8 +1246,8 @@ void main() {
       await pumpEventQueue();
 
       expect(
-        await testDatabase.iconRecordsDao.get('https://icon.example'),
-        isNotNull,
+        await testDatabase.iconRecordsDao.query('https://icon.example'),
+        isNotEmpty,
       );
     });
 

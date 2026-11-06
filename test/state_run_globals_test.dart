@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:fl_clash/bootstrap.dart';
-import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
@@ -45,7 +44,6 @@ void main() {
     test('the app always speaks with its own user agent', () {
       setGlobalUa('custom-agent/1.0');
 
-      expect(globalState.ua, _packageInfo.ua);
       expect(
         globalState.ua,
         'FlClashX/v1.2.3 Platform/${Platform.operatingSystem}',

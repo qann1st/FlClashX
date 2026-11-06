@@ -22,14 +22,22 @@ void main() {
     );
   });
 
-  test('profile apps join the accepted ones', () {
-    final props = accepting.withPackages(
-      include: const ['p.app', 'a.app'],
-      exclude: const ['x.app'],
-    );
+  test('picked apps outside the profile include list stay out', () {
+    final props = accepting
+        .copyWith(acceptList: ['a.app', 'p.app'])
+        .withPackages(include: const ['p.app', 'q.app'], exclude: const []);
 
     expect(props.mode, AccessControlMode.acceptSelected);
-    expect(props.acceptList, ['a.app', 'p.app']);
+    expect(props.acceptList, ['p.app']);
+  });
+
+  test('a profile excluded app stays out even when picked', () {
+    final props = accepting
+        .copyWith(acceptList: ['a.app', 'x.app'])
+        .withPackages(include: const [], exclude: const ['x.app']);
+
+    expect(props.mode, AccessControlMode.acceptSelected);
+    expect(props.acceptList, ['a.app']);
   });
 
   test('profile excluded apps join the rejected ones', () {
@@ -42,9 +50,9 @@ void main() {
     expect(props.rejectList, ['r.app', 'x.app']);
   });
 
-  test('an include list turns a rejecting list into an accepting one', () {
+  test('rejected apps and the exclude list narrow the include list', () {
     final props = rejecting.withPackages(
-      include: const ['p.app'],
+      include: const ['p.app', 'r.app', 'x.app'],
       exclude: const ['x.app'],
     );
 
@@ -53,12 +61,21 @@ void main() {
   });
 
   test('switched off access control takes only the profile lists', () {
-    final props = accepting
-        .copyWith(enable: false)
-        .withPackages(include: const [], exclude: const ['x.app']);
+    final off = accepting.copyWith(enable: false);
 
-    expect(props.enable, isTrue);
-    expect(props.mode, AccessControlMode.rejectSelected);
-    expect(props.rejectList, ['x.app']);
+    final rejected = off.withPackages(
+      include: const [],
+      exclude: const ['x.app'],
+    );
+    expect(rejected.enable, isTrue);
+    expect(rejected.mode, AccessControlMode.rejectSelected);
+    expect(rejected.rejectList, ['x.app']);
+
+    final accepted = off.withPackages(
+      include: const ['p.app', 'x.app'],
+      exclude: const ['x.app'],
+    );
+    expect(accepted.mode, AccessControlMode.acceptSelected);
+    expect(accepted.acceptList, ['p.app']);
   });
 }

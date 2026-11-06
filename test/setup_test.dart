@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 
 import '../setup.dart' as setup;
@@ -144,6 +146,27 @@ hooks:
       expect(script, contains('Arch=x64compatible'));
       expect(script, contains('Flags: runascurrentuser nowait'));
       expect(script, isNot(contains('{{')));
+    });
+
+    test('the installer clears a stale proxy once it has killed the app', () {
+      final script = File(
+        'windows/packaging/exe/inno_setup.iss',
+      ).readAsStringSync();
+
+      expect(
+        script,
+        contains("ExecAsOriginalUser(AppPath, '--clear-stale-proxy'"),
+      );
+      expect(
+        script,
+        matches(RegExp(r'ssPostInstall then\s+begin[^;]+;\s+ClearStaleProxy;')),
+      );
+      expect(
+        script,
+        matches(
+          RegExp(r'usUninstall:\s+begin\s+ShutDownApp;\s+ClearStaleProxy;'),
+        ),
+      );
     });
 
     test('downloads the appimagetool build matching the host', () {

@@ -125,6 +125,15 @@ class Service {
         false;
   }
 
+  Future<bool> restart() async {
+    _startRequested = true;
+    return await methodChannel.invokeMethod<bool>(
+          'restart',
+          ++_commandRevision,
+        ) ??
+        false;
+  }
+
   Future<String> init() async {
     return await methodChannel.invokeMethod<String>('init') ?? '';
   }

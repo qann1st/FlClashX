@@ -23,6 +23,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../helpers/app_paths.dart';
+import '../helpers/test_database_providers.dart';
 import '../helpers/test_profiles.dart';
 
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
@@ -60,6 +61,11 @@ CoreEvent _geoUpdate({
 class _ApplyRecordingSetupAction extends SetupAction {
   int updates = 0;
   int applies = 0;
+  int globalRulesApplies = 0;
+  final List<bool> appliedForce = [];
+
+  @override
+  void applyIfGlobalRulesUsed() => globalRulesApplies++;
 
   @override
   Future<void> updateConfigDebounce() async {
@@ -69,7 +75,15 @@ class _ApplyRecordingSetupAction extends SetupAction {
   @override
   void applyProfileDebounce({bool silence = false, bool force = false}) {
     applies++;
+    appliedForce.add(force);
   }
+}
+
+class _CrashRecordingCoreAction extends CoreAction {
+  final List<String> crashes = [];
+
+  @override
+  Future<void> restartAfterCrash(String reason) async => crashes.add(reason);
 }
 
 _MockCoreHandlerInterface _coreInterface() {
@@ -78,6 +92,10 @@ _MockCoreHandlerInterface _coreInterface() {
   when(() => coreInterface.stopLog()).thenAnswer((_) {});
   return coreInterface;
 }
+
+List<String> _crashesOf(ProviderContainer container) =>
+    (container.read(coreActionProvider.notifier) as _CrashRecordingCoreAction)
+        .crashes;
 
 /// TUN is on by default, and authorizing it has no place in a test.
 const _tunOff = PatchClashConfig(tun: Tun(enable: false));
@@ -167,6 +185,7 @@ void main() {
         coreHandlerProvider.overrideWithValue(
           CoreController.scoped(coreInterface),
         ),
+        coreActionProvider.overrideWith(_CrashRecordingCoreAction.new),
       ],
     );
     addTearDown(container.dispose);
@@ -191,6 +210,7 @@ void main() {
 
     expect(container.read(coreStatusProvider), CoreStatus.disconnected);
     expect(transitions, [CoreStatus.disconnected]);
+    expect(_crashesOf(container), ['boom']);
     verifyNever(() => coreInterface.stop());
 
     await tester.pumpWidget(const SizedBox());
@@ -201,7 +221,13 @@ void main() {
     tester,
   ) async {
     final coreInterface = _coreInterface();
-    final container = await _pumpCoreManager(tester, coreInterface);
+    final container = await _pumpCoreManager(
+      tester,
+      coreInterface,
+      overrides: [
+        coreActionProvider.overrideWith(_CrashRecordingCoreAction.new),
+      ],
+    );
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     container.read(coreStatusProvider.notifier).value = CoreStatus.connected;
 
@@ -210,6 +236,7 @@ void main() {
 
     expect(container.read(coreStatusProvider), CoreStatus.disconnected);
     expect(find.text('boom'), findsOneWidget);
+    expect(_crashesOf(container), ['boom']);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -218,7 +245,13 @@ void main() {
     tester,
   ) async {
     final coreInterface = _coreInterface();
-    final container = await _pumpCoreManager(tester, coreInterface);
+    final container = await _pumpCoreManager(
+      tester,
+      coreInterface,
+      overrides: [
+        coreActionProvider.overrideWith(_CrashRecordingCoreAction.new),
+      ],
+    );
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     container.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
     final transitions = <CoreStatus>[];
@@ -234,6 +267,7 @@ void main() {
     expect(container.read(coreStatusProvider), CoreStatus.connecting);
     expect(transitions, isEmpty);
     expect(find.text('boom'), findsNothing);
+    expect(_crashesOf(container), isEmpty);
 
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -345,6 +379,53 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('a test URL change forces the apply, which alone hands it '
+      'over', (tester) async {
+    final setupAction = _ApplyRecordingSetupAction();
+    final container = await _pumpCoreManager(
+      tester,
+      _coreInterface(),
+      overrides: [setupActionProvider.overrideWith(() => setupAction)],
+    );
+
+    container
+        .read(patchClashConfigProvider.notifier)
+        .update((state) => state.copyWith(hosts: const {'a.test': '1.1.1.1'}));
+    await tester.pump();
+    container
+        .read(appSettingProvider.notifier)
+        .update((state) => state.copyWith(testUrl: 'https://probe.test/204'));
+    await tester.pump();
+
+    expect(setupAction.appliedForce, [false, true]);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a change to the global added rules, not their first load, '
+      'asks for an apply', (tester) async {
+    final setupAction = _ApplyRecordingSetupAction();
+    final container = await _pumpCoreManager(
+      tester,
+      _coreInterface(),
+      overrides: [
+        setupActionProvider.overrideWith(() => setupAction),
+        globalRulesProvider.overrideWith(() => TestGlobalRules()),
+      ],
+    );
+    await tester.pump();
+    expect(setupAction.globalRulesApplies, 0);
+
+    container.read(globalRulesProvider.notifier).value = [
+      const Rule(id: 1, content: 'a.test', ruleTarget: 'DIRECT'),
+    ];
+    await tester.pump();
+
+    expect(setupAction.globalRulesApplies, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('core logs are recorded for the logs view', (tester) async {
     final coreInterface = _coreInterface();
     final container = await _pumpCoreManager(tester, coreInterface);
@@ -427,19 +508,14 @@ void main() {
     coreEventManager.sendEvent(
       const CoreEvent(
         type: CoreEventType.routeChanged,
-        data: {
-          'core-epoch': 7,
-          'picks-version': 42,
-          'picks': {'Proxy': 'HK-01'},
-        },
+        data: {'core-epoch': 7, 'route-version': 42},
       ),
     );
     await tester.pump();
 
     final route = container.read(routeTrackerProvider);
     expect(route.coreEpoch, 7);
-    expect(route.picksVersion, 42);
-    expect(route.picks, {'Proxy': 'HK-01'});
+    expect(route.routeVersion, 42);
     expect(route.synced, isTrue);
 
     await tester.pumpWidget(const SizedBox.shrink());

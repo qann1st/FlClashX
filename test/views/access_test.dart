@@ -291,14 +291,60 @@ void main() {
       await teardownView(tester);
     });
 
-    testWidgets('the bar menu selects then clears every visible app', (
+    testWidgets('the bar at the foot says access control is off and turns '
+        'it on', (tester) async {
+      seedAccessControl(const AccessControlProps());
+      await pumpAccessView(tester);
+      final l10n = AppLocalizations.current;
+
+      expect(find.text(l10n.accessControlDisabledDesc), findsOneWidget);
+      await tester.tap(find.widgetWithText(TonalButton, l10n.turnOn));
+      await tester.pump();
+
+      expect(container.read(accessControlStateProvider).enable, isTrue);
+      expect(find.text(l10n.accessControlDisabledDesc), findsNothing);
+      expect(find.text(l10n.accessControlNotAllowDesc), findsOneWidget);
+
+      await teardownView(tester);
+    });
+
+    testWidgets('the bar at the foot follows the mode and counts the '
+        'selected apps', (tester) async {
+      seedAccessControl(
+        const AccessControlProps(
+          enable: true,
+          rejectList: ['com.example.browser'],
+        ),
+      );
+      await pumpAccessView(tester);
+      final l10n = AppLocalizations.current;
+
+      expect(find.text(l10n.accessControlNotAllowDesc), findsOneWidget);
+      expect(find.text(l10n.accessControlSelectedCount(1)), findsOneWidget);
+
+      await tester.tap(find.text('Chat'));
+      await tester.pump();
+      expect(find.text(l10n.accessControlSelectedCount(2)), findsOneWidget);
+
+      container
+          .read(accessControlStateProvider.notifier)
+          .update(
+            (state) => state.copyWith(mode: AccessControlMode.acceptSelected),
+          );
+      await tester.pump();
+      expect(find.text(l10n.accessControlAllowDesc), findsOneWidget);
+      expect(find.text(l10n.accessControlSelectedCount(0)), findsOneWidget);
+
+      await teardownView(tester);
+    });
+
+    testWidgets('the bar button selects then clears every visible app', (
       tester,
     ) async {
       seedAccessControl(const AccessControlProps(enable: true));
       await pumpAccessView(tester);
 
-      await openBarMenu(tester);
-      await tester.tap(find.text('Select all'));
+      await tester.tap(find.byTooltip('Select all'));
       await tester.pumpAndSettle();
       expect(
         [...container.read(accessControlStateProvider).currentList]..sort(),
@@ -306,7 +352,12 @@ void main() {
       );
 
       await openBarMenu(tester);
-      await tester.tap(find.text('Deselect all'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CommonPopupMenu),
+          matching: find.text('Deselect all'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(container.read(accessControlStateProvider).currentList, isEmpty);
 
@@ -337,6 +388,69 @@ void main() {
 
       await tapMenuPath(['Access control', 'Turn on']);
       expect(container.read(accessControlStateProvider).enable, isTrue);
+
+      await teardownView(tester);
+    });
+
+    testWidgets('smart selection picks out the Russian apps', (tester) async {
+      container.read(packagesProvider.notifier).value = [
+        ..._packages,
+        _package('ru.sberbankmobile', label: 'Sber'),
+        _package('com.vkontakte.android', label: 'VK'),
+      ];
+      seedAccessControl(const AccessControlProps(enable: true));
+      await pumpAccessView(tester);
+
+      await openBarMenu(tester);
+      for (final label in ['Action', 'Smart selection']) {
+        await tester.tap(
+          find
+              .descendant(
+                of: find.byType(CommonPopupMenu),
+                matching: find.text(label),
+              )
+              .last,
+        );
+        await tester.pumpAndSettle();
+      }
+
+      final props = container.read(accessControlStateProvider);
+      expect(props.rejectList, ['ru.sberbankmobile', 'com.vkontakte.android']);
+      expect(props.acceptList, [
+        for (final item in _packages) item.packageName,
+      ]);
+
+      await teardownView(tester);
+    });
+
+    testWidgets('smart selection keeps the lists without an app list', (
+      tester,
+    ) async {
+      container.read(packagesProvider.notifier).value = [];
+      const picked = AccessControlProps(
+        enable: true,
+        acceptList: ['a.app'],
+        rejectList: ['r.app'],
+      );
+      seedAccessControl(picked);
+      await pumpAccessView(tester);
+
+      await openBarMenu(tester);
+      for (final label in ['Action', 'Smart selection']) {
+        await tester.tap(
+          find
+              .descendant(
+                of: find.byType(CommonPopupMenu),
+                matching: find.text(label),
+              )
+              .last,
+        );
+        await tester.pumpAndSettle();
+      }
+
+      final props = container.read(accessControlStateProvider);
+      expect(props.acceptList, picked.acceptList);
+      expect(props.rejectList, picked.rejectList);
 
       await teardownView(tester);
     });
@@ -492,30 +606,76 @@ void main() {
       await teardownView(tester);
     });
 
-    testWidgets('drops hidden packages and sorts what it persists', (
+    testWidgets(
+      'keeps hidden packages, drops uninstalled ones and sorts what it persists',
+      (tester) async {
+        seedAccessControl(
+          const AccessControlProps(
+            enable: true,
+            rejectList: ['com.android.settings', 'com.example.removed'],
+          ),
+        );
+        await pumpAccessView(tester);
+
+        await tester.tap(find.text('Chat'));
+        await tester.pump();
+        await tester.tap(find.text('Browser'));
+        await tester.pump();
+
+        await tester.tap(find.byTooltip('Save'));
+        await tester.pumpAndSettle();
+
+        final saved = container
+            .read(vpnSettingProvider)
+            .accessControlProps
+            .rejectList;
+        expect(saved, [
+          'com.android.settings',
+          'com.example.browser',
+          'com.example.chat',
+        ]);
+
+        await teardownView(tester);
+      },
+    );
+
+    testWidgets('a selected system app survives hiding system apps', (
       tester,
     ) async {
       seedAccessControl(
         const AccessControlProps(
           enable: true,
-          rejectList: ['com.android.settings'],
+          mode: AccessControlMode.acceptSelected,
+          isFilterSystemApp: false,
         ),
       );
       await pumpAccessView(tester);
+      final l10n = AppLocalizations.current;
 
-      await tester.tap(find.text('Chat'));
+      await tester.tap(find.text('Settings'));
       await tester.pump();
-      await tester.tap(find.text('Browser'));
-      await tester.pump();
+      await openBarMenu(tester);
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byType(CommonPopupMenu),
+              matching: find.text(l10n.settings),
+            )
+            .last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10n.systemApp));
+      await tester.pumpAndSettle();
+      Navigator.of(tester.element(find.byType(AccessControlPanel))).pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Settings'), findsNothing);
 
       await tester.tap(find.byTooltip('Save'));
       await tester.pumpAndSettle();
 
-      final saved = container
-          .read(vpnSettingProvider)
-          .accessControlProps
-          .rejectList;
-      expect(saved, ['com.example.browser', 'com.example.chat']);
+      final saved = container.read(vpnSettingProvider).accessControlProps;
+      expect(saved.isFilterSystemApp, isTrue);
+      expect(saved.acceptList, ['com.android.settings']);
 
       await teardownView(tester);
     });

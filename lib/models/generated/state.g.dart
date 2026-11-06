@@ -18,9 +18,7 @@ _SharedState _$SharedStateFromJson(Map<String, dynamic> json) => _SharedState(
   localNetworkTip: json['localNetworkTip'] as String,
   currentProfileName: json['currentProfileName'] as String,
   stopText: json['stopText'] as String,
-  onlyStatisticsProxy: json['onlyStatisticsProxy'] as bool,
   showStopAction: json['showStopAction'] as bool? ?? true,
-  appVisible: json['appVisible'] as bool? ?? true,
 );
 
 Map<String, dynamic> _$SharedStateToJson(_SharedState instance) =>
@@ -32,7 +30,5 @@ Map<String, dynamic> _$SharedStateToJson(_SharedState instance) =>
       'localNetworkTip': instance.localNetworkTip,
       'currentProfileName': instance.currentProfileName,
       'stopText': instance.stopText,
-      'onlyStatisticsProxy': instance.onlyStatisticsProxy,
       'showStopAction': instance.showStopAction,
-      'appVisible': instance.appVisible,
     };

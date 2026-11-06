@@ -598,9 +598,13 @@ void main() {
           autoUpdateDuration: Duration.zero,
         ).toCompanion(),
       ]);
-      await database.scriptsDao.setAll([
-        Script(id: 2, label: 'Script', lastUpdateTime: DateTime(2026)),
-      ]);
+      await database.scripts.put(
+        Script(
+          id: 2,
+          label: 'Script',
+          lastUpdateTime: DateTime(2026),
+        ).toCompanion(),
+      );
       await database.rulesDao.putRule(
         const Rule(id: 3, content: 'example.com', order: 'a'),
         profileId: 1,
