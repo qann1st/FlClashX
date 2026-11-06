@@ -5,13 +5,13 @@ go 1.27.0
 // The browser fingerprints mihomo names (Firefox 148, Safari 26.3 and up)
 // live on utls' `v1.9.0-mod-meta` branch, which has no tag. Prizrak-Core also
 // needs the ML-DSA-65 Reality bits from legiz-ru's branch of that release.
-replace github.com/metacubex/utls => github.com/legiz-ru/prizrak-utls v0.0.0-20261022072945-d5656b84bb52
+replace github.com/metacubex/utls => github.com/legiz-ru/prizrak-utls v0.0.0-20261101192859-2807fc753c53
 
 // v0.4.28 plus the darwin dscacheutil reap, see third_party/README.md.
 replace github.com/metacubex/sing-tun => ./third_party/sing-tun
 
 // Prizrak-Core keeps mihomo's module path, so it drops in here as a fork.
-replace github.com/metacubex/mihomo => github.com/legiz-ru/Prizrak-Core v1.19.33-r3
+replace github.com/metacubex/mihomo => github.com/legiz-ru/Prizrak-Core v1.19.33-r11
 
 // Prizrak-Core's http2 tuning, from the fork's own go.mod.
 replace github.com/metacubex/http => github.com/legiz-ru/prizrak-http v0.0.0-20260930180911-da5b4c1e0882
@@ -157,7 +157,6 @@ require (
 	golang.org/x/time v0.10.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 tool (
