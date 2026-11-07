@@ -780,6 +780,10 @@ Future<void> _packageAppImage(_Build build, String bundle) async {
   final bundledLib = Directory(p.join(usr, 'bin', 'lib'));
   if (bundledLib.existsSync()) {
     bundledLib.renameSync(p.join(usr, 'lib'));
+    // fl_dart_project.cc opens <exe dir>/lib/libapp.so, so the moved directory
+    // stays reachable from beside the executable; LD_LIBRARY_PATH keeps the
+    // conventional usr/lib path.
+    Link(p.join(usr, 'bin', 'lib')).createSync('../lib');
   }
   for (final extra in (config['include'] as List?) ?? const []) {
     final source = extra.toString();
