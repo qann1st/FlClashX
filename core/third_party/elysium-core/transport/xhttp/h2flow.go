@@ -1,0 +1,2386 @@
+package xhttp
+
+import (
+	"context"
+	gotls "crypto/tls"
+	"encoding/binary"
+	"errors"
+	"net"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
+	rand "github.com/metacubex/randv2"
+	"golang.org/x/net/http2"
+)
+
+// The HTTP/2 flow governor below is ported from Medium1992/mihomo-proxy-ros
+// (core_patches/xhttp_flow, synced with Xray-core-fork v26.10.21-h2Flow),
+// which carries the client role of the governor from Medium1992/Xray-core-fork.
+// Changes for Prizrak-Core: it builds with Go 1.20 (no min, max and clear
+// builtins, randv2 instead of math/rand/v2) and is switched on per proxy by
+// xhttp-opts h2-flow instead of the MIHOMO_XHTTP_FLOW environment variable; it
+// is off unless configured.
+
+// flowConn sits between a TLS/REALITY connection and the local HTTP/2 stack.
+// It rewrites HTTP/2 flow control so that nothing buffers more than its reader
+// has recently shown it can consume, the way TCP autotuning does:
+//   - uplink: the client is shown Go's own initial window, see flowShownUp,
+//     and gets more credit only as the handler reads, while the handler's
+//     unread data stays under a cap that follows what it read per RTT;
+//   - downlink: the server is shown a small client window and gets the
+//     client's credit back only while unread data at the client stays under
+//     a cap that follows what the client read per RTT.
+// The cap starts at twice that, see adjust, and may follow a model of the
+// path or the queue instead, see model and pi.
+// On a server both apply; on a client only the downlink does, since that is
+// the only side of the exchange whose buffers are local. Neither peer needs to
+// know: each only ever sees a window no larger than the other side granted.
+
+const (
+	h2Preface     = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+	h2FrameHeader = 9
+	h2InitWindow  = 65535
+	h2MaxWindow   = 1<<31 - 1
+
+	h2Data         = 0x0
+	h2Headers      = 0x1
+	h2RSTStream    = 0x3
+	h2Settings     = 0x4
+	h2PushPromise  = 0x5
+	h2Ping         = 0x6
+	h2GoAway       = 0x7
+	h2WindowUpdate = 0x8
+	h2Continuation = 0x9
+
+	// h2ErrFlowControl is FLOW_CONTROL_ERROR.
+	h2ErrFlowControl = 0x3
+
+	h2FlagEndStream  = 0x1
+	h2FlagAck        = 0x1
+	h2FlagEndHeaders = 0x4
+
+	h2SettingInitialWindowSize = 0x4
+	h2SettingMaxFrameSize      = 0x5
+	h2MinMaxFrameSize          = 16384
+
+	flowPingSlots    = 4
+	flowPingInterval = time.Second
+	flowPingTimeout  = 10 * time.Second
+	flowDefaultRTT   = 200 * time.Millisecond
+	flowRTTWindow    = 10 * time.Second
+	flowMinRTT       = time.Millisecond
+	flowLearnHalf    = time.Minute
+	flowStartWindow  = 256 << 10
+	// flowMaxStreams bounds the streams one connection makes the governor
+	// track; stock HTTP/2 refuses far fewer concurrent ones.
+	flowMaxStreams = 4096
+	// flowConnFloor is the connection window a governed receiver shows
+	// before its readers prove they need more: Go's default.
+	flowConnFloor   = 1 << 20
+	flowSmallCredit = 64 << 10
+	flowShrinkAfter = 3
+	// flowSettledRounds is how many round trips in a row a reader must
+	// take less than a quarter more than before to be modelled, see
+	// settled.
+	flowSettledRounds = 2
+	flowKernelEvery   = 20 * time.Millisecond
+	flowQueueHold     = 15 * time.Millisecond
+	flowQueueShrink   = 40 * time.Millisecond
+
+	flowUndecided = 0
+	flowH2        = 1
+	flowPlain     = 2
+)
+
+type flowLimit struct {
+	init, max int32
+}
+
+func (l flowLimit) enabled() bool {
+	return l.max > 0
+}
+
+// flowDefault never lets a cap shrink below the initial window HTTP/2 itself
+// defines, and lets it grow to 1 GiB. A cap only bounds what is shown: what
+// the sender is handed never goes past what the peer really granted, see the
+// bank in downRelease and upRelease.
+var flowDefault = flowLimit{init: h2InitWindow, max: 1 << 30}
+
+// The initial window each side is shown, where the receiver grants that
+// much. A server shows Go's own 1 MiB, so its SETTINGS carry the stock value
+// and new upload streams need no credit at once; the upload connection
+// window still holds everything nobody reads to 1 MiB.
+//
+// A client shows the protocol default, and must show no more than the lowest
+// cap a download stream can have (flowLimit.init). With a governor at both
+// ends of a download, each holds back credit. When the server has no window
+// left, the server-side governor takes for unread at the client what the
+// client showed less the credit it itself still holds, and hands that credit
+// on once its cap is above that. Its cap never falls below flowLimit.init, so
+// with no more than that shown it always can; with more, its cap can shrink
+// under the difference and both ends wait for each other for good.
+const (
+	flowShownUp   = 1 << 20
+	flowShownDown = h2InitWindow
+)
+
+// A constant larger than the lowest cap fails to compile here.
+const _ = uint(h2InitWindow - flowShownDown)
+
+// flowShownLimited is what a server with a send window shows its own HTTP/2
+// stack for the client's initial window: one frame. A stream has that much
+// whatever the connection's client holds, so it is what every stream past the
+// limit adds to it, and with hundreds of streams the protocol's 65535 each
+// was most of what the client held. The rest of a stream's window comes as
+// credit when it opens, as before. The value never leaves the process.
+const flowShownLimited = h2MinMaxFrameSize
+
+// flowShownFull is what the sender of downloads is shown otherwise.
+const flowShownFull = h2InitWindow // flowMax(h2InitWindow, flowShownDown); flowShownDown <= h2InitWindow is checked above
+
+// shownDown is the initial window the sender of downloads is shown for a
+// client that announces real.
+//
+// A client that announces no more than the protocol default gets all of it,
+// limit or not. It may be a governor: one shows exactly that and counts on
+// every byte of it. A server that kept its stack under what such a client
+// showed would wait for credit while the client waits for data, for good;
+// see flowShownDown. With all of it shown, what the stream's floor
+// in downRelease hands on is all the client has returned, so the limit holds
+// nothing back from it, and what such a client holds is up to its own
+// governor.
+//
+// found says the frame carries an initial window at all. One that does not
+// changes nothing here: what the stack was shown stands, and shownLimited
+// with it.
+//
+// A client whose server governs, once restock has shown it the stack's own
+// window, shows a later one as it is, less what changeInitialWindow takes
+// off for credit already forwarded.
+func (c *flowConn) shownDown(real int32, found bool) int32 {
+	if c.client && c.peerGoverned && !c.restock {
+		return h2MaxWindow
+	}
+	if found {
+		c.shownLimited = !c.client && c.sendWindow != 0 && real > h2InitWindow
+	}
+	if c.shownLimited {
+		return flowShownLimited
+	}
+	return flowShownFull
+}
+
+// initialWindow is the last SETTINGS_INITIAL_WINDOW_SIZE in payload.
+func initialWindow(payload []byte) (real int32, found bool) {
+	for i := 0; i+6 <= len(payload); i += 6 {
+		if binary.BigEndian.Uint16(payload[i:]) == h2SettingInitialWindowSize {
+			real, found = int32(flowMin(binary.BigEndian.Uint32(payload[i+2:]), h2MaxWindow)), true
+		}
+	}
+	return real, found
+}
+
+type flowOrdered interface {
+	~int | ~int32 | ~int64 | ~uint32 | ~float64
+}
+
+// flowMin and flowMax stand in for the Go 1.21 min and max builtins so the
+// governor builds with Go 1.20.
+func flowMin[T flowOrdered](a T, rest ...T) T {
+	for _, v := range rest {
+		if v < a {
+			a = v
+		}
+	}
+	return a
+}
+
+func flowMax[T flowOrdered](a T, rest ...T) T {
+	for _, v := range rest {
+		if v > a {
+			a = v
+		}
+	}
+	return a
+}
+
+// flowClear stands in for the Go 1.21 clear builtin on maps.
+func flowClear[K comparable, V any](m map[K]V) {
+	for k := range m {
+		delete(m, k)
+	}
+}
+
+type tcpStats struct {
+	rtt, minRTT, rttVar time.Duration
+	// inFlight is the bytes sent and not yet acknowledged.
+	inFlight int64
+}
+
+type flowListener struct {
+	net.Listener
+	up, down flowLimit
+	// connWindow is the connection receive window the local server grants.
+	connWindow int32
+	// sendWindow is what one connection's client may hold, 0 for no
+	// limit, see flowConn.downRelease.
+	sendWindow int64
+	// noQueueCuts leaves the queue on the path to TCP, see
+	// flowConn.noQueueCuts.
+	noQueueCuts bool
+}
+
+func (l *flowListener) Accept() (net.Conn, error) {
+	c, err := l.Listener.Accept()
+	if err != nil {
+		return nil, err
+	}
+	fc := newFlowConn(c, l.up, l.down)
+	fc.sendWindow, fc.noQueueCuts = l.sendWindow, l.noQueueCuts
+	if l.connWindow > 0 {
+		fc.upConnGrant, fc.upConnGrantKnown = int64(flowMax(l.connWindow, h2InitWindow)-h2InitWindow), true
+	}
+	return fc.wrap(), nil
+}
+
+// flowTLSConn is the governor over a TLS connection. It shows net/http the
+// TLS state and handshake, so the server treats it as TLS exactly as it would
+// the bare connection: it answers plaintext probes, picks the protocol by
+// ALPN and sends its SETTINGS before the client preface.
+type flowTLSConn struct {
+	*flowConn
+}
+
+func (c flowTLSConn) ConnectionState() gotls.ConnectionState {
+	return c.tlsConn.ConnectionState()
+}
+
+func (c flowTLSConn) HandshakeContext(ctx context.Context) error {
+	err := c.tlsConn.HandshakeContext(ctx)
+	c.followALPN()
+	return err
+}
+
+// wrap returns c as net/http should see it: with the TLS interfaces where
+// the connection under it is TLS.
+func (c *flowConn) wrap() net.Conn {
+	if tc, ok := c.Conn.(*gotls.Conn); ok {
+		c.tlsConn = tc
+		return flowTLSConn{c}
+	}
+	return c
+}
+
+// followALPN settles the mode of a TLS connection once its handshake is
+// done, as net/http does: HTTP/2 only where ALPN picked h2, so the server's
+// SETTINGS, written before the client preface, are governed, and anything
+// else passes untouched even if it looks like a preface.
+func (c *flowConn) followALPN() {
+	if c.tlsConn == nil || c.alpnDone.Load() {
+		return
+	}
+	st := c.tlsConn.ConnectionState()
+	if !st.HandshakeComplete {
+		return
+	}
+	if st.NegotiatedProtocol == "h2" {
+		c.alpnH2.Store(true)
+	} else {
+		c.mode.Store(flowPlain)
+	}
+	c.alpnDone.Store(true)
+}
+
+// CloseWrite lets net/http end the stream after an error response at once,
+// as it does on the bare connection.
+func (c *flowConn) CloseWrite() error {
+	if cw, ok := c.Conn.(interface{ CloseWrite() error }); ok {
+		return cw.CloseWrite()
+	}
+	return nil
+}
+
+type h2Frame struct {
+	typ, flags byte
+	stream     uint32
+	length     int
+}
+
+// control reports whether the governor inspects f. Anything malformed by the
+// stock rules, such as SETTINGS or PING off stream 0, passes on byte for
+// byte, so the receiving stack fails it as it would without the governor.
+func (f h2Frame) control() bool {
+	switch f.typ {
+	case h2Settings:
+		return f.stream == 0 && f.length%6 == 0 && f.length <= h2MinMaxFrameSize
+	case h2Ping:
+		return f.stream == 0 && f.length == 8
+	case h2GoAway:
+		return f.stream == 0 && f.length >= 8 && f.length <= h2MinMaxFrameSize
+	case h2WindowUpdate:
+		return f.length == 4
+	}
+	return false
+}
+
+// validSettings reports whether every value in a SETTINGS payload is one the
+// stock HTTP/2 stack accepts.
+func validSettings(payload []byte) bool {
+	for i := 0; i+6 <= len(payload); i += 6 {
+		s := http2.Setting{ID: http2.SettingID(binary.BigEndian.Uint16(payload[i:])), Val: binary.BigEndian.Uint32(payload[i+2:])}
+		if s.Valid() != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// frame sees each frame's header before its payload passes on; a frame it
+// drops passes on neither.
+type frameHandler interface {
+	frame(f h2Frame) (drop bool)
+	control(f h2Frame, header, payload, out []byte) []byte
+	boundary(out []byte) []byte
+}
+
+type frameParser struct {
+	f       h2Frame
+	hdr     [h2FrameHeader]byte
+	hdrLen  int
+	ctrl    []byte
+	remain  int
+	skip    bool
+	collect bool
+	inBlock bool
+}
+
+func (p *frameParser) atBoundary() bool {
+	return p.hdrLen == 0 && p.remain == 0 && !p.collect && !p.inBlock
+}
+
+func (p *frameParser) feed(in, out []byte, h frameHandler) []byte {
+	for len(in) > 0 {
+		switch {
+		case p.remain > 0:
+			n := flowMin(p.remain, len(in))
+			if !p.skip {
+				out = append(out, in[:n]...)
+			}
+			in, p.remain = in[n:], p.remain-n
+			if p.remain == 0 {
+				out = p.done(out, h)
+			}
+		case p.collect:
+			n := flowMin(p.f.length-len(p.ctrl), len(in))
+			p.ctrl = append(p.ctrl, in[:n]...)
+			in = in[n:]
+			if len(p.ctrl) == p.f.length {
+				out = p.finishControl(out, h)
+			}
+		default:
+			n := copy(p.hdr[p.hdrLen:], in)
+			p.hdrLen += n
+			in = in[n:]
+			if p.hdrLen < h2FrameHeader {
+				continue
+			}
+			p.hdrLen = 0
+			p.f = h2Frame{
+				typ:    p.hdr[3],
+				flags:  p.hdr[4],
+				stream: binary.BigEndian.Uint32(p.hdr[5:]) & 0x7fffffff,
+				length: int(p.hdr[0])<<16 | int(p.hdr[1])<<8 | int(p.hdr[2]),
+			}
+			// Inside a header block nothing but CONTINUATION may come;
+			// whatever does passes on unread and whole for the stack to
+			// reject.
+			if !p.inBlock && p.f.control() {
+				p.collect = true
+				if p.f.length == 0 {
+					out = p.finishControl(out, h)
+				}
+				continue
+			}
+			p.skip = !p.inBlock && h.frame(p.f)
+			if !p.skip {
+				out = append(out, p.hdr[:]...)
+			}
+			p.remain = p.f.length
+			if p.remain == 0 {
+				out = p.done(out, h)
+			}
+		}
+	}
+	return out
+}
+
+func (p *frameParser) finishControl(out []byte, h frameHandler) []byte {
+	out = h.control(p.f, p.hdr[:], p.ctrl, out)
+	p.ctrl = p.ctrl[:0]
+	p.collect = false
+	return p.done(out, h)
+}
+
+func (p *frameParser) done(out []byte, h frameHandler) []byte {
+	switch p.f.typ {
+	case h2Headers, h2PushPromise, h2Continuation:
+		p.inBlock = p.f.flags&h2FlagEndHeaders == 0
+	}
+	if p.inBlock {
+		return out
+	}
+	return h.boundary(out)
+}
+
+type flowWindow struct {
+	cap      int32
+	returned int64
+	mark     time.Time
+	markBase int64
+	slow     int
+	waiting  time.Time
+	prev     int64
+	measured bool
+	ramped   bool
+	qAt      time.Time
+	qSample  int
+	rates    [flowModelRounds]int64
+	rateAt   int
+	flat     int
+	steady   int
+	piPrev   float64
+	piRTT    time.Duration
+	// rate is what the reader took per second over pi's last round, and
+	// capped whether the cap held it then: it took a quarter of the cap.
+	rate   float64
+	capped bool
+	// noted is returned as of the connection's last flowEffect note, and
+	// tookAt when it last grew.
+	noted  int64
+	tookAt time.Time
+}
+
+// adjust sets the cap to twice what the reader consumed over the last round
+// trip: at once when that is more, and by a quarter at a time, never below
+// init, once the reader has kept well under it for flowShrinkAfter round trips.
+// Until the first round trip is measured the cap opens with every credit, and
+// while the reader keeps speeding up it also covers the sender doubling its
+// rate, as Linux receive autotuning does. hold keeps the cap from growing.
+//
+// One round trip without growth ends that: ramped. A reader that takes a
+// little, irregularly, would otherwise have every larger round taken for a
+// ramp. It does not yet say the reader has found its rate, see settled.
+func (w *flowWindow) adjust(now time.Time, rtt time.Duration, init, limit int32, shrink, hold bool) {
+	if w.mark.IsZero() {
+		w.mark, w.markBase = now, w.returned
+		return
+	}
+	if !w.measured && !hold {
+		if open := int64(init) + 2*w.returned; open > int64(w.cap) {
+			w.cap = int32(flowMin(open, int64(limit)))
+		}
+	}
+	if now.Sub(w.mark) < rtt {
+		return
+	}
+	copied := w.returned - w.markBase
+	s := 2 * copied
+	grow := s
+	if w.prev > 0 && copied <= w.prev {
+		w.ramped = true
+	}
+	if !w.ramped && w.prev > 0 {
+		// In floats: credit a hostile client returns has no bound, and the
+		// product of two such rounds would wrap.
+		grow += int64(flowMin(2*float64(s)*float64(copied-w.prev)/float64(w.prev), float64(limit)))
+	}
+	if hold {
+		grow = flowMin(grow, int64(w.cap))
+	}
+	if w.prev > 0 && 4*copied < 5*w.prev {
+		w.flat++
+		if w.ramped {
+			w.steady++
+		}
+	} else {
+		w.flat, w.steady = 0, 0
+	}
+	w.prev, w.measured = copied, true
+	w.mark, w.markBase = now, w.returned
+	switch {
+	case grow > int64(w.cap):
+		w.cap = int32(flowMin(grow, int64(limit)))
+		w.slow = 0
+	case shrink && 2*s < int64(w.cap):
+		if w.slow++; w.slow >= flowShrinkAfter {
+			w.cap = int32(flowMax(int64(init), s, int64(w.cap)*3/4))
+			w.slow = 0
+		}
+	default:
+		w.slow = 0
+	}
+}
+
+// Once the kernel vouches for the round trip of the empty path, a ramped
+// window follows a model of the path instead of reacting to queueing: the
+// bandwidth-delay product BBR would estimate, from the fastest the reader took
+// data over the last flowModelRounds round trips, plus a quarter. The quarter
+// lets the reader's rate rise by as much per round trip where there is room,
+// and leaves at most a quarter round trip of queue where there is not.
+const (
+	flowModelRounds      = 10
+	flowModelGainPercent = 125
+	flowModelMinRound    = 20 * time.Millisecond
+)
+
+// settled reports whether the reader has found its rate: less than a
+// quarter faster than the round before for flowSettledRounds rounds in a
+// row, counted from the round that ended its ramp. Flat rounds before that
+// do not count: a reader that grew slowly would otherwise be settled by the
+// first low round after them. Only then does a window follow the path model.
+// One round without growth is not enough for that: the end of a round may
+// fall between the reader getting data and returning its credit, so that it
+// reads low and the next makes up for it. A window that took such a round at
+// the start of a stream for its rate had that one small round to model the
+// path from, fell to it, and grew back a quarter at a time.
+func (w *flowWindow) settled() bool {
+	return w.steady >= flowSettledRounds
+}
+
+// model sets the cap from the path model; rtprop is the empty path's round
+// trip. gain scales the cap a new round sets, as a probe widens it, from init
+// too: a probe is asked for where the caps sit at init; within a round the cap
+// stays where that round set it.
+func (w *flowWindow) model(now time.Time, rtprop time.Duration, init, limit int32, gain float64) {
+	round := flowMax(rtprop, flowModelMinRound)
+	if w.rateAt == 0 && w.prev > 0 {
+		// The ramp's last round seeds the filter, so one slow first round
+		// cannot drop a window the reader just showed it fills.
+		w.rates[0] = flowRate(w.prev, round)
+		w.rateAt = 1
+	}
+	if now.Sub(w.mark) < round {
+		return
+	}
+	w.rates[w.rateAt%flowModelRounds] = flowRate(w.returned-w.markBase, now.Sub(w.mark))
+	w.rateAt++
+	w.mark, w.markBase = now, w.returned
+	var bw int64
+	for _, r := range w.rates {
+		bw = flowMax(bw, r)
+	}
+	target := flowMin(float64(bw)*rtprop.Seconds()*flowModelGainPercent/100, float64(limit))
+	w.cap = int32(flowMin(flowMax(target, float64(init))*gain, float64(limit)))
+}
+
+// flowRate is bytes per second, in floats and held well inside int64: credit
+// a hostile client returns has no bound, and times a second it would wrap.
+func flowRate(bytes int64, d time.Duration) int64 {
+	return int64(flowMin(float64(bytes)/d.Seconds(), 1<<53))
+}
+
+// Once the reader's rate has grown by less than a quarter for flowFullRounds
+// round trips in a row, the path is full, as BBR judges it, and a download
+// window on a server is held by a PI controller on the queue the kernel sees.
+// The error is a fraction of the setpoint and a step a fraction of the bytes
+// the setpoint holds at the reader's rate, once per round trip, so the loop
+// gain is the controller's own and the same gains fit any bandwidth and RTT.
+const (
+	flowFullRounds = 3
+	flowPIKi       = 0.3
+	flowPIKp       = 0.2
+	flowPIMaxStep  = 0.5
+	flowPIMinSet   = 5 * time.Millisecond
+)
+
+// pi moves the cap once per round trip so that the queue settles at a quarter
+// of the empty path's round trip, or at four times the RTT variance where the
+// path jitters more: the floor is the lowest sample ever, deep in the jitter's
+// tail, while the smoothed RTT sits at its middle, and that gap is no queue.
+// In velocity form it adds Ki times the error and Kp times its change. With
+// the queue under a quarter of the setpoint the cap may also grow by a
+// quarter per round trip, so that it catches up with a path that got faster.
+// A reader that takes less than a quarter of what the window gives it per
+// round limits itself: the cap does not grow then, and shrinks by a quarter
+// after flowShrinkAfter such rounds.
+// Cuts are scaled by gain, see flowEffect, and pi returns the bytes it cut
+// against the queue.
+//
+// A step up is taken at share, the mean rate of the connection's downloads
+// that their caps hold, where there are several: steps down in proportion
+// to each one's rate and steps up in proportion to each one's own would keep
+// whatever split the downloads started with, and a download that starts
+// beside another would keep the share it found. The steps add up to what
+// they did, so the queue sees the same loop.
+func (w *flowWindow) pi(now time.Time, st tcpStats, init, limit int32, gain, share float64) (cut float64) {
+	round := now.Sub(w.mark)
+	if round < flowMax(st.minRTT, flowModelMinRound) {
+		return 0
+	}
+	copied := w.returned - w.markBase
+	w.mark, w.markBase = now, w.returned
+	w.rate = float64(copied) / round.Seconds()
+	set := flowMax(st.minRTT/4, 4*st.rttVar, flowPIMinSet)
+	e := flowMin(flowMax(float64(set-(st.rtt-st.minRTT))/float64(set), -2), 1)
+	step := flowPIKi*e + flowPIKp*(e-w.piPrev)
+	held := float64(copied) * float64(set) / float64(round)
+	if step > 0 && share > 0 {
+		held = share * set.Seconds()
+	}
+	delta := held * step
+	w.piPrev = e
+	cap := float64(w.cap)
+	if e > 0.75 {
+		delta = flowMax(delta, cap/4)
+	}
+	delta = flowMin(flowMax(delta, -flowPIMaxStep*cap), flowPIMaxStep*cap)
+	if delta < 0 {
+		delta *= gain
+		cut = -delta
+	}
+	if w.piRTT > 0 {
+		// Where cuts do not move the queue, the cap follows the round trip,
+		// so the reader keeps its rate as the queue grows and shrinks. Up
+		// only while the cap is what holds the reader: above what some other
+		// limit lets it take, a cap that grew would leave a later cut
+		// nothing to land on, and flowEffect nothing to judge it by.
+		follow := (1 - gain) * cap * float64(st.rtt-w.piRTT) / float64(w.piRTT)
+		follow = flowMin(flowMax(follow, -flowPIMaxStep*cap), flowPIMaxStep*cap)
+		if follow < 0 || 4*float64(copied)*float64(st.rtt) >= 3*cap*float64(round) {
+			delta += follow
+		}
+	}
+	w.piRTT = st.rtt
+	// The cap covers a round trip, the round the empty path's: beside a
+	// queue a reader that takes all it is given still copies only the
+	// round's share of the cap, and must not be taken for one that limits
+	// itself.
+	w.capped = 4*float64(copied) >= float64(w.cap)*float64(round)/float64(flowMax(st.rtt, round))
+	if !w.capped {
+		delta = flowMin(delta, 0)
+		if w.slow++; w.slow >= flowShrinkAfter {
+			delta = flowMin(delta, -cap/4)
+			w.slow = 0
+		}
+	} else {
+		w.slow = 0
+	}
+	w.cap = int32(flowMin(flowMax(int64(cap+delta), int64(init)), int64(limit)))
+	// What reached the cap: a cap at init, or a round trip followed up, takes
+	// less off than the step, and bytes that never left the cap are no cut.
+	return flowMin(cut, flowMax(cap-float64(w.cap), 0))
+}
+
+// flowLearned remembers the largest cap a stream on this connection needed
+// recently, so short-lived streams (packet-up POSTs) start where the last one
+// left off. It halves every flowLearnHalf, so a fast session on a pooled
+// connection does not hand its window to every session after it.
+type flowLearned struct {
+	cap int32
+	at  time.Time
+}
+
+func (l *flowLearned) value(now time.Time, init int32) int32 {
+	if l.cap <= init {
+		return init
+	}
+	halves := now.Sub(l.at) / flowLearnHalf
+	if halves >= 31 {
+		return init
+	}
+	return init + (l.cap-init)>>halves
+}
+
+func (l *flowLearned) note(now time.Time, init, cap int32) {
+	if cap > l.value(now, init) {
+		l.cap, l.at = cap, now
+	}
+}
+
+type flowStream struct {
+	up, down      flowWindow
+	upSent        int64
+	upForwarded   int64
+	downSent      int64
+	downForwarded int64
+	clientDone    bool
+	serverDone    bool
+}
+
+type flowConn struct {
+	net.Conn
+	up, down flowLimit
+	client   bool
+	mode     atomic.Int32
+	// tlsConn is the TLS connection under the governor, if any; alpnH2
+	// says its ALPN picked h2 before the client preface was seen.
+	tlsConn  *gotls.Conn
+	alpnH2   atomic.Bool
+	alpnDone atomic.Bool
+
+	// mu guards every field below that is not atomic, the write side's
+	// included; wmu only keeps the writes to Conn whole and in order, and
+	// whoever calls send holds it.
+	// rpending and prefix belong to the one reader.
+	mu      sync.Mutex
+	streams map[uint32]*flowStream
+	// fedAt is when the bytes being parsed came, see fedNow.
+	fedAt       time.Time
+	upLearned   flowLearned
+	downLearned flowLearned
+	clientInit  int32
+	clientShown int32
+	serverInit  int32
+	serverShown int32
+	rtt         time.Duration
+	rttPrev     time.Duration
+	rttSince    time.Time
+	rttLast     time.Duration
+	rttBase     time.Duration
+	rttSamples  int
+	// pingBase is the path's round trip once it has risen over rttBase, see
+	// rebasePing, and pingStep how far it rose.
+	pingBase, pingStep time.Duration
+	// pingData is the payload of the last PING sent, kept for the tests.
+	pingData   uint64
+	pings      []flowPing
+	pingSentAt time.Time
+	lastPing   time.Time
+
+	incremental bool
+	guard       *time.Timer
+	guardProbe  bool
+	// guardArmed says the guard is set to fire for a stream that waits.
+	guardArmed bool
+	// peerGoverned says, on a client, that the server governs its downloads,
+	// as its PING ahead of any reply shows: the client then credits them as
+	// its reader does, and governing them twice takes no rate. serverReplied
+	// notes the server's first HEADERS.
+	peerGoverned, serverReplied bool
+	// pingTagged says a server has sent its tagged first PING, see flowPingTag.
+	pingTagged bool
+	// resets are streams whose client sent past their window, to be reset.
+	resets []uint32
+	// group is what a client shares with its other connections to the server,
+	// see flowGroup; probeSince is when its downloads were last seen to sit
+	// at init under a raised round trip, and wide that a probe widens them.
+	group      *flowGroup
+	probeSince time.Time
+	wide       bool
+	// restock says the server has been seen to govern and has yet to be
+	// shown the stack's window, see appendRestock; settingsOwn notes, in
+	// order, which SETTINGS sent to the server were the governor's.
+	restock     bool
+	settingsOwn []bool
+
+	rp       frameParser
+	rpending []byte
+	prefix   int
+	opened   []uint32
+
+	// wmu is held across each write to Conn; what follows it is still mu's.
+	wmu          sync.Mutex
+	wp           frameParser
+	wqueue       []byte
+	wcredit      map[uint32]int64
+	wpending     atomic.Bool
+	settingsSent bool
+	pingReady    bool
+	closed       bool
+	broken       bool
+	// goneAway says the server sent GOAWAY, and goAwayLast is the last
+	// client stream it named: it takes up none past that.
+	goneAway   bool
+	goAwayLast uint32
+
+	// Connection-level window of the upload: DATA the client sent, credit
+	// the server returned on stream 0, and credit handed on to the client.
+	upConnSent      int64
+	upConnReturned  int64
+	upConnForwarded int64
+	// upConnGrant is the connection window the server grants on top of the
+	// protocol's 65535: its first stream-0 credit, the rest of which is data
+	// a handler read. The listener knows it; without one it is the credit
+	// seen before any DATA.
+	upConnGrant      int64
+	upConnGrantKnown bool
+
+	// sendWindow is what this connection's client may hold, 0 for no
+	// limit, see downRelease. The counters under it say what it holds now,
+	// see clientHolds: over the streams the server has not finished, how many
+	// there are, what the server was forwarded, what it sent and what the
+	// client returned; and for the connection, how its window stands against
+	// where it started, the most it has stood at, and whether the client has
+	// returned connection credit in small steps.
+	sendWindow        int64
+	downOpen          int64
+	downOpenForwarded int64
+	downOpenSent      int64
+	downOpenReturned  int64
+	downConnWindow    int64
+	downConnHigh      int64
+	downConnSmall     bool
+	// shownLimited says the server's stack was shown flowShownLimited for
+	// the client's initial window, see shownDown and downRelease.
+	shownLimited bool
+
+	tcp   syscall.RawConn
+	kstat tcpStats
+	kAt   time.Time
+	kOK   bool
+	// base is the round trip of the empty path once the path itself has
+	// moved, see kernelStats: zero while the kernel's min_rtt stands for it.
+	base time.Duration
+	// baseStep is what the path added to the kernel's floor when base was
+	// last taken.
+	baseStep time.Duration
+	baseWin  flowMinWindow
+	lowGain  time.Time
+	// lowQueue is the most the queue stood at since lowGain began.
+	lowQueue time.Duration
+	// pinned says the downloads that took data lately all have caps at
+	// init, see cutGain.
+	pinned bool
+
+	// noQueueCuts leaves the queue on the path to TCP: a server that sets
+	// it neither runs pi nor cuts against a long queue, and its downloads'
+	// windows follow their readers alone, held while a queue stands. Such
+	// a server never takes a download below its share of a link that other
+	// traffic keeps full, and holds its own queue no shorter than TCP does.
+	noQueueCuts bool
+
+	// downShare is the mean rate of the downloads their caps hold, as of
+	// the last flowEffect note, see pi; 0 with fewer than two.
+	downShare float64
+
+	effect flowEffect
+}
+
+// queueing tells how far the kernel RTT of this TCP connection has climbed
+// above its own floor: 1 means a queue is building and download windows
+// should not grow, 2 means they should shrink, because more data in flight
+// would only wait in that queue. It compares the socket only with itself, so
+// a TCP proxy in front leaves it quiet; the round trip the windows grow by
+// still comes from the PING, which crosses such a proxy.
+func (c *flowConn) queueing(now time.Time) int {
+	if !c.kernelStats(now) {
+		return 0
+	}
+	switch q := c.kstat.rtt - c.kstat.minRTT; {
+	case q > flowMax(2*c.kstat.minRTT, flowQueueShrink):
+		return 2
+	case q > flowMax(c.kstat.minRTT, flowQueueHold):
+		return 1
+	}
+	return 0
+}
+
+// cutGain is how much of a cut against the queue takes effect, see
+// flowEffect: the connection notes its round trip, the bytes its kernel has
+// in flight and the caps of the downloads that took data lately, once per
+// round trip of the empty path. A stream that carries no data, as an
+// upload's beside the download, would have its cap stand for a cut that
+// never moved. Lately, not since the last note: a download that slows
+// returns credit less often than once a round, and a round it missed would
+// take its cap out of the sum, a cut that never happened.
+func (c *flowConn) cutGain(now time.Time) float64 {
+	if !c.kOK || !c.effect.due(now, flowMax(c.kstat.minRTT, flowModelMinRound)) {
+		return c.effect.value()
+	}
+	var caps, n int64
+	var rates float64
+	var held int
+	for _, s := range c.streams {
+		if s.down.returned != s.down.noted {
+			s.down.noted, s.down.tookAt = s.down.returned, now
+		}
+		if !s.serverDone && now.Sub(s.down.tookAt) < flowMax(flowEffectRecent*c.kstat.minRTT, time.Second) {
+			caps += int64(s.down.cap)
+			n++
+			if s.down.capped && s.down.rate > 0 {
+				rates += s.down.rate
+				held++
+			}
+		}
+	}
+	// One download has no share but its own.
+	c.downShare = 0
+	if held > 1 {
+		c.downShare = rates / float64(held)
+	}
+	c.pinned = n > 0 && caps <= 2*n*int64(c.down.init)
+	set := flowMax(c.kstat.minRTT/4, 4*c.kstat.rttVar, flowPIMinSet)
+	return c.effect.note(now, c.kstat.rtt, c.kstat.minRTT, set, c.kstat.inFlight, caps)
+}
+
+// kernelStats refreshes the kernel's view of this TCP connection and reports
+// whether there is one.
+func (c *flowConn) kernelStats(now time.Time) bool {
+	if c.tcp == nil {
+		return false
+	}
+	if now.Sub(c.kAt) >= flowKernelEvery {
+		c.kAt = now
+		c.kstat, c.kOK = readTCPStats(c.tcp)
+		if c.kOK && c.kstat.minRTT > 0 {
+			c.rebase(now)
+		}
+	}
+	return c.kOK && c.kstat.minRTT > 0
+}
+
+// flowBaseWindow is how long the round trip must stand over the kernel's
+// min_rtt, with cuts that do not move it, before that is the path's own.
+const flowBaseWindow = 2500 * time.Millisecond
+
+// flowBaseJitter is how far a path's smoothed round trip wanders by itself
+// while the path stands still: a queue that moves by no more stands.
+const flowBaseJitter = 20 * time.Millisecond
+
+// rebase has the queue counted from the path's round trip where the path
+// itself has moved. The kernel keeps its min_rtt for minutes, so a route or
+// cell that adds to the round trip reads as a standing queue: cuts do not
+// shorten it, the gain comes down, and with an error that never turns the
+// caps never grow back. Once cuts have done nothing for flowBaseWindow, with
+// the downloads' caps at init all that time, and the round trip has not come
+// under the kernel's floor plus twice the setpoint since, its least value
+// over that time is the path's. A queue of the server's own is its downloads'
+// data: their caps are well above init, and the gain of connections that
+// share it reads low now and then, which alone took a queue of the server's
+// own for the path's. The base only falls after that, with the round trip,
+// so a queue of the server's own on top of it never raises it; it is dropped
+// once the round trip has come back by half of what the path added. Half of
+// that, not the setpoint: the setpoint grows with the round trip's variance,
+// and a step of a few setpoints would lose its base to a jittery round.
+func (c *flowConn) rebase(now time.Time) {
+	floor := c.kstat.minRTT
+	least := c.baseWin.note(now, c.kstat.rtt)
+	set := flowMax(floor/4, 4*c.kstat.rttVar, flowPIMinSet)
+	if c.base != 0 {
+		c.base = flowMin(c.base, least)
+		if c.base-floor <= c.baseStep/2 {
+			c.base = 0
+		}
+	}
+	// A gain of none, a cut that landed in flight and moved the queue not at
+	// all, turns the cuts off: the caps stay where the cuts before it left
+	// them, and on a path whose window was over twice init before it moved
+	// they never come down to init. A gain of none counts as well where the
+	// queue stood through the window, its least no more than a tenth of its
+	// most or flowBaseJitter under it: a path that moved holds it whatever
+	// the connections do, while one that other traffic keeps fills and
+	// drains by more, and taken for the path would have its gain learnt
+	// again and cut anew.
+	if c.effect.active && (c.effect.gain < 0.5 && c.pinned || c.effect.gain == 0) {
+		if c.lowGain.IsZero() {
+			c.lowGain, c.lowQueue = now, 0
+		}
+		c.lowQueue = flowMax(c.lowQueue, c.kstat.rtt-floor)
+	} else {
+		c.lowGain = time.Time{}
+	}
+	if c.base == 0 && !c.lowGain.IsZero() && now.Sub(c.lowGain) >= flowBaseWindow && c.baseWin.full(now) &&
+		least > floor+2*set {
+		if c.pinned || c.lowQueue-(least-floor) <= flowMax(c.lowQueue/10, flowBaseJitter) {
+			c.base, c.baseStep = least, least-floor
+			c.lowGain = time.Time{}
+		} else {
+			// The queue moved: the server's own, or its own on top of a path
+			// that moved and has drained since. The next window looks again.
+			c.lowGain, c.lowQueue = now, c.kstat.rtt-floor
+		}
+	}
+	if c.client && c.group != nil {
+		c.probeClient(now, floor, least, set)
+	}
+	c.kstat.minRTT = flowMax(floor, c.base)
+}
+
+// probeClient is rebase for a client, which has no gain of its cuts to go by
+// and whose connections share the path, see flowGroup: once its downloads
+// have sat at init for flowProbeAfter under a round trip over the kernel's
+// floor it asks its group to probe, and takes the base only if the path
+// answered.
+func (c *flowConn) probeClient(now time.Time, floor, least, set time.Duration) {
+	var caps, n int64
+	for _, s := range c.streams {
+		if !s.serverDone && s.downSent > 0 {
+			caps += int64(s.down.cap)
+			n++
+		}
+	}
+	if n > 0 && caps <= 2*n*int64(c.down.init) && c.kstat.rtt-floor > 2*set && c.base == 0 {
+		if c.probeSince.IsZero() {
+			c.probeSince = now
+		}
+		if now.Sub(c.probeSince) >= flowProbeAfter {
+			c.group.request(now, c.kstat.rtt)
+		}
+	} else {
+		c.probeSince = time.Time{}
+	}
+	var moved time.Time
+	c.wide, moved = c.group.step(now)
+	if c.base == 0 && !moved.IsZero() && now.Sub(moved) < flowBaseWindow && least > floor+2*set {
+		c.base, c.baseStep = least, least-floor
+		c.probeSince = time.Time{}
+	}
+}
+
+// flowMinWindow is the least of a value over the last one to two
+// flowBaseWindow halves.
+type flowMinWindow struct {
+	start, at time.Time
+	cur, prev time.Duration
+}
+
+func (w *flowMinWindow) note(now time.Time, v time.Duration) time.Duration {
+	if w.start.IsZero() {
+		w.start, w.at, w.cur, w.prev = now, now, v, v
+	}
+	if now.Sub(w.at) >= flowBaseWindow/2 {
+		w.at, w.prev, w.cur = now, w.cur, v
+	}
+	w.cur = flowMin(w.cur, v)
+	return flowMin(w.cur, w.prev)
+}
+
+// full reports whether the window has covered flowBaseWindow.
+func (w *flowMinWindow) full(now time.Time) bool {
+	return !w.start.IsZero() && now.Sub(w.start) >= flowBaseWindow
+}
+
+// pingFloor is the round trip of the empty path for pingQueueing. The first
+// PING's ACK can already wait behind data the peer pushed while its TCP was
+// still in slow start, so the kernel's min_rtt, taken at the TCP handshake,
+// is preferred. A TCP proxy in front shows the kernel only the hop to the
+// proxy: a min_rtt that far below the PING's means exactly that, and the PING
+// is kept.
+func (c *flowConn) pingFloor(now time.Time) time.Duration {
+	floor := flowMax(c.rttBase, c.pingBase)
+	if c.floorConfirmed(now) && c.kstat.minRTT < floor {
+		floor = c.kstat.minRTT
+	}
+	return floor
+}
+
+// modelled reports whether windows follow the path model: the kernel vouches
+// for the round trip, as checked against the first PING.
+func (c *flowConn) modelled(now time.Time) bool {
+	return c.rttBase != 0 && c.floorConfirmed(now)
+}
+
+// floorConfirmed reports whether the kernel vouches for the round trip of the
+// empty path: it has a min_rtt for this socket that is not far below what the
+// PINGs show, so no TCP proxy sits in front.
+func (c *flowConn) floorConfirmed(now time.Time) bool {
+	return c.kernelStats(now) && c.floorVouched()
+}
+
+// fedNow is the time the bytes being parsed came: read once per Read or
+// Write, the first time a frame needs it.
+func (c *flowConn) fedNow() time.Time {
+	if c.fedAt.IsZero() {
+		c.fedAt = time.Now()
+	}
+	return c.fedAt
+}
+
+// floorVouched is floorConfirmed on the kernel's stats as last read.
+func (c *flowConn) floorVouched() bool {
+	return c.kOK && c.kstat.minRTT > 0 && (c.rttBase == 0 || 4*c.kstat.minRTT >= c.rttBase)
+}
+
+// Without a confirmed floor the PING-seen queue cannot be told from the round
+// trip, so windows that the queue hold guards stay where Go keeps them.
+const (
+	flowUnconfirmedUp   = 1 << 20
+	flowUnconfirmedDown = 4 << 20
+)
+
+// pingQueueing is queueing for what the kernel cannot see: the backlog of a
+// client's upload, or of a download towards a client this side dialed from.
+// A PING's ACK waits behind whatever is queued between the peers, so the last
+// round trip, or the wait for an ACK still due, above the lowest one this
+// connection has seen is that backlog. The floor
+// is kept for the connection's life: a long transfer keeps the queue full, and
+// a floor that forgot the empty path would rise with it. A PING samples it only
+// once a second, so it reacts at half the queue the kernel signal tolerates.
+func (c *flowConn) pingQueueing(now time.Time) int {
+	if c.rttBase == 0 {
+		return 0
+	}
+	last := c.rttLast
+	if !c.pingSentAt.IsZero() {
+		last = flowMax(last, now.Sub(c.pingSentAt))
+	}
+	floor := c.pingFloor(now)
+	switch q := last - floor; {
+	case q > flowMax(floor, flowQueueShrink):
+		return 2
+	case q > flowMax(floor/2, flowQueueHold):
+		return 1
+	}
+	return 0
+}
+
+// queueShrink trims a window that keeps a PING-seen queue standing: by a
+// quarter once per PING sample, since a sample stays stale for a second, and
+// never below what the reader takes over a round trip of the empty path, so
+// the path stays full while the queue drains.
+func (c *flowConn) queueShrink(w *flowWindow, now time.Time, init int32) {
+	if w.qSample == c.rttSamples {
+		return
+	}
+	w.qSample = c.rttSamples
+	keep := w.prev * int64(c.pingFloor(now)) / int64(c.currentRTT())
+	w.cap = int32(flowMax(int64(init), int64(w.cap)/4*3, keep))
+}
+
+// NetConn returns the accepted connection, so that code which looks through
+// connection wrappers, for the client's physical address or a PROXY header,
+// still finds it behind the governor.
+func (c *flowConn) NetConn() net.Conn {
+	return c.Conn
+}
+
+func newFlowConn(c net.Conn, up, down flowLimit) *flowConn {
+	fc := &flowConn{
+		Conn:        c,
+		up:          up,
+		down:        down,
+		streams:     make(map[uint32]*flowStream),
+		wcredit:     make(map[uint32]int64),
+		clientInit:  h2InitWindow,
+		clientShown: h2InitWindow,
+		serverInit:  h2InitWindow,
+		serverShown: h2InitWindow,
+	}
+	fc.tcp = rawTCP(c)
+	return fc
+}
+
+// newFlowClientConn governs the downlink of a connection this side dialed.
+func newFlowClientConn(c net.Conn) *flowConn {
+	fc := newFlowConn(c, flowLimit{}, flowDefault)
+	fc.client = true
+	// Only a connection the kernel reports on takes part in a probe.
+	if fc.tcp != nil {
+		if addr := c.RemoteAddr(); addr != nil {
+			fc.group = joinFlowGroup(addr.String())
+		}
+	}
+	return fc
+}
+
+// flowBufs holds the scratch buffers of Read and Write. It holds pointers: a
+// slice put in a sync.Pool as it is costs an allocation each time.
+var flowBufs = sync.Pool{New: func() any { return new([]byte) }}
+
+// flowBufKeep is the largest scratch buffer kept for reuse.
+const flowBufKeep = 256 << 10
+
+// getFlowBuf returns a scratch buffer of n bytes.
+func getFlowBuf(n int) *[]byte {
+	p := flowBufs.Get().(*[]byte)
+	if cap(*p) < n {
+		*p = make([]byte, n)
+	}
+	*p = (*p)[:n]
+	return p
+}
+
+// putFlowBuf gives p back, holding b instead where what was appended to p
+// outgrew it.
+func putFlowBuf(p *[]byte, b []byte) {
+	if cap(b) > cap(*p) {
+		*p = b
+	}
+	if cap(*p) <= flowBufKeep {
+		flowBufs.Put(p)
+	}
+}
+
+func (c *flowConn) Read(b []byte) (int, error) {
+	if len(c.rpending) > 0 {
+		n := copy(b, c.rpending)
+		c.rpending = c.rpending[n:]
+		if len(c.rpending) == 0 {
+			c.rpending = nil
+		}
+		return n, nil
+	}
+	for {
+		if c.mode.Load() == flowPlain {
+			return c.Conn.Read(b)
+		}
+		n, err := c.Conn.Read(b)
+		if c.tlsConn != nil {
+			c.followALPN()
+			if c.mode.Load() == flowPlain {
+				return n, err
+			}
+		}
+		if ne, ok := err.(net.Error); err != nil && !(ok && ne.Timeout()) {
+			c.release()
+		}
+		if n == 0 {
+			return 0, err
+		}
+		buf := getFlowBuf(n)
+		in := *buf
+		copy(in, b[:n])
+		// What does not fit in b goes to rpending, never past len(b).
+		var out []byte
+		if c.client {
+			out = c.fromServer(in[:n], b[:0:len(b)])
+		} else {
+			out = c.readFrames(in[:n], b[:0:len(b)])
+		}
+		putFlowBuf(buf, in)
+		if c.isBroken() {
+			c.Close()
+			return 0, errFlowGivenUp
+		}
+		m := copy(b, out)
+		if m < len(out) {
+			c.rpending = append([]byte(nil), out[m:]...)
+		}
+		if m > 0 || err != nil {
+			return m, err
+		}
+	}
+}
+
+func (c *flowConn) Close() error {
+	c.release()
+	return c.Conn.Close()
+}
+
+// release drops all per-stream state once the connection is gone, so a
+// connection object that lingers in some pool does not pin it.
+func (c *flowConn) release() {
+	c.mu.Lock()
+	c.releaseLocked()
+	c.mu.Unlock()
+}
+
+func (c *flowConn) releaseLocked() {
+	if c.group != nil {
+		c.group.leave()
+		c.group = nil
+	}
+	c.streams = map[uint32]*flowStream{}
+	c.downOpen, c.downOpenForwarded, c.downOpenSent, c.downOpenReturned = 0, 0, 0, 0
+	c.opened = nil
+	c.wqueue = nil
+	flowClear(c.wcredit)
+	c.closed = true
+	if c.guard != nil {
+		c.guard.Stop()
+	}
+	c.guardArmed = false
+}
+
+// giveUp marks the connection for closing at the next read or write and
+// drops its state at once: the peer lowered its window below the credit
+// already handed on, sent past the window it was shown, or opened more
+// streams than the governor tracks.
+func (c *flowConn) giveUp() {
+	c.broken = true
+	c.releaseLocked()
+}
+
+func (c *flowConn) readFrames(in, out []byte) []byte {
+	if c.mode.Load() == flowUndecided {
+		for len(in) > 0 && c.prefix < len(h2Preface) {
+			if in[0] != h2Preface[c.prefix] {
+				c.mode.Store(flowPlain)
+				return append(out, in...)
+			}
+			out = append(out, in[0])
+			in = in[1:]
+			c.prefix++
+		}
+		if c.prefix < len(h2Preface) {
+			return out
+		}
+		c.mode.Store(flowH2)
+	}
+	c.mu.Lock()
+	// A server pings only once the client preface is in: until then stock
+	// sends nothing but its SETTINGS.
+	c.pingReady = c.pingReady || (!c.client && c.settingsSent)
+	c.fedAt = time.Time{}
+	out = c.rp.feed(in, out, (*flowReader)(c))
+	credit := len(c.wcredit) > 0
+	c.mu.Unlock()
+	if credit {
+		c.wakeQueue()
+	}
+	return out
+}
+
+func (c *flowConn) Write(b []byte) (int, error) {
+	if c.client {
+		return c.writeToServer(b)
+	}
+	if c.mode.Load() != flowH2 && !c.alpnH2.Load() {
+		return c.Conn.Write(b)
+	}
+	c.wmu.Lock()
+	buf := getFlowBuf(len(b) + 64)
+	out := c.fromServer(b, (*buf)[:0])
+	if c.isBroken() {
+		putFlowBuf(buf, out)
+		c.wmu.Unlock()
+		c.Close()
+		return 0, errFlowGivenUp
+	}
+	err := c.send(out)
+	putFlowBuf(buf, out)
+	c.wmu.Unlock()
+	c.drainQueue()
+	if err != nil {
+		return 0, err
+	}
+	return len(b), nil
+}
+
+// fromServer processes frames on their way from the server to the client.
+func (c *flowConn) fromServer(in, out []byte) []byte {
+	c.mu.Lock()
+	c.fedAt = time.Time{}
+	out = c.wp.feed(in, out, (*flowWriter)(c))
+	c.mu.Unlock()
+	return out
+}
+
+func (c *flowConn) writeToServer(b []byte) (int, error) {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	if c.mode.Load() == flowPlain {
+		return c.Conn.Write(b)
+	}
+	buf := getFlowBuf(len(b) + 64)
+	out := c.readFrames(b, (*buf)[:0])
+	if c.isBroken() {
+		putFlowBuf(buf, out)
+		c.Close()
+		return 0, errFlowGivenUp
+	}
+	err := c.send(out)
+	putFlowBuf(buf, out)
+	if err != nil {
+		return 0, err
+	}
+	return len(b), nil
+}
+
+// injectToClient queues frames for the client without ever waiting for a
+// write in progress: whoever holds wmu drains the queue after letting go.
+// Only the guard's PING comes this way, and only one is ever queued.
+// Like creditClient it is a server's alone: a client arms no guard and
+// governs no upload, so writeToServer has no queue to drain after it.
+func (c *flowConn) injectToClient(frames []byte) {
+	c.mu.Lock()
+	if c.closed || len(c.wqueue) > 0 {
+		c.mu.Unlock()
+		return
+	}
+	c.wqueue = append(c.wqueue, frames...)
+	c.mu.Unlock()
+	c.wakeQueue()
+}
+
+// creditClient queues upload credit for the client. Credit for one stream
+// adds up in one entry, and the entry goes with the stream, so the queue
+// never holds more than the streams the governor tracks.
+func (c *flowConn) creditClient(id uint32, n int64) {
+	c.wcredit[id] += n
+}
+
+// queuedLocked appends everything queued for the client.
+func (c *flowConn) queuedLocked(out []byte) []byte {
+	out = append(out, c.wqueue...)
+	c.wqueue = nil
+	for id, n := range c.wcredit {
+		out = appendWindowUpdate(out, id, n)
+	}
+	flowClear(c.wcredit)
+	return out
+}
+
+func (c *flowConn) wakeQueue() {
+	c.wpending.Store(true)
+	if c.wmu.TryLock() {
+		go func() {
+			c.flushQueueLocked()
+			c.wmu.Unlock()
+			c.drainQueue()
+		}()
+	}
+}
+
+func (c *flowConn) drainQueue() {
+	for c.wpending.Load() && c.wmu.TryLock() {
+		c.flushQueueLocked()
+		c.wmu.Unlock()
+	}
+}
+
+func (c *flowConn) flushQueueLocked() {
+	c.wpending.Store(false)
+	c.mu.Lock()
+	var q []byte
+	if c.settingsSent && c.wp.atBoundary() {
+		q = c.queuedLocked(nil)
+	}
+	c.mu.Unlock()
+	if len(q) > 0 {
+		c.send(q)
+	}
+}
+
+// send writes rewritten frames with wmu held. Once any part of them is lost,
+// the peer's next frame would start inside a torn one, so a failed write ends
+// the connection rather than letting later frames follow.
+func (c *flowConn) send(b []byte) error {
+	if _, err := c.Conn.Write(b); err != nil {
+		c.Close()
+		return err
+	}
+	return nil
+}
+
+func (c *flowConn) stream(id uint32) *flowStream {
+	if id == 0 {
+		return nil
+	}
+	return c.streams[id]
+}
+
+func (c *flowConn) finish(id uint32, s *flowStream) {
+	if s.clientDone && s.serverDone {
+		c.drop(id)
+	}
+}
+
+func (c *flowConn) drop(id uint32) {
+	if s := c.streams[id]; s != nil {
+		c.endDown(s)
+	}
+	delete(c.streams, id)
+	delete(c.wcredit, id)
+}
+
+// endDown takes s out of what the server may still send: it has finished the
+// stream, or the stream is gone.
+func (c *flowConn) endDown(s *flowStream) {
+	if s.serverDone {
+		return
+	}
+	s.serverDone = true
+	c.downOpen--
+	c.downOpenForwarded -= s.downForwarded
+	c.downOpenSent -= s.downSent
+	c.downOpenReturned -= s.down.returned
+}
+
+// forwardDown hands the server rel of credit on s.
+func (c *flowConn) forwardDown(s *flowStream, rel int64) {
+	s.downForwarded += rel
+	if !s.serverDone {
+		c.downOpenForwarded += rel
+	}
+}
+
+// clientHolds is what the connection's client holds of the server's data, as
+// the server may still send it. It is counted two ways and the larger taken.
+//
+// By stream: over the streams the server has not finished, the data the
+// client has not returned stream credit for and the window left.
+//
+// By connection: the data the client has not returned connection credit for,
+// and the same window left. That also counts a download the server has ended
+// and the client has not read, which its stream no longer tells: a Go client
+// returns the last of a body through the connection only. A client raises its
+// connection window once at the start, so what it has not returned is how far
+// the window stands under the most it has stood at. A client that returns
+// connection credit only once half of a large window is read would look as
+// if it held that half for good, so this count is used only once the client
+// has returned connection credit in small steps.
+func (c *flowConn) clientHolds() int64 {
+	window := c.downOpen*int64(c.clientShown) + c.downOpenForwarded
+	holds := window - c.downOpenReturned
+	if c.downConnSmall {
+		holds = flowMax(holds, c.downConnHigh-c.downConnWindow+window-c.downOpenSent)
+	}
+	return holds
+}
+
+// noteConnCredit follows a connection WINDOW_UPDATE from the client. One that
+// takes the window above where it has been raises the window; any other
+// returns what was read. The two cannot be told apart in a credit that does
+// both, so a client that raises its window while it holds unread data has
+// that data dropped from the count: the count errs towards sending, not
+// towards stopping a client for data it does not hold.
+func (c *flowConn) noteConnCredit(inc int64) {
+	c.downConnWindow += inc
+	if c.downConnWindow > c.downConnHigh {
+		c.downConnHigh = c.downConnWindow
+	} else if inc < flowSmallCredit {
+		c.downConnSmall = true
+	}
+}
+
+// upConnRelease is how much connection credit the client may be given: no
+// more than the server granted, and no more than keeps the data sent and not
+// yet read under what the streams whose readers return credit may hold, plus
+// flowConnFloor for the rest. Streams nobody reads thus share Go's 1 MiB, as
+// they would without the governor, whatever the server's own window, and
+// slow readers holding their caps leave that room to new streams. A stream
+// that holds more than its cap, because the cap shrank while its reader
+// stalled, is allowed what it holds, so the excess does not come out of the
+// room the others share. Shrinking a cap only stops further stream credit:
+// what was granted before cannot be taken back and may still be spent, and
+// the allowance follows it up to the window the server really grants.
+func (c *flowConn) upConnRelease() int64 {
+	var reading int64
+	for _, s := range c.streams {
+		// A finished upload needs no room, even while its response waits.
+		if !s.clientDone && s.up.returned > 0 {
+			reading += flowMax(int64(s.up.cap), s.upSent-s.up.returned)
+		}
+	}
+	// What the server has not read, from the connection's own counters: it
+	// returns connection credit for every byte a handler reads, also on a
+	// request the client has finished, where no stream credit comes back,
+	// so a body read and held while its response waits is not counted.
+	unread := flowMax(c.upConnSent-(c.upConnReturned-c.upConnGrant), 0)
+	bank := c.upConnReturned - c.upConnForwarded
+	window := h2InitWindow + c.upConnForwarded - c.upConnSent
+	return flowMin(bank, flowConnFloor+reading-unread-window, h2MaxWindow)
+}
+
+func (c *flowConn) appendUpConnRelease(out []byte) []byte {
+	if rel := c.upConnRelease(); rel > 0 {
+		c.upConnForwarded += rel
+		out = appendWindowUpdate(out, 0, rel)
+	}
+	return out
+}
+
+// currentRTT is the kernel's min_rtt where it vouches for the path, otherwise
+// the lowest PING over the last one to two windows: PING queues behind data,
+// so anything above the minimum is our own backlog and must not feed back into
+// the caps.
+func (c *flowConn) currentRTT() time.Duration {
+	if c.rttBase != 0 && c.floorVouched() {
+		return c.kstat.minRTT
+	}
+	switch {
+	case c.rtt == 0:
+		return flowDefaultRTT
+	case c.rttPrev == 0:
+		return c.rtt
+	}
+	return flowMin(c.rtt, c.rttPrev)
+}
+
+func (c *flowConn) sampleRTT(now time.Time, sample time.Duration) {
+	sample = flowMax(sample, flowMinRTT)
+	c.rttLast = sample
+	c.rttSamples++
+	if c.rttBase == 0 || sample < c.rttBase {
+		c.rttBase = sample
+	}
+	if now.Sub(c.rttSince) >= flowRTTWindow {
+		c.rttPrev, c.rtt, c.rttSince = c.rtt, 0, now
+	}
+	if c.rtt == 0 || sample < c.rtt {
+		c.rtt = sample
+	}
+	c.rebasePing()
+}
+
+// rebasePing moves the floor PINGs are measured against where the path's own
+// round trip has risen: rttBase keeps the least PING for the life of the
+// connection, so a route or network that adds to the round trip reads as a
+// standing queue, and queueShrink holds the windows at init. Where even the
+// least PING over the last one to two flowRTTWindow stands that far above,
+// the queue is not one cuts can drain, as an own queue drains within seconds
+// of a quarter cut a second, and that least PING is the path's. The base only
+// falls after that, with the PINGs, and is dropped once they have come back
+// by half of what the path added.
+func (c *flowConn) rebasePing() {
+	if c.rttPrev == 0 {
+		return
+	}
+	least := flowMin(c.rtt, c.rttPrev)
+	if c.pingBase != 0 {
+		c.pingBase = flowMin(c.pingBase, least)
+		if c.pingBase-c.rttBase <= c.pingStep/2 {
+			c.pingBase, c.pingStep = 0, 0
+		}
+	}
+	if floor := flowMax(c.rttBase, c.pingBase); least-floor > flowMax(floor, flowQueueShrink) {
+		c.pingBase, c.pingStep = least, least-c.rttBase
+	}
+}
+
+// appendPing adds a PING for the remote peer once a second while streams are
+// open, so the connection knows its round trip. The first goes out as soon as
+// both prefaces are through, before data can queue in front of its ACK, so the
+// connection learns the round trip of the empty path. Once the kernel vouches
+// for that round trip, no more are needed.
+func (c *flowConn) appendPing(now time.Time, out []byte) []byte {
+	if !c.pingReady || (len(c.streams) == 0 && c.rttBase != 0) || c.modelled(now) || now.Sub(c.lastPing) < flowPingInterval ||
+		(!c.pingSentAt.IsZero() && now.Sub(c.pingSentAt) < flowPingTimeout) {
+		return out
+	}
+	c.pingSentAt, c.lastPing = now, now
+	return c.appendPingFrame(out)
+}
+
+// flowPing is a PING of ours that has not been answered yet.
+type flowPing struct {
+	data uint64
+	at   time.Time
+}
+
+// appendPingFrame adds a PING carrying fresh random data, as Go's own HTTP/2
+// health checks do, and remembers it to recognize the ACK. The last
+// flowPingSlots are remembered, so a guard probe sent while a periodic PING
+// is due back does not make that one's ACK look foreign.
+// flowPingTag marks the first PING a governed server sends, with its first
+// SETTINGS: a governed client takes it, and no other early PING, for a
+// server that governs its downloads, see peerGoverned. The PING's payload is
+// inside TLS, but on plain TLS any client that connects sees it before its
+// first request; under REALITY a client that cannot authenticate never
+// reaches the governor.
+const flowPingTag = 0x6b7a3f91
+
+func (c *flowConn) appendPingFrame(out []byte) []byte {
+	c.pingData = rand.Uint64()
+	if !c.client && !c.pingTagged {
+		c.pingTagged = true
+		c.pingData = flowPingTag<<32 | c.pingData&0xffffffff
+	}
+	c.pings = append(c.pings, flowPing{c.pingData, time.Now()})
+	if len(c.pings) > flowPingSlots {
+		c.pings = c.pings[len(c.pings)-flowPingSlots:]
+	}
+	out = append(out, 0, 0, 8, h2Ping, 0, 0, 0, 0, 0)
+	return binary.BigEndian.AppendUint64(out, c.pingData)
+}
+
+// pingAck reports whether a PING ACK answers one of ours, taking its round
+// trip.
+func (c *flowConn) pingAck(f h2Frame, payload []byte) bool {
+	if f.flags&h2FlagAck == 0 {
+		return false
+	}
+	data := binary.BigEndian.Uint64(payload)
+	for i, p := range c.pings {
+		if p.data != data {
+			continue
+		}
+		c.pings = append(c.pings[:i], c.pings[i+1:]...)
+		now := time.Now()
+		c.sampleRTT(now, now.Sub(p.at))
+		if !c.pingSentAt.After(p.at) {
+			c.pingSentAt = time.Time{}
+		}
+		return true
+	}
+	return false
+}
+
+// flowGuardMin is the least time a downlink stream sits with the server out
+// of window and no credit from the client before the guard steps in.
+var flowGuardMin = 200 * time.Millisecond
+
+func (c *flowConn) guardDelay() time.Duration {
+	return flowMax(4*c.currentRTT(), flowGuardMin)
+}
+
+// armGuard notes that s ran the server out of window while the client still
+// owes it credit. Go clients hand credit back every few KiB they read; some
+// HTTP/2 stacks only do so once half of their own, much larger, window is
+// consumed and would never do it under a small cap. Until the client has
+// shown it credits in small steps, a stream stuck like this gets probed.
+func (c *flowConn) armGuard(s *flowStream) {
+	if c.client || c.incremental || !s.down.waiting.IsZero() {
+		return
+	}
+	if int64(c.clientShown)+s.downForwarded-s.downSent > 0 {
+		return
+	}
+	if int64(c.clientInit)+s.down.returned-int64(c.clientShown)-s.downForwarded <= 0 {
+		return
+	}
+	s.down.waiting = time.Now()
+	// A guard already armed for a stream that waits longer stays as it is:
+	// moved for each stream that gets stuck after it, it would never fire
+	// while they keep coming.
+	switch {
+	case c.guard == nil:
+		c.guard = time.AfterFunc(c.guardDelay(), c.fireGuard)
+	case !c.guardArmed:
+		c.guard.Reset(c.guardDelay())
+	}
+	c.guardArmed = true
+}
+
+// fireGuard asks the client for a PING: its ACK arrives on the read side,
+// where stuck streams can then be given more room in order with other frames.
+func (c *flowConn) fireGuard() {
+	c.mu.Lock()
+	c.guardArmed = false
+	// A probe still queued behind a write in progress answers for this one
+	// too: another would be dropped, see injectToClient, and noted as sent.
+	if c.closed || c.incremental || !c.anyWaiting() || len(c.wqueue) > 0 {
+		c.mu.Unlock()
+		return
+	}
+	c.guardProbe = true
+	c.pingSentAt = time.Now()
+	ping := c.appendPingFrame(nil)
+	c.mu.Unlock()
+	c.injectToClient(ping)
+}
+
+// anyWaiting reports whether a stream still waits for credit: one that got
+// it since the guard was armed needs no probe.
+func (c *flowConn) anyWaiting() bool {
+	for _, s := range c.streams {
+		if !s.down.waiting.IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
+// unstick grows the cap of every stream that has waited out the guard delay
+// to at least half the client's own window, then doubles it on each further
+// probe, and hands the server what that allows.
+func (c *flowConn) unstick(now time.Time, out []byte) []byte {
+	c.guardProbe = false
+	delay := c.guardDelay()
+	again := false
+	for id, s := range c.streams {
+		if s.down.waiting.IsZero() {
+			continue
+		}
+		if now.Sub(s.down.waiting) < delay {
+			again = true
+			continue
+		}
+		// A client that waits for half of its window never gets it on a
+		// connection at its limit, where the streams share less than that
+		// each. This one has returned nothing in small steps, so it may be
+		// such a client: the limit cannot hold for it.
+		if !c.incremental {
+			c.sendWindow = 0
+		}
+		s.down.cap = int32(flowMin(int64(c.down.max), flowMax(2*int64(s.down.cap), int64(c.clientInit)/2+flowSmallCredit)))
+		s.down.waiting = time.Time{}
+		if rel := c.downRelease(s); rel > 0 {
+			c.forwardDown(s, rel)
+			out = appendWindowUpdate(out, id, rel)
+		}
+	}
+	if again && c.guard != nil {
+		c.guard.Reset(delay)
+		c.guardArmed = true
+	}
+	return out
+}
+
+// upRelease is how much credit the client may be given on s: no more than the
+// server granted, and no more than keeps the handler's unread data under cap.
+func (c *flowConn) upRelease(s *flowStream) int64 {
+	bank := int64(c.serverInit) + s.up.returned - int64(flowMax(h2InitWindow, c.serverShown)) - s.upForwarded
+	unread := s.upSent - s.up.returned
+	window := int64(c.serverShown) + s.upForwarded - s.upSent
+	return flowMin(bank, int64(s.up.cap)-unread-window, h2MaxWindow)
+}
+
+// downRelease is how much credit the server may be given on s: no more than
+// the client granted, and no more than keeps the client's unread data under cap.
+//
+// On a server the streams of one connection also share sendWindow. A cap
+// follows its own reader, but many streams starting at once on a fast link
+// each look fast for a moment, and the client has to hold their sum: twenty
+// of them took a client past 40 MiB within a second. What the client holds
+// is clientHolds. The limit does not follow the window the client announces:
+// a client with a governor of its own announces the protocol default whatever
+// its window, so that says nothing, and a value under the 4 MiB a Go client
+// announces has to be able to hold. A stream may always hold a frame, or what
+// the server's stack is shown for it where that is more (clientShown, see
+// shownDown), so none waits for the others; streams opened once the limit is
+// used up add that much each.
+func (c *flowConn) downRelease(s *flowStream) int64 {
+	bank := int64(c.clientInit) + s.down.returned - int64(c.clientShown) - s.downForwarded
+	held := int64(c.clientShown) + s.downForwarded - s.down.returned
+	rel := flowMin(bank, int64(s.down.cap)-held, h2MaxWindow)
+	if c.shownLimited {
+		// A stack shown less has to be forwarded more for the same window,
+		// and credit it has not used is what a client's lowering of its
+		// initial window cannot take back: changeInitialWindow can only
+		// lower what the stack was shown. So the stack is forwarded no more
+		// ahead of the data it has sent than it had unused with
+		// flowShownFull shown: a stream opens with what it was shown less
+		// missing from its window, which comes once data moves, and a
+		// lowering that could be passed on before any data still can. A
+		// stream at the lowest cap is forwarded what it was shown less all
+		// the same, or its window would stay at one frame.
+		ahead := flowMax(int64(s.down.cap)-flowShownFull, flowShownFull-flowShownLimited)
+		rel = flowMin(rel, s.downSent+ahead-s.downForwarded)
+	}
+	if c.client && (c.restock || !c.peerGoverned && !c.serverReplied) {
+		// Until the server's first reply shows whether it governs, and until
+		// restock has shown a server that does the stack's window, a client
+		// forwards credit only as its stack returns it. The server adds the
+		// raise restock shows to every open stream, and credit forwarded
+		// ahead of the stack before it would stand above the stack's window:
+		// a reader that paused would be sent past it, and the stack would
+		// close the connection.
+		rel = flowMin(rel, s.down.returned-s.downForwarded)
+	}
+	if rel <= 0 || c.client || c.sendWindow == 0 {
+		return rel
+	}
+	// Whatever the client holds, a stream may hold a frame: what the stack
+	// was shown for it, or forwarded up to that where a client's lowering of
+	// its window left the stack shown less. With less, a stream at a full
+	// limit sent less than a Go client returns credit for, or nothing, and
+	// nothing looked at it again when the limit freed.
+	floor := flowMax(int64(c.clientShown), flowShownLimited) - held
+	return flowMin(rel, flowMax(c.sendWindow-c.clientHolds(), floor))
+}
+
+func appendWindowUpdate(out []byte, stream uint32, n int64) []byte {
+	out = append(out, 0, 0, 4, h2WindowUpdate, 0)
+	out = binary.BigEndian.AppendUint32(out, stream)
+	return binary.BigEndian.AppendUint32(out, uint32(n))
+}
+
+func rewriteInitialWindow(payload []byte, limit int32) (real, shown int32, found bool) {
+	for i := 0; i+6 <= len(payload); i += 6 {
+		if binary.BigEndian.Uint16(payload[i:]) != h2SettingInitialWindowSize {
+			continue
+		}
+		real = int32(flowMin(binary.BigEndian.Uint32(payload[i+2:]), h2MaxWindow))
+		shown = flowMin(real, limit)
+		binary.BigEndian.PutUint32(payload[i+2:], uint32(shown))
+		found = true
+	}
+	return
+}
+
+// changeInitialWindow applies a SETTINGS_INITIAL_WINDOW_SIZE in payload to
+// one direction. The sender moves every open stream by the change of the
+// value it is shown, the receiver by the change of the real one, so credit
+// already forwarded beyond the shown window has to come off the shown value:
+// for each stream shown + forwarded <= real + returned. Where no value is
+// low enough, ok is false and the connection has to go. Streams the sender
+// has finished do not count: nothing more is sent on them.
+func (c *flowConn) changeInitialWindow(payload []byte, start int32, init, shown *int32, credit func(*flowStream) (returned, forwarded int64, done bool)) (ok bool) {
+	real, show, found := rewriteInitialWindow(payload, start)
+	if !found {
+		return true
+	}
+	for _, s := range c.streams {
+		returned, forwarded, done := credit(s)
+		if done {
+			continue
+		}
+		lim := int64(real) + returned - forwarded
+		if lim < 0 {
+			return false
+		}
+		show = int32(flowMin(int64(show), lim))
+	}
+	for i := 0; i+6 <= len(payload); i += 6 {
+		if binary.BigEndian.Uint16(payload[i:]) == h2SettingInitialWindowSize {
+			binary.BigEndian.PutUint32(payload[i+2:], uint32(show))
+		}
+	}
+	*init, *shown = real, show
+	return true
+}
+
+// errFlowGivenUp ends a connection the governor gave up, see giveUp.
+var errFlowGivenUp = errors.New("http2 flow governor: connection given up")
+
+// isBroken reports whether the connection has to go, see giveUp.
+func (c *flowConn) isBroken() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.broken
+}
+
+// capFrameSize lowers the largest frame the peer is told it may send to the
+// HTTP/2 default. The local stack still takes frames up to what it really
+// allows, but its frame reader keeps a buffer as large as the largest frame
+// it has ever read, for as long as the connection lives.
+func capFrameSize(payload []byte) {
+	for i := 0; i+6 <= len(payload); i += 6 {
+		if binary.BigEndian.Uint16(payload[i:]) == h2SettingMaxFrameSize {
+			binary.BigEndian.PutUint32(payload[i+2:], flowMin(binary.BigEndian.Uint32(payload[i+2:]), h2MinMaxFrameSize))
+		}
+	}
+}
+
+// flowReader handles frames from the client to the server.
+type flowReader flowConn
+
+func (r *flowReader) frame(f h2Frame) (drop bool) {
+	c := (*flowConn)(r)
+	switch f.typ {
+	case h2Headers:
+		s := c.stream(f.stream)
+		// A stream the client opened before it saw the server's GOAWAY is
+		// one the server will not take up: the stack drops it, and so does
+		// the governor.
+		if s == nil && f.stream%2 == 1 && !c.closed && !(c.goneAway && f.stream > c.goAwayLast) {
+			if len(c.streams) >= flowMaxStreams {
+				c.giveUp()
+				return false
+			}
+			now := c.fedNow()
+			s = &flowStream{}
+			s.up.cap = flowMax(c.upLearned.value(now, c.up.init), flowStartWindow)
+			s.down.cap = flowMax(c.downLearned.value(now, c.down.init), flowStartWindow)
+			if c.client && c.peerGoverned {
+				s.down.cap = c.down.max
+			}
+			c.streams[f.stream] = s
+			c.downOpen++
+			c.opened = append(c.opened, f.stream)
+		}
+		if s != nil && f.flags&h2FlagEndStream != 0 {
+			s.clientDone = true
+			c.finish(f.stream, s)
+		}
+	case h2Data:
+		c.upConnSent += int64(f.length)
+		// The stack is given larger windows than the client is shown, so it
+		// would not stop a client that sends past what it was shown: the
+		// governor does, as the stack would with the windows shown.
+		up := !c.client && c.up.enabled()
+		if up && c.upConnSent > h2InitWindow+c.upConnForwarded {
+			c.giveUp()
+			return false
+		}
+		if s := c.stream(f.stream); s != nil {
+			s.upSent += int64(f.length)
+			// Past a stream's window is the stream's error alone, as with a
+			// stack shown that window: the stream is reset both ways, see
+			// appendResets, and the connection goes on. The frame is dropped:
+			// a stack shown the window takes none of it into the body, and one
+			// that ended the stream would end the body cleanly before the
+			// reset. Like a stack that refuses it, the governor takes none of
+			// it from the connection window either, and returns no credit for
+			// it.
+			// An empty frame takes no window and is past none, though a
+			// lowered window may leave what came before it past.
+			if up && f.length > 0 && s.upSent > int64(c.serverShown)+s.upForwarded {
+				c.resets = append(c.resets, f.stream)
+				c.drop(f.stream)
+				c.upConnSent -= int64(f.length)
+				return true
+			}
+			if f.flags&h2FlagEndStream != 0 {
+				s.clientDone = true
+				c.finish(f.stream, s)
+			}
+		}
+	case h2RSTStream:
+		c.drop(f.stream)
+	}
+	return false
+}
+
+func (r *flowReader) control(f h2Frame, header, payload, out []byte) []byte {
+	c := (*flowConn)(r)
+	switch f.typ {
+	case h2Settings:
+		if f.flags&h2FlagAck == 0 && validSettings(payload) {
+			init, shown := c.clientInit, c.clientShown
+			if c.client {
+				c.settingsOwn = append(c.settingsOwn, false)
+			}
+			if c.down.enabled() && !c.changeInitialWindow(payload, c.shownDown(initialWindow(payload)), &c.clientInit, &c.clientShown, func(s *flowStream) (int64, int64, bool) {
+				return s.down.returned, s.downForwarded, s.serverDone
+			}) {
+				c.giveUp()
+				return out
+			}
+			capFrameSize(payload)
+			c.pingReady = c.pingReady || c.client
+			out = append(out, header...)
+			out = append(out, payload...)
+			// A raised window funds credit the receiver no longer owes. A
+			// SETTINGS that left the windows as they were funds nothing, and
+			// a walk over every stream for each one would let a client that
+			// floods them cost the server that walk each time.
+			if c.down.enabled() && (c.clientInit != init || c.clientShown != shown) {
+				for id, s := range c.streams {
+					if s.serverDone {
+						continue
+					}
+					if rel := c.downRelease(s); rel > 0 {
+						c.forwardDown(s, rel)
+						out = appendWindowUpdate(out, id, rel)
+					}
+				}
+			}
+			return out
+		}
+	case h2Ping:
+		if !c.client && c.pingAck(f, payload) {
+			if c.guardProbe {
+				return c.unstick(time.Now(), out)
+			}
+			return out
+		}
+	case h2WindowUpdate:
+		inc := int64(binary.BigEndian.Uint32(payload) & 0x7fffffff)
+		if f.stream == 0 {
+			c.noteConnCredit(inc)
+		}
+		s := c.stream(f.stream)
+		if s == nil || inc == 0 || !c.down.enabled() {
+			break
+		}
+		now := c.fedNow()
+		s.down.returned += inc
+		if !s.serverDone {
+			c.downOpenReturned += inc
+		}
+		s.down.waiting = time.Time{}
+		if inc < flowSmallCredit {
+			c.incremental = true
+		}
+		if c.client && c.peerGoverned {
+			// The server governs this download, as it does an official
+			// client's once it has been shown the real window, see
+			// restock: the reader's credit goes on as it comes.
+			s.down.cap = c.down.max
+		} else {
+			c.governDown(now, s)
+		}
+		c.downLearned.note(now, c.down.init, s.down.cap)
+		rel := c.downRelease(s)
+		if rel <= 0 {
+			return out
+		}
+		c.forwardDown(s, rel)
+		return appendWindowUpdate(out, f.stream, rel)
+	}
+	out = append(out, header...)
+	return append(out, payload...)
+}
+
+// appendRestock makes a client whose server governs its downloads look to
+// that server as an official client does: it sends the stack's own initial
+// window in a SETTINGS of the governor's, whose ACK the stack does not see,
+// and hands on all the credit it held back. The server then governs these
+// downloads, the client's memory with them, as it does an official
+// client's; two governors that each held back credit took rate and memory
+// a server-side governor alone keeps. No stream has been forwarded more than
+// its stack returned by then, see downRelease: the server adds the raise of
+// the initial window to every open stream, on top of what it was forwarded.
+func (c *flowConn) appendRestock(out []byte) []byte {
+	c.restock = false
+	out = append(out, 0, 0, 6, h2Settings, 0, 0, 0, 0, 0)
+	out = binary.BigEndian.AppendUint16(out, h2SettingInitialWindowSize)
+	out = binary.BigEndian.AppendUint32(out, uint32(c.clientInit))
+	c.settingsOwn = append(c.settingsOwn, true)
+	c.clientShown = c.clientInit
+	for id, s := range c.streams {
+		if s.serverDone {
+			continue
+		}
+		s.down.cap = c.down.max
+		if rel := c.downRelease(s); rel > 0 {
+			c.forwardDown(s, rel)
+			out = appendWindowUpdate(out, id, rel)
+		}
+	}
+	return out
+}
+
+// appendResets resets the streams whose client sent past the window it was
+// shown, with FLOW_CONTROL_ERROR, as a stack shown that window would: to the
+// stack, as if from the client, so the handler ends, and to the client.
+func (c *flowConn) appendResets(out []byte) []byte {
+	if len(c.resets) == 0 {
+		return out
+	}
+	for _, id := range c.resets {
+		out = appendRSTStream(out, id, h2ErrFlowControl)
+		c.wqueue = appendRSTStream(c.wqueue, id, h2ErrFlowControl)
+	}
+	c.resets = c.resets[:0]
+	c.wakeQueue()
+	return out
+}
+
+// appendRSTStream adds an RST_STREAM for id with code to out.
+func appendRSTStream(out []byte, id, code uint32) []byte {
+	out = append(out, 0, 0, 4, h2RSTStream, 0)
+	out = binary.BigEndian.AppendUint32(out, id&0x7fffffff)
+	return binary.BigEndian.AppendUint32(out, code)
+}
+
+func (r *flowReader) boundary(out []byte) []byte {
+	c := (*flowConn)(r)
+	out = c.appendResets(out)
+	// Ahead of any credit: the server is to know the window before it is
+	// handed what the window holds.
+	if c.client && c.restock && c.clientInit != 0 {
+		out = c.appendRestock(out)
+	}
+	for _, id := range c.opened {
+		s := c.stream(id)
+		if s == nil {
+			continue
+		}
+		if c.down.enabled() {
+			if rel := c.downRelease(s); rel > 0 {
+				c.forwardDown(s, rel)
+				out = appendWindowUpdate(out, id, rel)
+			}
+		}
+		// Like the stock server, grant no upload credit to a request that
+		// has already ended.
+		if c.up.enabled() && !s.clientDone {
+			if rel := c.upRelease(s); rel > 0 {
+				s.upForwarded += rel
+				c.creditClient(id, rel)
+			}
+		}
+	}
+	c.opened = c.opened[:0]
+	if c.client && !c.peerGoverned {
+		out = c.appendPing(c.fedNow(), out)
+	}
+	return out
+}
+
+// flowWriter handles frames from the server to the client.
+type flowWriter flowConn
+
+func (w *flowWriter) frame(f h2Frame) (drop bool) {
+	c := (*flowConn)(w)
+	s := c.stream(f.stream)
+	switch f.typ {
+	case h2Data:
+		if c.group != nil {
+			c.group.bytes.Add(int64(f.length))
+		}
+		c.downConnWindow -= int64(f.length)
+		if s != nil {
+			s.downSent += int64(f.length)
+			if !s.serverDone {
+				c.downOpenSent += int64(f.length)
+			}
+			if c.down.enabled() {
+				c.armGuard(s)
+			}
+		}
+		fallthrough
+	case h2Headers:
+		c.serverReplied = true
+		if s != nil && f.flags&h2FlagEndStream != 0 {
+			c.endDown(s)
+			c.finish(f.stream, s)
+		}
+	case h2RSTStream:
+		c.drop(f.stream)
+	}
+	return false
+}
+
+func (w *flowWriter) control(f h2Frame, header, payload, out []byte) []byte {
+	c := (*flowConn)(w)
+	switch f.typ {
+	case h2Settings:
+		// The ACK of a SETTINGS the governor sent, see restock, is not the
+		// stack's to see: ACKs come in the order the SETTINGS went.
+		// Only a well-formed one: an ACK with a payload is a FRAME_SIZE_ERROR
+		// the stack has to see to raise, and it takes no SETTINGS off the queue.
+		if c.client && f.flags&h2FlagAck != 0 && f.length == 0 && f.stream == 0 && len(c.settingsOwn) > 0 {
+			own := c.settingsOwn[0]
+			c.settingsOwn = c.settingsOwn[1:]
+			if own {
+				return out
+			}
+		}
+		if f.flags&h2FlagAck == 0 && validSettings(payload) {
+			if c.up.enabled() && !c.changeInitialWindow(payload, flowMax(c.up.init, flowShownUp), &c.serverInit, &c.serverShown, func(s *flowStream) (int64, int64, bool) {
+				return s.up.returned, s.upForwarded, s.clientDone
+			}) {
+				c.giveUp()
+				return out
+			}
+			capFrameSize(payload)
+			c.settingsSent = true
+			c.pingReady = c.pingReady || (!c.client && c.mode.Load() == flowH2)
+			out = append(out, header...)
+			out = append(out, payload...)
+			if c.up.enabled() {
+				for id, s := range c.streams {
+					if s.clientDone {
+						continue
+					}
+					if rel := c.upRelease(s); rel > 0 {
+						s.upForwarded += rel
+						out = appendWindowUpdate(out, id, rel)
+					}
+				}
+			}
+			return out
+		}
+	case h2Ping:
+		if c.client && c.pingAck(f, payload) {
+			return out
+		}
+		// A governed server sends a PING of its own with its first SETTINGS,
+		// before it answers anything, tagged: a stock server's health check can
+		// come early too, and is not one.
+		if c.client && f.flags&h2FlagAck == 0 && !c.serverReplied && !c.peerGoverned && len(payload) == 8 && binary.BigEndian.Uint32(payload) == flowPingTag {
+			c.peerGoverned, c.restock = true, true
+		}
+	case h2GoAway:
+		// The server will not take up the client's streams past the last it
+		// names: the stacks forget them, so does the governor.
+		last := binary.BigEndian.Uint32(payload) & 0x7fffffff
+		if !c.goneAway || last < c.goAwayLast {
+			c.goneAway, c.goAwayLast = true, last
+		}
+		for id := range c.streams {
+			if id > last && id%2 == 1 {
+				c.drop(id)
+			}
+		}
+	case h2WindowUpdate:
+		inc := int64(binary.BigEndian.Uint32(payload) & 0x7fffffff)
+		if f.stream == 0 && inc > 0 && c.up.enabled() {
+			c.upConnReturned += inc
+			if !c.upConnGrantKnown && c.upConnSent == 0 {
+				c.upConnGrant += inc
+			}
+			return c.appendUpConnRelease(out)
+		}
+		s := c.stream(f.stream)
+		if s == nil || inc == 0 || !c.up.enabled() {
+			break
+		}
+		now := c.fedNow()
+		s.up.returned += inc
+		var q int
+		switch {
+		case c.modelled(now) && s.up.settled():
+			s.up.model(now, c.currentRTT(), c.up.init, c.up.max, 1)
+		case c.modelled(now):
+			s.up.adjust(now, c.currentRTT(), c.up.init, c.up.max, true, false)
+		default:
+			q = c.pingQueueing(now)
+			s.up.adjust(now, c.currentRTT(), c.up.init, c.up.max, true, q > 0)
+		}
+		if q == 2 {
+			c.queueShrink(&s.up, now, c.up.init)
+		}
+		if !c.floorConfirmed(now) {
+			s.up.cap = flowMin(s.up.cap, flowUnconfirmedUp)
+		}
+		c.upLearned.note(now, c.up.init, s.up.cap)
+		if rel := c.upRelease(s); rel > 0 {
+			s.upForwarded += rel
+			out = appendWindowUpdate(out, f.stream, rel)
+		}
+		// What the reader took also frees room on the connection.
+		return c.appendUpConnRelease(out)
+	}
+	out = append(out, header...)
+	return append(out, payload...)
+}
+
+// governDown sets a download's cap from its reader and the queue on the path,
+// as the stream's credit comes back.
+func (c *flowConn) governDown(now time.Time, s *flowStream) {
+	var q int
+	switch {
+	case c.client && c.modelled(now):
+	case c.client:
+		q = c.pingQueueing(now)
+	default:
+		q = c.queueing(now)
+	}
+	switch {
+	case c.client && c.modelled(now) && s.down.settled():
+		gain := 1.0
+		if c.wide {
+			gain = flowProbeGain
+		}
+		s.down.model(now, c.currentRTT(), c.down.init, c.down.max, gain)
+	case !c.client && !c.noQueueCuts && c.incremental && s.down.flat >= flowFullRounds && c.modelled(now):
+		// Only clients that credit in small steps: one that waits for
+		// half of its own window could be held below that half. Only
+		// where the kernel sees the path: behind a TCP proxy it sees
+		// no queue at all.
+		// A download the server has finished takes no part in the gain, see
+		// cutGain, and neither does what is cut from it.
+		gain := c.cutGain(now)
+		if cut := s.down.pi(now, c.kstat, c.down.init, c.down.max, gain, c.downShare); !s.serverDone {
+			c.effect.cutBy(cut)
+		}
+	default:
+		s.down.adjust(now, c.currentRTT(), c.down.init, c.down.max, c.client || c.incremental, q > 0)
+		// A round trip pi saw before the stream left it is no step to
+		// follow when it comes back.
+		s.down.piRTT = 0
+	}
+	switch {
+	case c.client:
+		if q == 2 {
+			c.queueShrink(&s.down, now, c.down.init)
+		}
+		if !c.floorConfirmed(now) {
+			s.down.cap = flowMin(s.down.cap, flowUnconfirmedDown)
+		}
+	case q == 2 && !c.noQueueCuts && now.Sub(s.down.qAt) >= c.currentRTT():
+		s.down.qAt = now
+		before := s.down.cap
+		// The quarter cut as it always was, before/4*3, scaled by the gain.
+		// A client that has not shown it credits in small steps may wait for
+		// half of its own window before it credits at all: a cap under that
+		// stops the download until the guard lifts it, see unstick, and the
+		// next cut stops it again. Such a client is cut no lower than the
+		// guard would lift it.
+		floor := c.down.init
+		if !c.incremental {
+			floor = int32(flowMin(int64(c.down.max), flowMax(int64(floor), int64(c.clientInit)/2+flowSmallCredit)))
+		}
+		s.down.cap = flowMax(flowMin(floor, before), before-int32(c.cutGain(now)*float64(before-before/4*3)))
+		if !s.serverDone {
+			c.effect.cutBy(float64(before - s.down.cap))
+		}
+	}
+}
+
+func (w *flowWriter) boundary(out []byte) []byte {
+	c := (*flowConn)(w)
+	if c.client || !c.settingsSent {
+		return out
+	}
+	out = c.queuedLocked(out)
+	return c.appendPing(c.fedNow(), out)
+}

@@ -10,10 +10,12 @@ replace github.com/metacubex/utls => github.com/legiz-ru/prizrak-utls v0.0.0-202
 // v0.4.28 plus the darwin dscacheutil reap, see third_party/README.md.
 replace github.com/metacubex/sing-tun => ./third_party/sing-tun
 
-// Prizrak-Core keeps mihomo's module path, so it drops in here as a fork.
-replace github.com/metacubex/mihomo => github.com/legiz-ru/Prizrak-Core v1.19.33-r11
+// Elysium-Core is a mihomo fork that keeps mihomo's module path. It lives in
+// third_party, so every platform (including Android's gomobile build) compiles
+// the same source; tool/sync_core.sh refreshes it from the working fork.
+replace github.com/metacubex/mihomo => ./third_party/elysium-core
 
-// Prizrak-Core's http2 tuning, from the fork's own go.mod.
+// Elysium-Core's http2 tuning, from the fork's own go.mod.
 replace github.com/metacubex/http => github.com/legiz-ru/prizrak-http v0.0.0-20260930180911-da5b4c1e0882
 
 require (

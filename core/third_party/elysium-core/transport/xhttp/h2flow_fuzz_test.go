@@ -1,0 +1,146 @@
+//go:build go1.24
+
+package xhttp
+
+import (
+	"bytes"
+	"encoding/binary"
+	mrand "math/rand/v2"
+	"testing"
+	"time"
+
+	"golang.org/x/net/http2"
+)
+
+// FuzzFlowConn feeds arbitrary bytes to both directions of the governor after
+// a valid preface: whatever a broken or hostile peer sends, it must not panic,
+// must not hold on to more than a bounded amount of state, and must pass every
+// byte of a stream it does not rewrite.
+func FuzzFlowConn(f *testing.F) {
+	var seed bytes.Buffer
+	fr := http2.NewFramer(&seed, nil)
+	fr.WriteSettings(http2.Setting{ID: http2.SettingInitialWindowSize, Val: 4 << 20})
+	fr.WriteHeaders(http2.HeadersFrameParam{StreamID: 1, BlockFragment: []byte{0x82}, EndHeaders: true})
+	fr.WriteData(1, false, make([]byte, 1000))
+	fr.WriteWindowUpdate(1, 70000)
+	fr.WriteWindowUpdate(0, 70000)
+	fr.WritePing(true, [8]byte{0x78, 0x66, 0x6c, 0x77, 0, 0, 0, 1})
+	fr.WriteRSTStream(1, http2.ErrCodeCancel)
+	f.Add(seed.Bytes(), seed.Bytes(), uint8(7))
+	f.Add([]byte{0, 0, 0, 4, 0, 0, 0, 0, 0}, []byte{0, 0, 6, 4, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 1}, uint8(1))
+	f.Add([]byte{0xff, 0xff, 0xff, 1, 0xff, 0x7f, 0xff, 0xff, 0xff}, []byte{0, 0, 4, 8, 0, 0, 0, 0, 3, 0, 0, 0, 0}, uint8(3))
+
+	// A client that announces a large window, opens a stream and lowers the
+	// window under what the server was forwarded: the governor gives the
+	// connection up, and the server's write fails.
+	f.Add([]byte("\x00\x00\x06\x040\x00\x00\x00\x00\x00\x040000\x00\x00\x01\x01700010\x00\x00\x1e\x040\x00\x00\x00\x00000000\x00\x04\x00\x0000000000000000000000"), []byte("0"), uint8(3))
+
+	f.Fuzz(func(t *testing.T, fromClient, fromServer []byte, cut uint8) {
+		// The same input with the send window off and at its default, and
+		// with a kernel that reports a queue of 0 to 350 ms over a 50 ms
+		// path, so the cuts and the models run.
+		for i, sendWindow := range []int64{0, flowServerSendWindow, flowServerSendWindow} {
+			capture := &captureConn{}
+			c := newFlowConn(capture, testUp, testDown)
+			c.sendWindow = sendWindow
+			c.rtt = 1
+			if i == 2 {
+				c.tcp, c.kAt, c.kOK = fakeRawConn{}, time.Now().Add(time.Hour), true
+				c.kstat = tcpStats{rtt: time.Duration(cut%8+1) * 50 * time.Millisecond, minRTT: 50 * time.Millisecond}
+				c.rttBase = 50 * time.Millisecond
+			}
+			step := int(cut%16) + 1
+			out := c.readFrames([]byte(h2Preface), nil)
+			for in := fromClient; len(in) > 0; {
+				n := flowMin(step, len(in))
+				out = c.readFrames(append([]byte(nil), in[:n]...), out)
+				in = in[n:]
+			}
+			for in := fromServer; len(in) > 0; {
+				n := flowMin(step, len(in))
+				if _, err := c.Write(in[:n]); err != nil {
+					// A connection the governor gave up takes no more.
+					if !c.isBroken() {
+						t.Fatal(err)
+					}
+					break
+				}
+				in = in[n:]
+			}
+			c.wmu.Lock()
+			c.wmu.Unlock()
+			c.mu.Lock()
+			streams, queued := len(c.streams), queuedBytes(c)
+			c.mu.Unlock()
+			if streams > len(fromClient)/h2FrameHeader+1 {
+				t.Fatalf("%d streams tracked from %d input bytes", streams, len(fromClient))
+			}
+			if queued > 1<<16 {
+				t.Fatalf("%d bytes queued for the client", queued)
+			}
+			if limit := len(h2Preface) + len(fromClient) + 64*(len(fromClient)/h2FrameHeader+2); len(out) > limit {
+				t.Fatalf("read side produced %d bytes from %d", len(out), len(fromClient))
+			}
+			if err := downCountersAgree(c); err != nil {
+				t.Fatalf("send window %d: %v", sendWindow, err)
+			}
+			// The governor rewrites credit and SETTINGS, never data: what
+			// the server reads of each stream is what the client sent, as
+			// far as the frames parse and the connection was not given up.
+			if !c.isBroken() {
+				if sent, got := dataFrames(fromClient), dataFrames(out[len(h2Preface):]); !bytes.Equal(sent, got) {
+					t.Fatalf("send window %d: the server read %d bytes of data frames, the client sent %d", sendWindow, len(got), len(sent))
+				}
+			}
+			c.Close()
+		}
+
+		for _, client := range []bool{false, true} {
+			in := append([]byte(h2Preface), fromClient...)
+			if client {
+				in = fromServer
+			}
+			rnd := mrand.New(mrand.NewPCG(uint64(cut), uint64(len(in))))
+			cc := &chunkConn{data: in, rnd: rnd}
+			rc := newFlowConn(cc, testUp, testDown)
+			rc.sendWindow = flowServerSendWindow
+			if client {
+				rc = newFlowClientConn(cc)
+				rc.mode.Store(flowH2)
+			}
+			var got []byte
+			for {
+				b := make([]byte, 1+rnd.IntN(64))
+				n, err := rc.Read(b)
+				got = append(got, b[:n]...)
+				if err != nil {
+					break
+				}
+			}
+			if len(got) > len(in)+64*(len(in)/h2FrameHeader+2) {
+				t.Fatalf("Read produced %d bytes from %d", len(got), len(in))
+			}
+			if err := downCountersAgree(rc); err != nil {
+				t.Fatalf("client %v: %v", client, err)
+			}
+		}
+	})
+}
+
+// dataFrames is the stream id and payload of each DATA frame in b, in order,
+// up to the first frame that does not parse.
+func dataFrames(b []byte) []byte {
+	fr := http2.NewFramer(nil, bytes.NewReader(b))
+	fr.SetMaxReadFrameSize(1 << 24)
+	var out []byte
+	for {
+		f, err := fr.ReadFrame()
+		if err != nil {
+			return out
+		}
+		if d, ok := f.(*http2.DataFrame); ok {
+			out = binary.BigEndian.AppendUint32(out, d.StreamID)
+			out = append(out, d.Data()...)
+		}
+	}
+}

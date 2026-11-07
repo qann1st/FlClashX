@@ -1,0 +1,29 @@
+package features
+
+func Tags() (tags []string) {
+	if CMFA {
+		tags = append(tags, "cmfa")
+	}
+	if WithLowMemory {
+		tags = append(tags, "with_low_memory")
+	}
+	if WithPowerSave {
+		tags = append(tags, "with_powersave")
+	}
+	if NoFakeTCP {
+		tags = append(tags, "no_fake_tcp")
+	}
+	if NoTailscale {
+		tags = append(tags, "no_tailscale")
+	}
+	if NoZeroTier {
+		tags = append(tags, "no_zerotier")
+	}
+	if NoEasyTier {
+		tags = append(tags, "no_easytier")
+	}
+	if WithGVisor {
+		tags = append(tags, "with_gvisor")
+	}
+	return
+}
