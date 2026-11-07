@@ -1,0 +1,58 @@
+# Maintainer: qann1st <qann1st@users.noreply.github.com>
+
+pkgname=flclashx-elysium-git
+_pkgname=FlClashX
+pkgver=0.5.9
+pkgrel=1
+# The release the .deb files come from; the publish workflow rewrites this line
+# so the package can follow either a stable tag or a vX.Y.Z-pre.N one.
+_tag="v${pkgver}"
+pkgdesc="Elysium-Core build of FlClashX | A multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free."
+arch=('aarch64' 'x86_64')
+url="https://github.com/qann1st/FlClashX"
+license=('GPL-3.0')
+conflicts=("${pkgname%-git}" "flclashx-bin" "flclashx-git" "flclash-bin" "flclash" "flclashx")
+provides=("${pkgname%-git}=${pkgver}")
+depends=('gtk3' 'libayatana-appindicator' 'libsecret')
+options=('!strip' '!emptydirs')
+source_x86_64=("${pkgname%-git}-${pkgver}-x86_64.deb::${url}/releases/download/${_tag}/${_pkgname}-linux-amd64.deb")
+source_aarch64=("${pkgname%-git}-${pkgver}-aarch64.deb::${url}/releases/download/${_tag}/${_pkgname}-linux-arm64.deb")
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+prepare() {
+    bsdtar -xf "${srcdir}/data."*
+    # The .deb carries an absolute Exec into /opt; point it at the packaged
+    # wrapper instead.
+    sed -i -e "
+      s|^Exec=.*|Exec=${pkgname%-git}|
+      s|^Icon=.*|Icon=${pkgname%-git}|
+      s|^Categories=.*|Categories=Network;|
+    " "${srcdir}/usr/share/applications/com.follow.clashx.desktop"
+}
+
+package() {
+    # lib/ and data/ stay beside the executable: that is where the Flutter
+    # engine and the Helper look for them, and pacman installs this tree as
+    # root, which the Helper requires.
+    install -dm755 "${pkgdir}/usr/lib/${pkgname%-git}"
+    cp -Pr --no-preserve=ownership "${srcdir}/opt/${_pkgname}/." \
+        "${pkgdir}/usr/lib/${pkgname%-git}/"
+
+    install -Dm644 "${srcdir}/usr/share/applications/com.follow.clashx.desktop" \
+        "${pkgdir}/usr/share/applications/${pkgname%-git}.desktop"
+    install -Dm644 "${srcdir}/usr/share/icons/hicolor/256x256/apps/${_pkgname}.png" \
+        "${pkgdir}/usr/share/icons/hicolor/256x256/apps/${pkgname%-git}.png"
+
+    install -dm755 "${pkgdir}/usr/bin"
+    cat > "${pkgdir}/usr/bin/${pkgname%-git}" <<EOF
+#!/bin/bash
+set -o pipefail
+_APPDIR="/usr/lib/${pkgname%-git}"
+export PATH="\${_APPDIR}:\${PATH}"
+export LD_LIBRARY_PATH="\${_APPDIR}/lib:\${LD_LIBRARY_PATH}"
+cd "\${_APPDIR}" || exit 1
+exec "\${_APPDIR}/${_pkgname}" "\$@"
+EOF
+    chmod 755 "${pkgdir}/usr/bin/${pkgname%-git}"
+}

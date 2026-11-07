@@ -2,15 +2,20 @@ name: publish
 
 # Manual re-run of the post-build release steps (AUR publish + Telegram
 # announcement) for an existing tag — no rebuild, no signing. Reuses the
-# already-published GitHub release (its assets and notes). Toggle either step
+# already-published GitHub release (its assets and notes) and either creates
+# the AUR package on the first run or updates it in place. Toggle either step
 # with the inputs.
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.4.2)"
+        description: "Release tag (e.g. v0.5.9)"
         required: true
         type: string
+      package:
+        description: "AUR package to create or update"
+        type: string
+        default: flclashx-elysium-git
       aur:
         description: "Publish to AUR"
         type: boolean
@@ -18,7 +23,7 @@ on:
       telegram:
         description: "Send Telegram announcement"
         type: boolean
-        default: true
+        default: false
 
 jobs:
   aur-publish:
@@ -51,15 +56,25 @@ jobs:
           if [[ "$VERSION" =~ ^([0-9.]+)-pre\.([0-9]+)$ ]]; then
             echo "pkgver=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
             echo "pkgrel=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
-            echo "aur_pkg=flclashx-git" >> "$GITHUB_OUTPUT"
           else
             echo "pkgver=$VERSION" >> "$GITHUB_OUTPUT"
             echo "pkgrel=1" >> "$GITHUB_OUTPUT"
-            echo "aur_pkg=flclashx-bin" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Clone AUR repository
-        run: git clone ssh://aur@aur.archlinux.org/${{ steps.release.outputs.aur_pkg }}.git /tmp/aur-pkg
+      # AUR has no API to create a package: the first push of a PKGBUILD does
+      # it, so a clone that finds nothing seeds the repository from the
+      # template this repo carries.
+      - name: Take the AUR repository
+        env:
+          PKG: ${{ inputs.package }}
+        run: |
+          if git clone "ssh://aur@aur.archlinux.org/$PKG.git" /tmp/aur-pkg; then
+            exit 0
+          fi
+          rm -rf /tmp/aur-pkg
+          git init -b master /tmp/aur-pkg
+          git -C /tmp/aur-pkg remote add origin "ssh://aur@aur.archlinux.org/$PKG.git"
+          cp "$GITHUB_WORKSPACE/aur/$PKG/PKGBUILD" /tmp/aur-pkg/PKGBUILD
 
       - name: Download release assets and compute checksums
         id: checksums
@@ -92,18 +107,21 @@ jobs:
         env:
           PKGVER: ${{ steps.release.outputs.pkgver }}
           PKGREL: ${{ steps.release.outputs.pkgrel }}
+          TAG: ${{ inputs.tag }}
           SHA_X86: ${{ steps.checksums.outputs.sha_x86 }}
           SHA_ARM: ${{ steps.checksums.outputs.sha_arm }}
           HAS_ARM: ${{ steps.checksums.outputs.has_arm }}
         run: |
           sed -i "s/^pkgver=.*/pkgver=${PKGVER}/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=${PKGREL}/" PKGBUILD
+          sed -i "s|^_tag=.*|_tag=\"${TAG}\"|" PKGBUILD
           sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${SHA_X86}')/" PKGBUILD
 
           if [ "$HAS_ARM" == "true" ]; then
+            sed -i "s/^arch=.*/arch=('aarch64' 'x86_64')/" PKGBUILD
             sed -i "s/^sha256sums_aarch64=.*/sha256sums_aarch64=('${SHA_ARM}')/" PKGBUILD
           else
-            sed -i "/^[[:space:]]*'aarch64'/d" PKGBUILD
+            sed -i "s/^arch=.*/arch=('x86_64')/" PKGBUILD
             sed -i "/^source_aarch64=/d" PKGBUILD
             sed -i "/^sha256sums_aarch64=/d" PKGBUILD
           fi
@@ -120,12 +138,14 @@ jobs:
           TAG: ${{ inputs.tag }}
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "Github Actions (pluralplay)"
+          git config user.name "qann1st (GitHub Actions)"
           git add PKGBUILD .SRCINFO
-          if ! git diff --cached --quiet; then
-            git commit -m "Update to $TAG"
-            git push
+          if git diff --cached --quiet; then
+            echo "the AUR package already matches $TAG"
+            exit 0
           fi
+          git commit -m "Update to $TAG"
+          git push -u origin master
 
   notify:
     needs: [aur-publish]
