@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.5.9 (2026-11-07)
+
+**Features**
+
+- **windows** Ship WinDivert beside the executable (80794fc)
+- **ua** Name Elysium-Core on Windows (b778597)
+- **core** Build the Elysium-Core fork from a vendored copy (29385ed)
+
 ## v0.5.8 (2026-11-06)
 
 **Features**
