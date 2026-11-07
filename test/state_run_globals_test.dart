@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:fl_clash/bootstrap.dart';
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/state.dart';
@@ -56,7 +57,7 @@ void main() {
 
       expect(
         globalState.ua,
-        'FlClashX/v1.2.3 core/Prizrak-Core/v1.19.32 Platform/${Platform.operatingSystem}',
+        'FlClashX/v1.2.3 core/$coreDisplayName/v1.19.32 Platform/${Platform.operatingSystem}',
       );
     });
   });

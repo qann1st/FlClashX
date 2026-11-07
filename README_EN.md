@@ -65,7 +65,7 @@ The app reads the HTTP headers of the response that serves the subscription and 
 <details>
 <summary><strong>What the app sends</strong></summary>
 
-Every subscription download goes with `User-Agent: FlClashX/v<version> core/Prizrak-Core/v<core version> Platform/<os>`, e.g. `FlClashX/v0.5.0 core/Prizrak-Core/v1.19.33-r3 Platform/android`.
+Every subscription download goes with `User-Agent: FlClashX/v<version> core/<core>/v<core version> Platform/<os>`, where `<core>` is `Elysium-Core` on Windows and `Prizrak-Core` elsewhere, e.g. `FlClashX/v0.5.0 core/Elysium-Core/v1.19.33-r11 Platform/windows`.
 
 When "Send HWID" is on for the profile (on by default), these are added:
 

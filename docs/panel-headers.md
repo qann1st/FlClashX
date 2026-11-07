@@ -8,8 +8,9 @@ FlClashX читает HTTP-заголовки ответа, которым па�
 
 ## Что приложение отправляет
 
-Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/Prizrak-Core/v<версия ядра> Platform/<ос>`,
-например `FlClashX/v0.5.0 core/Prizrak-Core/v1.19.33-r3 Platform/android`.
+Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/<ядро>/v<версия ядра> Platform/<ос>`,
+где `<ядро>` — `Elysium-Core` на Windows и `Prizrak-Core` на остальных платформах,
+например `FlClashX/v0.5.0 core/Elysium-Core/v1.19.33-r11 Platform/windows`.
 
 Если у профиля включено «Отправлять HWID» (по умолчанию включено, переключатель
 есть при добавлении по ссылке и в редактировании подписки), добавляются:
