@@ -90,6 +90,31 @@ begin
   RunHidden('sc.exe', 'start "' + HelperService + '"');
 end;
 
+// zapret leaves the WinDivert driver running, which locks WinDivert64.sys and
+// makes the next update fail. Stop and delete the service; the new pair
+// registers it again the first time it is used.
+procedure StopWinDivert;
+var
+  Attempt: Integer;
+  Code: Integer;
+begin
+  for Attempt := 1 to 6 do
+  begin
+    if RunHidden('sc.exe', 'stop "WinDivert"') = 0 then
+      Break;
+    Sleep(500);
+  end;
+  Sleep(800);
+  for Attempt := 1 to 6 do
+  begin
+    Code := RunHidden('sc.exe', 'delete "WinDivert"');
+    // 1060: no such service; 1072: already marked for deletion.
+    if (Code = 0) or (Code = 1060) or (Code = 1072) then
+      Break;
+    Sleep(700);
+  end;
+end;
+
 function IsAppInstalled(): Boolean;
 var
   UninstallKey: String;
@@ -128,6 +153,7 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   ShutDownApp;
+  StopWinDivert;
   Result := '';
 end;
 
