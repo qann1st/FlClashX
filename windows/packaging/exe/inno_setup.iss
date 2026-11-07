@@ -216,6 +216,7 @@ begin
     usUninstall:
     begin
       ShutDownApp;
+      StopWinDivert;
       ClearStaleProxy;
       RunHidden('sc.exe', 'delete "' + HelperService + '"');
     end;
