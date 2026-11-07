@@ -444,6 +444,21 @@ Future<void> _packageWindows(_Build build, Set<String> targets) async {
     'runner',
     'Release',
   );
+  // The core loads WinDivert.dll by name and the DLL loads WinDivert64.sys
+  // from its own directory, so both belong beside FlClashX.exe. WinDivert
+  // ships x86 and x64 only, and an arm64 process cannot load the x64 DLL.
+  if (build.arch != 'arm64') {
+    for (final name in const [
+      'WinDivert.dll',
+      'WinDivert64.sys',
+      'WinDivert-LICENSE.txt',
+    ]) {
+      build.copy(
+        p.join(build.rootDir, 'windows', 'windivert', name),
+        p.join(bundle, name),
+      );
+    }
+  }
   if (targets.contains('zip')) {
     final zip = build.dist(artifactName('windows', build.arch, '.zip'));
     if (File(zip).existsSync()) File(zip).deleteSync();
