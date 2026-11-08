@@ -164,9 +164,13 @@ hooks:
       expect(
         script,
         matches(
-          RegExp(r'usUninstall:\s+begin\s+ShutDownApp;\s+ClearStaleProxy;'),
+          RegExp(
+            r'usUninstall:\s+begin\s+ShutDownApp;\s+StopWinDivert;\s+ClearStaleProxy;',
+          ),
         ),
       );
+      // The driver locks WinDivert64.sys, so both paths stop it after the app.
+      expect(script, matches(RegExp(r'ShutDownApp;\s+StopWinDivert;')));
     });
 
     test('downloads the appimagetool build matching the host', () {
