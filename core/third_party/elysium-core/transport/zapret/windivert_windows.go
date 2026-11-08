@@ -12,6 +12,12 @@ import (
 const (
 	windivertLayerNetwork     = 0
 	windivertParamQueueLength = 0
+	windivertParamQueueSize   = 2
+
+	// One WinDivert handle is opened per flow, so its kernel queues must be
+	// small: the default 4 MB queue per handle adds up fast.
+	windivertQueueLength = 512
+	windivertQueueSize   = 256 * 1024
 )
 
 // windivertAddress mirrors WINDIVERT_ADDRESS from windivert.h. The bitfield
@@ -91,15 +97,15 @@ func (w *winDivert) open(filter string) (syscall.Handle, error) {
 		return 0, winErr(e)
 	}
 	h := syscall.Handle(r1)
-	// A larger queue keeps bursts of Discord packets from being dropped.
-	_, _, _ = w.paramFn.Call(uintptr(h), windivertParamQueueLength, 8192)
+	// Keep per-flow kernel queues small: the default 4 MB queue per handle
+	// multiplied by every intercepted connection is significant memory.
+	_, _, _ = w.paramFn.Call(uintptr(h), windivertParamQueueLength, windivertQueueLength)
+	_, _, _ = w.paramFn.Call(uintptr(h), windivertParamQueueSize, windivertQueueSize)
 	return h, nil
 }
 
-func (w *winDivert) recv(h syscall.Handle) ([]byte, *windivertAddress, error) {
-	buf := make([]byte, 65535)
+func (w *winDivert) recv(h syscall.Handle, buf []byte, addr *windivertAddress) (int, error) {
 	var n uint32
-	addr := &windivertAddress{}
 	r1, _, e := w.recvFn.Call(
 		uintptr(h),
 		uintptr(unsafe.Pointer(&buf[0])),
@@ -110,14 +116,12 @@ func (w *winDivert) recv(h syscall.Handle) ([]byte, *windivertAddress, error) {
 	runtime.KeepAlive(buf)
 	runtime.KeepAlive(addr)
 	if r1 == 0 {
-		return nil, nil, winErr(e)
+		return 0, winErr(e)
 	}
 	if n == 0 || int(n) > len(buf) {
-		return nil, nil, fmt.Errorf("WinDivertRecv length %d", n)
+		return 0, fmt.Errorf("WinDivertRecv length %d", n)
 	}
-	out := make([]byte, n)
-	copy(out, buf[:n])
-	return out, addr, nil
+	return int(n), nil
 }
 
 func (w *winDivert) send(h syscall.Handle, data []byte, addr *windivertAddress) error {

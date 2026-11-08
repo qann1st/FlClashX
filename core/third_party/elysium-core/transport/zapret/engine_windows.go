@@ -75,13 +75,15 @@ type windivertFlow struct {
 
 func (h *windivertFlow) loop() {
 	defer h.close()
+	buf := make([]byte, 65535)
+	addr := &windivertAddress{}
 	for {
-		data, addr, err := h.backend.wd.recv(h.handle)
+		n, err := h.backend.wd.recv(h.handle, buf, addr)
 		if err != nil {
 			log.Debugln("[zapret] recv: %v", err)
 			return
 		}
-		pkts := h.flow.process(data, addr)
+		pkts := h.flow.process(buf[:n], addr)
 		failed := false
 		for _, p := range pkts {
 			if p.fallback {
