@@ -76,4 +76,32 @@ void main() {
       expect(logs.existsSync(), isFalse);
     },
   );
+
+  test('an update drops the smart model and training data once', () async {
+    await mockPreferences();
+    final homePath = await appPath.homeDirPath;
+    final model = File(join(homePath, 'Model.bin'))..writeAsBytesSync([1]);
+    final samples = File(join(homePath, 'smart_weight_data.csv'))
+      ..writeAsStringSync('weight\n');
+
+    await cleanStaleCoreArtifacts('0.5.10/v1.19.33-r11');
+
+    expect(model.existsSync(), isFalse);
+    expect(samples.existsSync(), isFalse);
+    expect(
+      await preferences.getCleanedCoreArtifactsRelease(),
+      '0.5.10/v1.19.33-r11',
+    );
+  });
+
+  test('the same release keeps a file written after the cleanup', () async {
+    await mockPreferences();
+    final homePath = await appPath.homeDirPath;
+    await cleanStaleCoreArtifacts('0.5.11/v1.19.33-r11');
+    final model = File(join(homePath, 'Model.bin'))..writeAsBytesSync([1]);
+
+    await cleanStaleCoreArtifacts('0.5.11/v1.19.33-r11');
+
+    expect(model.existsSync(), isTrue);
+  });
 }

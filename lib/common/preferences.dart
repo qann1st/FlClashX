@@ -10,6 +10,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Preferences {
+  static const _cleanedCoreArtifactsKey = 'cleanedCoreArtifactsRelease';
+
   static Preferences? _instance;
   var _store = ResolveOnce(_open);
 
@@ -192,6 +194,17 @@ class Preferences {
   Future<void> saveBootRecord(BootRecord record) async {
     final sharedPreferencesIns = await _store.value;
     await sharedPreferencesIns?.setString(bootRecordKey, json.encode(record));
+  }
+
+  /// The release whose one-time core cleanup already ran.
+  Future<String?> getCleanedCoreArtifactsRelease() async {
+    final sharedPreferencesIns = await _store.value;
+    return sharedPreferencesIns?.getString(_cleanedCoreArtifactsKey);
+  }
+
+  Future<void> setCleanedCoreArtifactsRelease(String release) async {
+    final sharedPreferencesIns = await _store.value;
+    await sharedPreferencesIns?.setString(_cleanedCoreArtifactsKey, release);
   }
 
   Future<void> clearPreferences() async {
