@@ -53,7 +53,6 @@ const (
 	startLogMethod                 CoreMethod = "startLog"
 	stopLogMethod                  CoreMethod = "stopLog"
 	setHostActiveMethod            CoreMethod = "setHostActive"
-	setPowersaveMethod             CoreMethod = "setPowersave"
 	startListenerMethod            CoreMethod = "startListener"
 	stopListenerMethod             CoreMethod = "stopListener"
 	updateDnsMethod                CoreMethod = "updateDns"

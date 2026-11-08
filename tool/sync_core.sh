@@ -26,17 +26,6 @@ mkdir -p "$dest"
 # .git and the fork's downloaded binaries never belong in this repository.
 rsync -a --delete --exclude='.git' --exclude='bin' "$src"/ "$dest"/
 
-# Local patches on top of the fork live here, not in the fork's checkout, so
-# rsync drops them and they are applied again on every sync.
-shopt -s nullglob
-for patch_file in "$root"/core/patches/*.patch; do
-  if ! patch -p1 --batch -d "$dest" < "$patch_file" >/dev/null; then
-    echo "error: $patch_file did not apply to the synced copy" >&2
-    exit 1
-  fi
-  echo "applied $(basename "$patch_file")"
-done
-
 echo "synced $src -> $dest"
 echo
 echo "Core version in build_config.yaml: $(sed -n 's/^core_version: *//p' "$root/build_config.yaml")"

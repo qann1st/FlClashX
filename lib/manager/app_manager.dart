@@ -58,11 +58,7 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
     });
     // A provider nobody listens to is paused and would miss the updates.
     ref.listenManual(appVisibleProvider, (_, visible) {
-      final core = ref.read(coreHandlerProvider);
-      core.setHostActive(visible);
-      core.setPowersave(
-        visible ? CorePowersave.active : CorePowersave.background,
-      );
+      ref.read(coreHandlerProvider).setHostActive(visible);
     });
     ref.listenManual(profileHeadersActionProvider, (_, _) {});
     ref.listenManual(profileSettingsActionProvider, (_, _) {});

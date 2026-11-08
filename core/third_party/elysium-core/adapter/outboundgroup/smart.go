@@ -27,7 +27,6 @@ import (
 	"github.com/metacubex/mihomo/common/xsync"
 	"github.com/metacubex/mihomo/component/geodata"
 	"github.com/metacubex/mihomo/component/mmdb"
-	"github.com/metacubex/mihomo/component/powersave"
 	"github.com/metacubex/mihomo/component/profile/cachefile"
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/component/smart"
@@ -1405,11 +1404,6 @@ func (s *Smart) logConnectionStats(err error, record *smart.StatsRecord, metadat
 func (s *Smart) collectConnectionData(input *smart.ModelInput, metadata *C.Metadata,
 	baseWeight float64, proxyName string, ModelPredicted bool,
 ) {
-	// Training data costs a disk write per connection; collect it only while
-	// someone is using the device, so a screen-off tunnel stays quiet.
-	if powersave.Current() != powersave.Active {
-		return
-	}
 	if s.sampleRate < 1.0 && rand.Float64() > s.sampleRate {
 		return
 	}
@@ -2367,39 +2361,6 @@ func (s *Smart) InitSmart() {
 	}
 }
 
-// smartBackgroundInterval is how often the group's timed work may run with the
-// screen off: these timers wake the radio and the CPU for work that only
-// matters while someone is using the device.
-const smartBackgroundInterval = 30 * time.Minute
-
-// smartTaskDue says whether a timed task may run now: always while active,
-// once per smartBackgroundInterval with the screen off, never while idle.
-func smartTaskDue(lastRun time.Time) bool {
-	switch powersave.Current() {
-	case powersave.Idle:
-		return false
-	case powersave.Background:
-		return time.Since(lastRun) >= smartBackgroundInterval
-	default:
-		return true
-	}
-}
-
-// waitForUse blocks while the device is idle and reports whether the group
-// closed instead of the device being used again.
-func (s *Smart) waitForUse() bool {
-	if powersave.Current() != powersave.Idle {
-		return false
-	}
-	changed := powersave.Changed()
-	select {
-	case <-changed:
-		return false
-	case <-s.ctx.Done():
-		return true
-	}
-}
-
 // startTimedTask waits for tunnel.Running before the first run, then repeats on its interval.
 func (s *Smart) startTimedTask(initialDelay, interval time.Duration, taskName string, task func(), runOnce bool) {
 	s.wg.Add(1)
@@ -2429,19 +2390,9 @@ func (s *Smart) startTimedTask(initialDelay, interval time.Duration, taskName st
 			return
 		}
 
-		var lastRun time.Time
-		run := func() {
-			if tunnel.Status() != tunnel.Running || !smartTaskDue(lastRun) {
-				return
-			}
-			lastRun = time.Now()
+		if tunnel.Status() == tunnel.Running {
 			task()
 		}
-
-		if s.waitForUse() {
-			return
-		}
-		run()
 
 		if runOnce {
 			log.Debugln("[Smart] Task [%s] completed", taskName)
@@ -2455,10 +2406,9 @@ func (s *Smart) startTimedTask(initialDelay, interval time.Duration, taskName st
 		for {
 			select {
 			case <-ticker.C:
-				if s.waitForUse() {
-					return
+				if tunnel.Status() == tunnel.Running {
+					task()
 				}
-				run()
 			case <-s.ctx.Done():
 				return
 			}

@@ -189,7 +189,6 @@ var methodHandlers = map[CoreMethod]methodHandler{
 	startLogMethod:            acknowledged(handleStartLog),
 	stopLogMethod:             acknowledged(handleStopLog),
 	setHostActiveMethod:       withArguments(handleSetHostActive),
-	setPowersaveMethod:        withArguments(handleSetPowersave),
 	validateConfigMethod:      withMessage(handleValidateConfig),
 	decryptConfigMethod:       withFallible(handleDecryptConfig),
 	getConfigMethod:           withFallible(handleGetConfig),
