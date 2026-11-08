@@ -85,6 +85,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     ref.listenManual(coreStatusProvider, (prev, next) {
       if (next == CoreStatus.connected && prev != CoreStatus.connected) {
         _syncLogStream();
+        _syncHostState();
       }
     }, fireImmediately: true);
   }
@@ -98,6 +99,17 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     } else {
       _core.stopLog();
     }
+  }
+
+  /// A restarted Core starts from its own defaults, so the host state is sent
+  /// again: no event stream and the power-save mode while the screen is off.
+  void _syncHostState() {
+    final visible = ref.read(appVisibleProvider);
+    final core = _core;
+    core.setHostActive(visible);
+    core.setPowersave(
+      visible ? CorePowersave.active : CorePowersave.background,
+    );
   }
 
   @override

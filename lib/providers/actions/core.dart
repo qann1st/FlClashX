@@ -33,6 +33,11 @@ class CoreAction extends _$CoreAction {
       await ref.read(providersProvider.notifier).syncProviders();
     }
     _core.setHostActive(ref.read(appVisibleProvider));
+    _core.setPowersave(
+      ref.read(appVisibleProvider)
+          ? CorePowersave.active
+          : CorePowersave.background,
+    );
     try {
       globalState.coreVersion = await _core.getCoreVersion();
     } catch (_) {}

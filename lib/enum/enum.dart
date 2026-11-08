@@ -853,6 +853,17 @@ enum LoadingTag {
 
 enum CoreStatus { connecting, connected, disconnected }
 
+/// The modes `component/powersave` understands, in its own order.
+enum CorePowersave {
+  active(0),
+  background(1),
+  idle(2);
+
+  const CorePowersave(this.value);
+
+  final int value;
+}
+
 enum RequestFeed { recent, live }
 
 enum VpnRefusal { cancelled, otherAlwaysOn, restricted }

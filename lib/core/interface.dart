@@ -106,6 +106,8 @@ mixin CoreInterface {
 
   FutureOr<void> setHostActive(bool active);
 
+  FutureOr<void> setPowersave(CorePowersave mode);
+
   Future<bool> crash();
 
   FutureOr<List<TrackerInfo>> getConnections();
@@ -576,6 +578,10 @@ abstract class CoreHandlerInterface with CoreInterface {
   @override
   FutureOr<void> setHostActive(bool active) =>
       _invokeUnobserved(CoreMethod.setHostActive, arguments: active);
+
+  @override
+  FutureOr<void> setPowersave(CorePowersave mode) =>
+      _invokeUnobserved(CoreMethod.setPowersave, arguments: mode.value);
 
   /// For calls whose callers never wait on them, so a Core that is gone or
   /// restarting cannot surface as an unhandled asynchronous error.
