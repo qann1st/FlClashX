@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.5.10 (2026-11-08)
+
+**Features**
+
+- **aur** Publish flclashx-elysium-git (598d64f)
+
+**Bug Fixes**
+
+- **core** Drop the smart group's model and training data on update (09a0d54)
+- **android,core** Stop smart work while the screen is off (b061579)
+- **linux** Keep libapp.so reachable from the AppImage executable (5e8828e)
+- **windows** Remove the WinDivert service on uninstall too (e9dc58d)
+- **windows** Stop the WinDivert driver before installing (754f7a7)
+
+**Reverts**
+
+- **android** Build the core without powersave (e021707)
+
 ## v0.5.9 (2026-11-07)
 
 **Features**

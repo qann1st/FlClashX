@@ -2,6 +2,64 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.5.10",
+      "tag": "v0.5.10",
+      "date": "2026-11-08",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "598d64f",
+              "scope": "aur",
+              "text": "Publish flclashx-elysium-git"
+            }
+          ]
+        },
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "09a0d54",
+              "scope": "core",
+              "text": "Drop the smart group's model and training data on update"
+            },
+            {
+              "id": "b061579",
+              "scope": "android,core",
+              "text": "Stop smart work while the screen is off"
+            },
+            {
+              "id": "5e8828e",
+              "scope": "linux",
+              "text": "Keep libapp.so reachable from the AppImage executable"
+            },
+            {
+              "id": "e9dc58d",
+              "scope": "windows",
+              "text": "Remove the WinDivert service on uninstall too"
+            },
+            {
+              "id": "754f7a7",
+              "scope": "windows",
+              "text": "Stop the WinDivert driver before installing"
+            }
+          ]
+        },
+        {
+          "type": "revert",
+          "entries": [
+            {
+              "id": "e021707",
+              "scope": "android",
+              "text": "Build the core without powersave"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.9",
       "tag": "v0.5.9",
       "date": "2026-11-07",
