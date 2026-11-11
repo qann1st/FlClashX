@@ -546,6 +546,30 @@ jobs:
             sed "s|VERSION|$version|g" ./.github/pre_release_template.md >> release.md
           fi
 
+      # The Arch package is a repack of the .deb, built here so it can ship
+      # beside it; a pre-release tag carries a hyphen its pkgver cannot hold.
+      - name: Build the Arch package
+        if: ${{ env.IS_STABLE == 'true' }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          work="$RUNNER_TEMP/archpkg"
+          rm -rf "$work"
+          mkdir -p "$work"
+          cp dist/FlClashX-linux-amd64.deb "$work/"
+          cp aur/flclashx-elysium-git/PKGBUILD "$work/"
+          sha=$(sha256sum "$work/FlClashX-linux-amd64.deb" | cut -d' ' -f1)
+          sed -i "s/^pkgver=.*/pkgver=$version/" "$work/PKGBUILD"
+          sed -i "s/^pkgrel=.*/pkgrel=1/" "$work/PKGBUILD"
+          sed -i "s|^arch=.*|arch=('x86_64')|" "$work/PKGBUILD"
+          sed -i "s|^source_x86_64=.*|source_x86_64=(\"FlClashX-linux-amd64.deb\")|" "$work/PKGBUILD"
+          sed -i "s|^sha256sums_x86_64=.*|sha256sums_x86_64=('$sha')|" "$work/PKGBUILD"
+          sed -i "/^source_aarch64=/d" "$work/PKGBUILD"
+          sed -i "/^sha256sums_aarch64=/d" "$work/PKGBUILD"
+          docker run --rm -v "$work:/pkg" archlinux:base-devel bash -c \
+            "useradd -m -u $(id -u) builder && chown -R builder:builder /pkg && su builder -c 'cd /pkg && makepkg --nodeps --noconfirm'"
+          cp "$work"/*.pkg.tar.zst dist/
+          ls -l dist/*.pkg.tar.zst
+
       - name: Generate sha256
         if: ${{ env.IS_STABLE == 'true' }}
         run: |
