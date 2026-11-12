@@ -332,6 +332,16 @@ jobs:
     # Releases publish where the release links point: the public repository.
     if: github.repository == 'qann1st/FlClashX' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ${{ matrix.os }}
+    # Optional Apple secrets: without them the macOS DMG ships ad-hoc signed, as
+    # this fork has always released it. Steps check the value, since `secrets`
+    # itself is not readable in `if`.
+    env:
+      APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
     strategy:
       fail-fast: false
       matrix:
@@ -478,14 +488,13 @@ jobs:
           npm install --global --allow-scripts=fs-xattr,macos-alias create-dmg \
             || npm install --global create-dmg
 
-      # A prerelease ships macOS unsigned; only a stable release is signed and notarized.
+      # A prerelease ships macOS unsigned; a stable release is signed and
+      # notarized only when the repository carries the Apple secrets.
       # The certificate chains to Apple's first Developer ID intermediate, which
       # the runner image does not carry; it expires 2027-02-01, as the certificate does.
       - name: Import macOS signing certificate
-        if: startsWith(matrix.platform,'macos') && env.IS_STABLE == 'true'
+        if: startsWith(matrix.platform,'macos') && env.IS_STABLE == 'true' && env.APPLE_CERTIFICATE != ''
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           INTERMEDIATE_SHA256: 7afc9d01a62f03a2de9637936d4afe68090d2de18d03f29c88cfb0b1ba63587f
         run: |
           keychain="$RUNNER_TEMP/signing.keychain-db"
@@ -507,15 +516,12 @@ jobs:
       - name: Setup
         env:
           ANDROID_NDK_HOME: ${{ steps.build-ndk.outputs.ndk-path }}
-          APPLE_DEVELOPER_ID: ${{ startsWith(matrix.platform,'macos') && env.IS_STABLE == 'true' && secrets.APPLE_DEVELOPER_ID || '' }}
+          # Signing needs the certificate the step above imported.
+          APPLE_DEVELOPER_ID: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_DEVELOPER_ID || '' }}
         run: dart setup.dart ${{ matrix.platform }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }} -v
 
       - name: Notarize macOS
-        if: startsWith(matrix.platform,'macos') && env.IS_STABLE == 'true'
-        env:
-          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        if: startsWith(matrix.platform,'macos') && env.IS_STABLE == 'true' && env.APPLE_API_KEY_BASE64 != '' && env.APPLE_DEVELOPER_ID != ''
         run: |
           key="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$key"
