@@ -40,6 +40,7 @@ const (
 	getConnectionsMethod           CoreMethod = "getConnections"
 	getConnectionCountMethod       CoreMethod = "getConnectionCount"
 	closeConnectionsMethod         CoreMethod = "closeConnections"
+	closeConnectionsForGroupMethod CoreMethod = "closeConnectionsForGroup"
 	resetConnectionsMethod         CoreMethod = "resetConnections"
 	clearDnsCacheMethod            CoreMethod = "clearDnsCache"
 	closeConnectionMethod          CoreMethod = "closeConnection"

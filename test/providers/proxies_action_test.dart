@@ -524,6 +524,100 @@ void main() {
       verifyNever(core.closeConnections);
     });
 
+    test('closes only the changed group when the header asks for it', () async {
+      when(
+        () => core.closeConnectionsForGroup(any()),
+      ).thenAnswer((_) async => true);
+      final container = buildContainer(
+        profile: const Profile(
+          id: 1,
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {'Proxy': 'HK-01'},
+          providerHeaders: {'flclashx-closeconnections': 'related'},
+        ),
+      );
+      container.read(appSettingProvider.notifier).value = const AppSettingProps(
+        closeConnections: true,
+      );
+
+      await actionOf(
+        container,
+      ).changeProxy(groupName: 'Proxy', proxyName: 'HK-01');
+
+      verify(() => core.closeConnectionsForGroup('Proxy')).called(1);
+      verifyNever(core.closeConnections);
+      verifyNever(core.resetConnections);
+    });
+
+    test('a true header means the changed group alone', () async {
+      when(
+        () => core.closeConnectionsForGroup(any()),
+      ).thenAnswer((_) async => true);
+      final container = buildContainer(
+        profile: const Profile(
+          id: 1,
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {'Proxy': 'HK-01'},
+          providerHeaders: {'flclashx-closeconnections': 'true'},
+        ),
+      );
+
+      await actionOf(
+        container,
+      ).changeProxy(groupName: 'Proxy', proxyName: 'HK-01');
+
+      verify(() => core.closeConnectionsForGroup('Proxy')).called(1);
+      verifyNever(core.closeConnections);
+    });
+
+    test('closes everything when the header says all', () async {
+      final container = buildContainer(
+        profile: const Profile(
+          id: 1,
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {'Proxy': 'HK-01'},
+          providerHeaders: {'flclashx-closeconnections': 'all'},
+        ),
+      );
+      container.read(appSettingProvider.notifier).value = const AppSettingProps(
+        closeConnections: false,
+      );
+
+      await actionOf(
+        container,
+      ).changeProxy(groupName: 'Proxy', proxyName: 'HK-01');
+
+      verify(core.closeConnections).called(1);
+      verifyNever(() => core.closeConnectionsForGroup(any()));
+      verifyNever(core.resetConnections);
+    });
+
+    test('a failing group close does not fail the switch', () async {
+      when(() => core.closeConnectionsForGroup(any())).thenThrow(
+        const CoreMethodException(
+          code: 'transport_disconnected',
+          message: 'Core RPC client is closed',
+        ),
+      );
+      final container = buildContainer(
+        profile: const Profile(
+          id: 1,
+          autoUpdateDuration: Duration.zero,
+          selectedMap: {'Proxy': 'HK-00'},
+          providerHeaders: {'flclashx-closeconnections': 'related'},
+        ),
+      );
+
+      await actionOf(
+        container,
+      ).changeProxy(groupName: 'Proxy', proxyName: 'HK-01');
+
+      verify(() => core.closeConnectionsForGroup('Proxy')).called(1);
+      expect(container.read(currentProfileProvider)?.selectedMap, {
+        'Proxy': 'HK-01',
+      });
+    });
+
     test('a failing connection reset does not fail the switch', () async {
       when(core.closeConnections).thenThrow(
         const CoreMethodException(

@@ -55,6 +55,7 @@ FlClashX читает HTTP-заголовки ответа, которым па�
 | `flclashx-background` | `URL` или `URL,<видимость 1–100>` | Картинка под всеми полноэкранными страницами, приглушённая цветом страницы. Без числа видно 8 %. Качается один раз в дисковый кэш |
 | `flclashx-view` | `ключ:значение;...` | Внешний вид, см. ниже |
 | `flclashx-settings` | флаги через запятую: `minimize`, `autorun`, `shadowstart`, `autostart`, `autoupdate`, `openlogs`, `closeconnections` | Названные переключатели приложения включаются, остальные из списка выключаются |
+| `flclashx-closeconnections` | `related` (или `true`), `all` | Какие соединения рвать при смене прокси. `related` — только те, что шли через изменённую группу, включая группы, которые её выбрали; `all` — все. Без заголовка решает настройка приложения «Автозакрытие соединений» |
 | `flclashx-special` | флаги через запятую: `androidsecure`, `noglobal`, `denywidgets` | Особые режимы. `androidsecure` на Android обнуляет локальные порты, прячет пункт «Порт» и выключает системный прокси VPN; подписки и ресурсы приложение тогда качает напрямую, а не через локальный порт. На других платформах ничего не делает. `noglobal` убирает режим Global: из карточки и панели выбора режима, кнопки «Правила/Глобальный», из трея целиком уходит выбор режима, горячая клавиша не срабатывает, а выбранный Global переводится в Rule. `denywidgets` прячет кнопку «Редактировать дашборд» |
 
 ### Карточки для `flclashx-widgets`
@@ -119,6 +120,7 @@ flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
 flclashx-background: https://cdn.myvpn.example/bg.jpg,25
 flclashx-view: app.board:extended;app.color:#FF5733;app.style:soft;app.black:false;app.navbar:docked;app.tabs:fade;app.glass:standard;proxies.type:tab;proxies.sort:delay;proxies.card:compact
 flclashx-settings: minimize,autostart,closeconnections
+flclashx-closeconnections: related
 flclashx-special: androidsecure,noglobal,denywidgets
 ```
 
@@ -162,6 +164,10 @@ support-url: https://t.me/myvpn_support
   {
     "key": "flclashx-settings",
     "value": "minimize, autorun, shadowstart, autostart, autoupdate"
+  },
+  {
+    "key": "flclashx-closeconnections",
+    "value": "related"
   },
   {
     "key": "flclashx-serverinfo",

@@ -97,6 +97,18 @@ class ProviderHeaders {
 
   bool get hideIp => specials?.contains('hideip') ?? false;
 
+  /// `flclashx-closeconnections`: what a proxy switch drops.
+  ///
+  /// `related` (or `true`) drops only the connections that went through the
+  /// changed proxy group, including the groups that select it; `all` drops
+  /// every connection. Anything else leaves the app switch in charge.
+  CloseConnectionsScope? get closeConnectionsScope =>
+      switch (text('flclashx-closeconnections')?.toLowerCase()) {
+        'related' || 'true' || 'yes' || '1' => CloseConnectionsScope.related,
+        'all' => CloseConnectionsScope.all,
+        _ => null,
+      };
+
   String? get serviceName => _plainOrBase64(text('flclashx-servicename'));
 
   String? get serviceLogo {

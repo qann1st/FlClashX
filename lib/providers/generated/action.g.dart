@@ -150,7 +150,7 @@ final class ProfileHeadersActionProvider
 }
 
 String _$profileHeadersActionHash() =>
-    r'6de99f935c02a1a096e700353a496bedc4ad716f';
+    r'9949f5bedf6a22bed892c8640f0a3c902ce72458';
 
 /// Lands once per update of, or switch to, a profile; edits in between stay.
 
@@ -577,7 +577,7 @@ final class ProxiesActionProvider
   }
 }
 
-String _$proxiesActionHash() => r'bf67f404dbbde5124acf1b8d5cfafa1a3d2a96ac';
+String _$proxiesActionHash() => r'28c5d9f1c5a48cc6b86f7bacbb7c00ddf4bd0798';
 
 abstract class _$ProxiesAction extends $Notifier<void> {
   void build();

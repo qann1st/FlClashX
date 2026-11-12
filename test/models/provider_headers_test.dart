@@ -504,6 +504,30 @@ void main() {
     });
   });
 
+  group('closeConnectionsScope', () {
+    CloseConnectionsScope? scopeOf(String? value) => ProviderHeaders({
+      'flclashx-closeconnections': ?value,
+    }).closeConnectionsScope;
+
+    test('related, true and yes ask for the changed group alone', () {
+      for (final value in ['related', ' Related ', 'true', 'TRUE', 'yes', '1']) {
+        expect(scopeOf(value), CloseConnectionsScope.related, reason: value);
+      }
+    });
+
+    test('all asks for every connection', () {
+      expect(scopeOf('all'), CloseConnectionsScope.all);
+      expect(scopeOf('ALL'), CloseConnectionsScope.all);
+    });
+
+    test('an absent or unknown value leaves the app switch in charge', () {
+      expect(scopeOf(null), isNull);
+      expect(scopeOf(''), isNull);
+      expect(scopeOf('false'), isNull);
+      expect(scopeOf('whatever'), isNull);
+    });
+  });
+
   group('specials', () {
     test('androidsecure is one of the special flags', () {
       const headers = ProviderHeaders({'flclashx-special': 'AndroidSecure, x'});

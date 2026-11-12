@@ -250,6 +250,9 @@ enum ProxiesLayout { loose, standard, tight }
 
 enum ProxyCardType { loose, standard, compact }
 
+/// What a proxy switch drops, as `flclashx-closeconnections` asks.
+enum CloseConnectionsScope { related, all }
+
 enum DnsMode {
   normal,
   @JsonValue('fake-ip')

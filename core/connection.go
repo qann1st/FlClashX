@@ -1,6 +1,8 @@
 package core
 
 import (
+	"slices"
+
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
@@ -43,6 +45,20 @@ func handleGetConnectionCount() int {
 func handleCloseConnections() bool {
 	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
 		_ = c.Close()
+		return true
+	})
+	return true
+}
+
+// handleCloseConnectionsForGroup closes only the connections that passed
+// through the named proxy group. A group names itself in the chain of every
+// connection it routed, and so do the groups above it, so a change in a child
+// group also drops the connections of the selectors that chose it.
+func handleCloseConnectionsForGroup(groupName string) bool {
+	statistic.DefaultManager.Range(func(c statistic.Tracker) bool {
+		if slices.Contains(c.Chains(), groupName) {
+			_ = c.Close()
+		}
 		return true
 	})
 	return true

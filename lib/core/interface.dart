@@ -126,6 +126,8 @@ mixin CoreInterface {
 
   FutureOr<bool> closeConnections();
 
+  FutureOr<bool> closeConnectionsForGroup(String groupName);
+
   FutureOr<bool> resetConnections();
 
   FutureOr<bool> clearDnsCache();
@@ -537,6 +539,15 @@ abstract class CoreHandlerInterface with CoreInterface {
   @override
   Future<bool> closeConnections() async {
     return await _invokeMethod<bool>(method: CoreMethod.closeConnections) ??
+        false;
+  }
+
+  @override
+  Future<bool> closeConnectionsForGroup(String groupName) async {
+    return await _invokeMethod<bool>(
+          method: CoreMethod.closeConnectionsForGroup,
+          arguments: groupName,
+        ) ??
         false;
   }
 

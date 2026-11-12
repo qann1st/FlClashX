@@ -212,6 +212,23 @@ flclashx-settings: minimize,autostart,closeconnections
 </details>
 
 <details>
+<summary><strong>flclashx-closeconnections</strong></summary>
+
+Which open connections to drop when the user switches the proxy of a group.
+
+| Value | What is closed |
+|---|---|
+| `related` (or `true`) | Only the connections that went through the changed group. If "Chosen location" points at the "Location choice" group, switching "Location choice" also drops the connections through "Chosen location": they passed through both |
+| `all` | Every connection, like the `closeconnections` flag in `flclashx-settings` |
+
+Without the header the app's own "Auto close connections" switch decides.
+
+```http
+flclashx-closeconnections: related
+```
+</details>
+
+<details>
 <summary><strong>flclashx-special</strong></summary>
 
 Comma-separated flags.
@@ -262,6 +279,10 @@ The same set in the form panel settings accept (Remnawave and alike): a `headers
   {
     "key": "flclashx-settings",
     "value": "minimize, autorun, shadowstart, autostart, autoupdate"
+  },
+  {
+    "key": "flclashx-closeconnections",
+    "value": "related"
   },
   {
     "key": "flclashx-serverinfo",

@@ -212,6 +212,23 @@ flclashx-settings: minimize,autostart,closeconnections
 </details>
 
 <details>
+<summary><strong>flclashx-closeconnections</strong></summary>
+
+Какие открытые соединения рвать, когда пользователь меняет сервер в группе.
+
+| Значение | Что закрывается |
+|---|---|
+| `related` (или `true`) | Только соединения, которые шли через изменённую группу. Если «Выбранная локация» указывает на группу «Выбор локации», смена «Выбор локации» закроет и соединения через «Выбранная локация»: они проходили через обе группы |
+| `all` | Все соединения, как флаг `closeconnections` в `flclashx-settings` |
+
+Без заголовка решает настройка приложения «Автозакрытие соединений».
+
+```http
+flclashx-closeconnections: related
+```
+</details>
+
+<details>
 <summary><strong>flclashx-special</strong></summary>
 
 Флаги через запятую.
@@ -250,6 +267,7 @@ flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
 flclashx-background: https://cdn.myvpn.example/bg.jpg,25
 flclashx-view: app.board:extended;app.color:#FF5733;app.style:soft;app.black:false;app.navbar:docked;app.tabs:fade;app.glass:standard;proxies.type:tab;proxies.sort:delay;proxies.card:compact
 flclashx-settings: minimize,autostart,closeconnections
+flclashx-closeconnections: related
 flclashx-special: androidsecure,noglobal,denywidgets
 ```
 

@@ -239,6 +239,10 @@ class CoreController {
     await _interface.closeConnections();
   }
 
+  Future<void> closeConnectionsForGroup(String groupName) async {
+    await _interface.closeConnectionsForGroup(groupName);
+  }
+
   Future<void> resetConnections() async {
     await _interface.resetConnections();
   }

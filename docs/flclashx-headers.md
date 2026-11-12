@@ -14,6 +14,7 @@
 | `flclashx-background` | `URL` или `URL,<видимость 1–100>` | Картинка под всеми полноэкранными страницами, приглушённая цветом страницы. Без числа видно 8 %. Качается один раз в дисковый кэш |
 | `flclashx-view` | `ключ:значение;...` | Внешний вид приложения и вкладки прокси |
 | `flclashx-settings` | флаги через запятую | Переключатели приложения |
+| `flclashx-closeconnections` | `related` (или `true`), `all` | Какие соединения рвать при смене прокси |
 | `flclashx-special` | флаги через запятую | Особые режимы |
 
 Примеры ниже даны в том виде, в каком заголовки добавляются в настройках
@@ -164,6 +165,23 @@
 { "key": "flclashx-settings", "value": "minimize, autorun, shadowstart, autostart, autoupdate" }
 ```
 
+## `flclashx-closeconnections`
+
+Какие открытые соединения рвать, когда пользователь меняет сервер в группе
+прокси.
+
+| Значение | Что закрывается |
+|---|---|
+| `related` (или `true`) | Только соединения, которые шли через изменённую группу. Если группа «Выбранная локация» указывает на группу «Выбор локации», смена «Выбор локации» закроет и соединения через «Выбранная локация»: они проходили через обе группы |
+| `all` | Все соединения, как переключатель `closeconnections` в `flclashx-settings` |
+
+Без заголовка или с любым другим значением решает настройка приложения
+«Автозакрытие соединений».
+
+```json
+{ "key": "flclashx-closeconnections", "value": "related" }
+```
+
 ## `flclashx-special`
 
 | Флаг | Что делает |
@@ -205,6 +223,7 @@
   { "key": "flclashx-servicename", "value": "Example VPN" },
   { "key": "flclashx-servicelogo", "value": "https://assets.example.com/logo.png" },
   { "key": "flclashx-settings", "value": "minimize, autorun, shadowstart, autostart, autoupdate" },
+  { "key": "flclashx-closeconnections", "value": "related" },
   { "key": "flclashx-serverinfo", "value": "SERVERS" },
   { "key": "flclashx-special", "value": "noglobal,androidsecure,denywidgets" },
   { "key": "flclashx-buytraffic", "value": "https://shop.example.com/#/buy-extra-traffic,10" },
@@ -221,6 +240,7 @@ flclashx-background: https://assets.example.com/back.jpg,20
 flclashx-servicename: Example VPN
 flclashx-servicelogo: https://assets.example.com/logo.png
 flclashx-settings: minimize, autorun, shadowstart, autostart, autoupdate
+flclashx-closeconnections: related
 flclashx-serverinfo: SERVERS
 flclashx-special: noglobal,androidsecure,denywidgets
 flclashx-buytraffic: https://shop.example.com/#/buy-extra-traffic,10
