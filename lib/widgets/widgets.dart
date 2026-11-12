@@ -8,5 +8,6 @@ export 'palette.dart';
 export 'managed_setting.dart';
 export 'record.dart';
 export 'record_table.dart';
+export 'rising_hold.dart';
 export 'subscription_info_view.dart';
 export 'package:fl_clash/ui/ui.dart';

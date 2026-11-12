@@ -17,6 +17,10 @@ Future<T> _decodeJSON<T>(String content) async {
   return json.decode(content);
 }
 
+Future<String> encodeJSONTask(Object? data) async {
+  return compute<Object?, String>(json.encode, data);
+}
+
 Future<String> encodeYamlTask<T>(T data) async {
   return compute<T, String>(_encodeYaml, data);
 }
@@ -533,6 +537,12 @@ Map<String, Object?>? _overwriteOfOverrideData(Object? overrideData) {
   };
 }
 
+bool _isPlainFileName(String name) =>
+    name.isNotEmpty &&
+    name != '.' &&
+    name != '..' &&
+    !name.contains(RegExp(r'[/\\]'));
+
 Future<MigrationData> migrateLegacyConfig({
   required Map<String, Object?> configMap,
   required String sourcePath,
@@ -605,7 +615,8 @@ Future<MigrationData> migrateLegacyConfig({
   final List<Profile> profiles = [];
   for (final rawProfile in rawProfiles) {
     final rawId = rawProfile['id'] as String?;
-    if (rawId == null) {
+    // The id names the profile's file in the backup.
+    if (rawId == null || !_isPlainFileName(rawId)) {
       continue;
     }
     final profileId = idMap.updateCacheValue(rawId, () => snowflake.id);
@@ -657,7 +668,9 @@ Future<MigrationData> migrateLegacyConfig({
       targetPath,
       BackupEntries.profile(profileId),
     );
-    await sourceFile.safeCopy(targetFilePath);
+    if (await sourceFile.exists()) {
+      await sourceFile.safeCopy(targetFilePath);
+    }
     profiles.add(Profile.fromJson(rawProfile));
   }
   final currentProfileId = configMap['currentProfileId'];

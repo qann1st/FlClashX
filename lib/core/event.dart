@@ -46,6 +46,8 @@ abstract mixin class CoreEventListener {
   void onRouteChanged(RouteSnapshot snapshot) {}
 
   void onDialerLoop(String proxyName) {}
+
+  void onTunFailed() {}
 }
 
 class CoreEventManager {
@@ -99,6 +101,9 @@ class CoreEventManager {
               break;
             case CoreEventType.dialerLoop:
               listener.onDialerLoop(event.data as String);
+              break;
+            case CoreEventType.tunFailed:
+              listener.onTunFailed();
               break;
           }
         } catch (error) {

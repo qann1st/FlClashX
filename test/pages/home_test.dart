@@ -1259,9 +1259,8 @@ void main() {
     expect(find.byType(TextField), findsNothing);
   });
 
-  testWidgets('a desktop page left open reopens in the mobile layout', (
-    tester,
-  ) async {
+  testWidgets('a desktop page left open stays open, state and all, in the '
+      'mobile layout until it closes', (tester) async {
     tester.view.physicalSize = const Size(1200, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -1310,21 +1309,79 @@ void main() {
       isA<CommonDesktopRoute<String>>(),
     );
 
+    final route = ModalRoute.of(tester.element(find.text('Sub page')));
     tester.view.physicalSize = const Size(500, 800);
     container.read(viewSizeProvider.notifier).value = const Size(500, 800);
     await tester.pumpAndSettle();
 
-    expect(find.text('Sub page'), findsOneWidget);
-    final reopened = tester.element(find.text('Sub page'));
-    expect(ModalRoute.of(reopened), isA<CommonRoute<String>>());
+    final kept = tester.element(find.text('Sub page'));
+    expect(ModalRoute.of(kept), same(route));
     expect(results, isEmpty);
+    final navigators = find.byType(Navigator).evaluate().length;
 
-    Navigator.of(reopened).pop('done');
+    Navigator.of(kept).pop('done');
     await tester.pumpAndSettle();
 
     expect(find.text('Sub page'), findsNothing);
     expect(results, ['done']);
+    expect(find.byType(Navigator).evaluate().length, navigators - 1);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the system back asks the open page first, guard and all', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final results = <String?>[];
+    final container = ProviderContainer(
+      overrides: [
+        navigationItemsStateProvider.overrideWithValue(
+          NavigationItemsState(
+            value: [
+              NavigationItem(
+                glyph: AppGlyphs.dashboard,
+                label: PageLabel.dashboard,
+                builder: (_) => _PageOpener(
+                  key: const GlobalObjectKey(PageLabel.dashboard),
+                  guarded: true,
+                  onClosed: results.add,
+                ),
+              ),
+              NavigationItem(
+                glyph: AppGlyphs.settings,
+                label: PageLabel.tools,
+                builder: (_) => const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    globalState.container = container;
+    container.read(viewSizeProvider.notifier).value = const Size(1200, 800);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TestApp(includeNavigatorKey: false, child: HomePage()),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Open page'));
+    await tester.pumpAndSettle();
+    tester.view.physicalSize = const Size(500, 800);
+    container.read(viewSizeProvider.notifier).value = const Size(500, 800);
+    await tester.pumpAndSettle();
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Sub page'), findsOneWidget);
+    expect(results, isEmpty);
   });
 
   testWidgets(
@@ -1494,8 +1551,9 @@ class _NestedSearchLauncher extends StatelessWidget {
 
 class _PageOpener extends StatelessWidget {
   final ValueChanged<String?> onClosed;
+  final bool guarded;
 
-  const _PageOpener({super.key, required this.onClosed});
+  const _PageOpener({super.key, required this.onClosed, this.guarded = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1505,7 +1563,10 @@ class _PageOpener extends StatelessWidget {
           onClosed(
             await BaseNavigator.push<String>(
               context,
-              const Scaffold(body: Center(child: Text('Sub page'))),
+              PopScope(
+                canPop: !guarded,
+                child: const Scaffold(body: Center(child: Text('Sub page'))),
+              ),
             ),
           );
         },

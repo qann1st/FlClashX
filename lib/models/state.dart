@@ -249,6 +249,10 @@ abstract class MigrationData with _$MigrationData {
     @Default([]) List<ClashProvider> clashProviders,
     @Default([]) List<CustomProxy> customProxies,
     @Default([]) List<ProxyDialer> proxyDialers,
+    @Default([]) List<IconSet> iconSets,
+    // False for an archive that carries settings alone: an empty list then
+    // says nothing about the rows, so an override restore must keep them.
+    @Default(true) bool includesTables,
   }) = _MigrationData;
 }
 

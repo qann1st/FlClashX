@@ -221,7 +221,6 @@
   "go": "Go",
   "externalLink": "External link",
   "forkAuthor": "Fork author",
-  "otherContributors": "Other contributors",
   "originalRepository": "Original repository",
   "autoCloseConnections": "Auto close connections",
   "autoCloseConnectionsDesc": "Auto close connections drops open connections when you switch proxies.",
@@ -262,6 +261,7 @@
   "proxyProviders": "Proxy providers",
   "ruleProviders": "Rule providers",
   "providerUrlTip": "Only remote providers are supported",
+  "providerReplacedTip": "This provider was replaced while you edited it. Reopen it to edit the current one.",
   "ruleSetEmptyTip": "The rule set has no usable entries",
   "ruleSetMixedTip": "The rule set mixes domains and IP ranges, so its type cannot be told",
   "ruleSetInvalidTip": "This mrs file cannot be read",
@@ -596,6 +596,7 @@
   "inputProxyGroupName": "Enter the proxy group name",
   "helperCorruptTip": "Helper service unavailable; TUN mode cannot be enabled. Reinstall FlClashX to restore it.",
   "tunAuthorizationFailed": "TUN could not be authorized, so it was turned off.",
+  "tunStartFailed": "TUN could not start, so it was turned off.",
   "sudoPasswordTitle": "Enter your password for sudo",
   "coreBlockedByPolicyTip": "Windows refused to run FlClashCore.exe (error {code}). An app control policy such as Smart App Control or AppLocker blocks unsigned programs; allow FlClashX in that policy or turn it off, then try again.",
   "coreBlockedBySmartAppControlTip": "Windows Smart App Control blocked FlClashCore.exe because it is not signed. Open Windows Security → App & browser control → Smart App Control settings, choose Off, then start FlClashX again. Smart App Control cannot be turned back on without reinstalling Windows.",
@@ -981,5 +982,8 @@
   "vpnBlockedByAnotherApp": "VPN blocked by another app",
   "vpnBlockedByAnotherAppTip": "Another VPN app has Always-on VPN turned on. Turn it off for that app in the VPN settings, then start again.",
   "openVpnSettings": "Open VPN settings",
-  "vpnRestrictedByAdministrator": "VPN is restricted on this device by its administrator"
+  "vpnRestrictedByAdministrator": "VPN is restricted on this device by its administrator",
+  "shareLogs": "Share logs",
+  "noLogsToday": "There are no logs for today",
+  "downloadTooLarge": "The file is too large to download"
 }

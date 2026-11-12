@@ -1,3 +1,5 @@
+import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -12,14 +14,27 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart' show Override;
+import 'package:mocktail/mocktail.dart';
 
 import '../helpers/test_app.dart';
 import '../helpers/test_profiles.dart';
+
+/// Off the global Core, whose transport another file in a bundle may leave open.
+class _NoProfileBaseCore extends Mock implements CoreHandlerInterface {
+  @override
+  Future<ProfileBase> getProfileBase(String path) =>
+      Future.error(StateError('no Core in this test'));
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late ProviderContainer container;
+
+  Override noCore() => coreHandlerProvider.overrideWithValue(
+    CoreController.scoped(_NoProfileBaseCore()),
+  );
 
   const profile = Profile(
     id: 1,
@@ -38,6 +53,7 @@ void main() {
       overrides: [
         profilesProvider.overrideWith(() => TestProfiles([profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+        noCore(),
       ],
     );
     addTearDown(container.dispose);
@@ -186,22 +202,23 @@ void main() {
     expect(setting().minimizeOnExit, isTrue);
   });
 
-  testWidgets('a view key dims its block on the theme page', (tester) async {
+  Future<void> pumpTheme(WidgetTester tester, String view) async {
     tester.view.physicalSize = const Size(1000, 3000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    const styled = Profile(
+    final styled = Profile(
       id: 2,
       label: 'Plan',
       type: ProfileType.url,
       autoUpdateDuration: Duration.zero,
-      providerHeaders: {'flclashx-view': 'app.board:extended'},
+      providerHeaders: {'flclashx-view': view},
     );
     container = ProviderContainer(
       overrides: [
         profilesProvider.overrideWith(() => TestProfiles([styled])),
         currentProfileIdProvider.overrideWithBuild((_, _) => styled.id),
+        noCore(),
       ],
     );
     addTearDown(container.dispose);
@@ -216,6 +233,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('a view key dims its block on the theme page', (tester) async {
+    await pumpTheme(tester, 'app.board:extended');
 
     expect(
       find.ancestor(
@@ -227,6 +248,25 @@ void main() {
     expect(
       find.ancestor(
         of: find.text('Pure black mode'),
+        matching: find.byType(Opacity),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('the theme key dims the appearance block', (tester) async {
+    await pumpTheme(tester, 'app.theme:dark');
+
+    expect(
+      find.ancestor(
+        of: find.text('Appearance'),
+        matching: find.byType(Opacity),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.ancestor(
+        of: find.text('Theme mode'),
         matching: find.byType(Opacity),
       ),
       findsNothing,
@@ -311,6 +351,7 @@ void main() {
       overrides: [
         profilesProvider.overrideWith(() => TestProfiles([colored])),
         currentProfileIdProvider.overrideWithBuild((_, _) => colored.id),
+        noCore(),
       ],
     );
     addTearDown(container.dispose);
@@ -336,6 +377,7 @@ void main() {
       overrides: [
         profilesProvider.overrideWith(() => TestProfiles([profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+        noCore(),
       ],
     );
     addTearDown(container.dispose);

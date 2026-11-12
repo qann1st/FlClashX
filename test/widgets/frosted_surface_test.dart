@@ -24,7 +24,7 @@ void main() {
   Future<void> pump(
     WidgetTester tester, {
     required bool glass,
-    LiquidGlassQuality quality = LiquidGlassQuality.standard,
+    LiquidGlassQuality quality = LiquidGlassQuality.ultra,
     Widget? child,
   }) => tester.pumpWidget(
     MaterialApp(
@@ -54,10 +54,16 @@ void main() {
     expect(decoration.color, surface);
   });
 
+  testWidgets('a surface stays solid on the standard tier', (tester) async {
+    await pump(tester, glass: true, quality: LiquidGlassQuality.standard);
+
+    expect(find.byType(LiquidGlass), findsNothing);
+  });
+
   testWidgets('a surface frosts in its corners once glass is on', (
     tester,
   ) async {
-    await pump(tester, glass: true, quality: LiquidGlassQuality.ultra);
+    await pump(tester, glass: true);
 
     final pane = tester.widget<LiquidGlass>(find.byType(LiquidGlass));
     expect(pane.borderRadius, radius);
@@ -85,7 +91,10 @@ void main() {
     expect(find.byType(LiquidGlass), findsOneWidget);
     expect(pageColor, Colors.transparent);
     expect(frost?.surface, surface);
-    expect(frost?.opacity, 0.6);
+    expect(
+      frost?.opacity,
+      LiquidGlassStyle.frostOpacity(LiquidGlassQuality.ultra),
+    );
   });
 
   testWidgets('a solid sheet offers no frost to fill over', (tester) async {

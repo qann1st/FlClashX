@@ -419,16 +419,19 @@ class Database extends _$Database {
     List<ClashProvider> clashProviders = const [],
     List<CustomProxy> customProxies = const [],
     List<ProxyDialer> proxyDialers = const [],
+    List<IconSet> iconSets = const [],
     bool isOverride = false,
   }) async {
-    if (profiles.isEmpty &&
+    if (!isOverride &&
+        profiles.isEmpty &&
         scripts.isEmpty &&
         rules.isEmpty &&
         disabledRules.isEmpty &&
         proxyGroups.isEmpty &&
         clashProviders.isEmpty &&
         customProxies.isEmpty &&
-        proxyDialers.isEmpty) {
+        proxyDialers.isEmpty &&
+        iconSets.isEmpty) {
       return;
     }
     await transaction(() async {
@@ -444,6 +447,7 @@ class Database extends _$Database {
           clashProvidersDao.setAllWithBatch(b, clashProviders);
           // Rewriting profiles or custom proxies cascades into these.
           proxyDialersDao.setAllWithBatch(b, proxyDialers);
+          iconSetsDao.setAllWithBatch(b, iconSets);
           return;
         }
         profilesDao.putAllWithBatch(
@@ -456,6 +460,7 @@ class Database extends _$Database {
         customProxiesDao.putAllWithBatch(b, customProxies);
         clashProvidersDao.putAllWithBatch(b, clashProviders);
         proxyDialersDao.putAllWithBatch(b, proxyDialers);
+        iconSetsDao.putAllWithBatch(b, iconSets);
       });
       await _purgeOrphans();
     });

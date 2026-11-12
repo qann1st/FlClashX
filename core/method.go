@@ -208,6 +208,7 @@ var methodHandlers = map[CoreMethod]methodHandler{
 	asyncTestDelayMethod:      withArguments(handleTestDelay),
 	watchRouteMethod:          watchRouteHandler,
 	checkRoutesMethod:         withArguments(handleCheckRoutes),
+	getTunFailedMethod:        withoutArguments(handleGetTunFailed),
 
 	outboundIpMethod:               withArguments(handleOutboundIp),
 	serviceCheckMethod:             withArguments(handleServiceCheck),

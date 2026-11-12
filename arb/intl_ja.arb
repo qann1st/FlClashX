@@ -221,7 +221,6 @@
   "go": "開く",
   "externalLink": "外部リンク",
   "forkAuthor": "フォーク作者",
-  "otherContributors": "その他の貢献者",
   "originalRepository": "オリジナルリポジトリ",
   "autoCloseConnections": "接続を自動的に閉じる",
   "autoCloseConnectionsDesc": "プロキシを切り替えると、既存の接続を自動的に閉じます。",
@@ -262,6 +261,7 @@
   "proxyProviders": "プロキシプロバイダー",
   "ruleProviders": "ルールプロバイダー",
   "providerUrlTip": "リモートリソースのみ対応しています",
+  "providerReplacedTip": "編集中にこのプロバイダーが置き換えられました。現在のものを編集するには開き直してください。",
   "ruleSetEmptyTip": "ルールセットに使用できるエントリがありません",
   "ruleSetMixedTip": "ルールセットにドメインと IP 範囲が混在しているため、種類を判別できません",
   "ruleSetInvalidTip": "この mrs ファイルを読み込めません",
@@ -596,6 +596,7 @@
   "inputProxyGroupName": "プロキシグループ名を入力してください",
   "helperCorruptTip": "Helper サービスが利用できないため、TUN モードを有効にできません。FlClashX を再インストールしてください。",
   "tunAuthorizationFailed": "TUN の権限を取得できなかったため、オフにしました。",
+  "tunStartFailed": "TUN を起動できなかったため、オフにしました。",
   "sudoPasswordTitle": "sudo のパスワードを入力",
   "coreBlockedByPolicyTip": "Windows が FlClashCore.exe の実行を拒否しました（エラー {code}）。スマート アプリ コントロールや AppLocker などのアプリ制御ポリシーは未署名のプログラムをブロックします。ポリシーで FlClashX を許可するか、ポリシーを無効にしてから再試行してください。",
   "coreBlockedBySmartAppControlTip": "Windows のスマート アプリ コントロールが、署名されていない FlClashCore.exe をブロックしました。Windows セキュリティ → アプリとブラウザーの制御 → スマート アプリ コントロールの設定で「オフ」を選び、FlClashX を再起動してください。一度オフにすると、Windows を再インストールしない限り再度オンにはできません。",
@@ -981,5 +982,8 @@
   "vpnBlockedByAnotherApp": "別のアプリが VPN をブロックしています",
   "vpnBlockedByAnotherAppTip": "別の VPN アプリで「常時接続 VPN」がオンになっています。VPN 設定でそのアプリの設定をオフにしてから、もう一度開始してください。",
   "openVpnSettings": "VPN 設定を開く",
-  "vpnRestrictedByAdministrator": "このデバイスでは管理者によって VPN が制限されています"
+  "vpnRestrictedByAdministrator": "このデバイスでは管理者によって VPN が制限されています",
+  "shareLogs": "ログを共有",
+  "noLogsToday": "今日のログはありません",
+  "downloadTooLarge": "ファイルが大きすぎてダウンロードできません"
 }

@@ -59,15 +59,14 @@ final class _SessionDisconnect {
 final class _TransportConnectionWaiter {
   final Completer<void> _settled = Completer<void>();
   late final StreamSubscription<DesktopTransportEvent> _subscription;
-  late final Timer _timer;
+  Timer? _timer;
   TransportConnected? _connection;
   Object? _error;
   StackTrace? _stackTrace;
 
-  _TransportConnectionWaiter(
-    Stream<DesktopTransportEvent> events,
-    Duration timeout,
-  ) {
+  bool connectionLost = false;
+
+  _TransportConnectionWaiter(Stream<DesktopTransportEvent> events) {
     _subscription = events.listen(
       (event) {
         switch (event) {
@@ -81,12 +80,18 @@ final class _TransportConnectionWaiter {
               _error = error;
               _stackTrace = stackTrace;
               _settled.complete();
+            } else {
+              connectionLost = _connection != null;
             }
-          case TransportReady() || TransportDisconnected():
+          case TransportDisconnected(:final generation):
+            connectionLost =
+                connectionLost || generation == _connection?.generation;
+          case TransportReady():
             break;
         }
       },
       onDone: () {
+        connectionLost = _connection != null;
         if (!_settled.isCompleted) {
           _error = StateError('Core transport closed before connection');
           _stackTrace = StackTrace.current;
@@ -94,7 +99,11 @@ final class _TransportConnectionWaiter {
         }
       },
     );
-    _timer = Timer(timeout, () {
+  }
+
+  /// From the launch's answer on, as the Helper's launch has its own deadline.
+  void arm(Duration timeout) {
+    _timer ??= Timer(timeout, () {
       if (!_settled.isCompleted) {
         _error = TimeoutException(
           'Core transport connection timed out',
@@ -116,7 +125,7 @@ final class _TransportConnectionWaiter {
   }
 
   Future<void> cancel() async {
-    _timer.cancel();
+    _timer?.cancel();
     await _subscription.cancel();
   }
 }
@@ -401,14 +410,12 @@ final class DesktopCoreLifecycle implements DesktopCoreLifecycleController {
       if (!_wantsRunning) {
         return false;
       }
-      connectionWaiter = _TransportConnectionWaiter(
-        _transport.events,
-        timeouts.connection,
-      );
+      connectionWaiter = _TransportConnectionWaiter(_transport.events);
       lease = await launcher.start(
         sessionId: sessionId,
         address: _transport.address,
       );
+      connectionWaiter.arm(timeouts.connection);
       if (lease.sessionId != sessionId) {
         await releaseLease();
         throw _failure(
@@ -428,6 +435,16 @@ final class DesktopCoreLifecycle implements DesktopCoreLifecycleController {
       if (connected == null || !_wantsRunning) {
         await releaseLease();
         return false;
+      }
+      if (connectionWaiter.connectionLost) {
+        await releaseLease();
+        throw _failure(
+          code: 'unexpected_disconnect',
+          phase: DesktopCorePhase.starting,
+          revision: revision,
+          lease: lease,
+          connectionGeneration: connected.generation,
+        );
       }
       if (verifyPeerPid && connected.pid != lease.pid) {
         await releaseLease();

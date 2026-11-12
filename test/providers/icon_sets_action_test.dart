@@ -58,7 +58,11 @@ void main() {
   setUp(() {
     final bindingOverrides = HttpOverrides.current;
     HttpOverrides.global = null;
-    addTearDown(() => HttpOverrides.global = bindingOverrides);
+    request.resetClient();
+    addTearDown(() {
+      HttpOverrides.global = bindingOverrides;
+      request.resetClient();
+    });
     held = null;
     testDatabase = db.Database(NativeDatabase.memory());
     db.database = testDatabase;

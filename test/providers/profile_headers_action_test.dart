@@ -4,6 +4,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/color.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_profiles.dart';
@@ -106,6 +107,23 @@ void main() {
     expect(style(), ThemeStyle.original);
     expect(container.read(proxiesStyleSettingProvider).type, ProxiesType.tab);
   });
+
+  test(
+    'the theme key sets the appearance unless the user took it over',
+    () async {
+      await select(_profile(1, view: 'app.theme:dark'));
+      expect(container.read(themeSettingProvider).themeMode, ThemeMode.dark);
+
+      container
+          .read(appSettingProvider.notifier)
+          .update((state) => state.copyWith(ownedSettings: {'view.app.theme'}));
+      container
+          .read(themeSettingProvider.notifier)
+          .update((state) => state.copyWith(themeMode: ThemeMode.system));
+      await select(_profile(2, view: 'app.theme:light'));
+      expect(container.read(themeSettingProvider).themeMode, ThemeMode.system);
+    },
+  );
 
   test('a switch the user took over is left to the user', () async {
     container
@@ -222,7 +240,7 @@ void main() {
         .update(
           (state) => state.copyWith(
             appliedHeadersUpdate: profileHeadersUpdateOf(
-              _profile(1, updatedAt: updatedAt),
+              _profile(1, view: 'app.board:extended', updatedAt: updatedAt),
             ),
           ),
         );
@@ -236,6 +254,22 @@ void main() {
     );
 
     expect(style(), ThemeStyle.original);
+  });
+
+  test('a second update within the same second applies its headers', () async {
+    final updatedAt = DateTime(2026, 10, 19, 10);
+    await select(_profile(1, view: 'app.theme:dark', updatedAt: updatedAt));
+    expect(container.read(themeSettingProvider).themeMode, ThemeMode.dark);
+
+    await put(
+      _profile(
+        1,
+        view: 'app.theme:light',
+        updatedAt: updatedAt.add(const Duration(milliseconds: 400)),
+      ),
+    );
+
+    expect(container.read(themeSettingProvider).themeMode, ThemeMode.light);
   });
 
   test('a profile restored after the last was deleted applies again', () async {

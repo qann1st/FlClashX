@@ -150,6 +150,7 @@ _VpnOptions _$VpnOptionsFromJson(Map<String, dynamic> json) => _VpnOptions(
           ?.map((e) => e as String)
           .toList() ??
       const [],
+  excludesAllRoutes: json['excludesAllRoutes'] as bool? ?? false,
   mtu: (json['mtu'] as num?)?.toInt() ?? 0,
   congestionController: json['congestionController'] as String? ?? '',
 );
@@ -166,6 +167,7 @@ Map<String, dynamic> _$VpnOptionsToJson(_VpnOptions instance) =>
       'bypassDomain': instance.bypassDomain,
       'stack': instance.stack,
       'routeAddress': instance.routeAddress,
+      'excludesAllRoutes': instance.excludesAllRoutes,
       'mtu': instance.mtu,
       'congestionController': instance.congestionController,
     };
@@ -279,6 +281,7 @@ const _$CoreEventTypeEnumMap = {
   CoreEventType.geoUpdate: 'geoUpdate',
   CoreEventType.routeChanged: 'routeChanged',
   CoreEventType.dialerLoop: 'dialerLoop',
+  CoreEventType.tunFailed: 'tunFailed',
 };
 
 _Delay _$DelayFromJson(Map<String, dynamic> json) => _Delay(

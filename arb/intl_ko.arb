@@ -221,7 +221,6 @@
   "go": "이동",
   "externalLink": "외부 링크",
   "forkAuthor": "포크 작성자",
-  "otherContributors": "기타 기여자",
   "originalRepository": "원본 저장소",
   "autoCloseConnections": "연결 자동 종료",
   "autoCloseConnectionsDesc": "연결 자동 종료는 프록시를 전환할 때 열려 있는 연결을 끊습니다.",
@@ -262,6 +261,7 @@
   "proxyProviders": "프록시 공급자",
   "ruleProviders": "규칙 공급자",
   "providerUrlTip": "원격 공급자만 지원합니다",
+  "providerReplacedTip": "편집하는 동안 이 공급자가 교체되었습니다. 현재 공급자를 편집하려면 다시 여세요.",
   "ruleSetEmptyTip": "규칙 세트에 사용할 수 있는 항목이 없습니다",
   "ruleSetMixedTip": "규칙 세트에 도메인과 IP 범위가 섞여 있어 유형을 판별할 수 없습니다",
   "ruleSetInvalidTip": "이 mrs 파일을 읽을 수 없습니다",
@@ -596,6 +596,7 @@
   "inputProxyGroupName": "프록시 그룹 이름을 입력하세요",
   "helperCorruptTip": "헬퍼 서비스를 사용할 수 없어 TUN 모드를 켤 수 없습니다. FlClashX를 다시 설치하여 복구하세요.",
   "tunAuthorizationFailed": "TUN 권한을 얻지 못해 끄기로 되돌렸습니다.",
+  "tunStartFailed": "TUN을 시작하지 못해 끄기로 되돌렸습니다.",
   "sudoPasswordTitle": "sudo 비밀번호를 입력하세요",
   "coreBlockedByPolicyTip": "Windows에서 FlClashCore.exe 실행을 거부했습니다(오류 {code}). Smart App Control이나 AppLocker와 같은 앱 제어 정책이 서명되지 않은 프로그램을 차단합니다. 해당 정책에서 FlClashX를 허용하거나 정책을 끈 후 다시 시도하세요.",
   "coreBlockedBySmartAppControlTip": "서명되지 않아 Windows Smart App Control이 FlClashCore.exe를 차단했습니다. Windows 보안 → 앱 및 브라우저 컨트롤 → Smart App Control 설정에서 끔을 선택한 후 FlClashX를 다시 시작하세요. Smart App Control은 Windows를 다시 설치하지 않으면 다시 켤 수 없습니다.",
@@ -981,5 +982,8 @@
   "vpnBlockedByAnotherApp": "다른 앱이 VPN을 차단하고 있습니다",
   "vpnBlockedByAnotherAppTip": "다른 VPN 앱에 '상시 VPN'이 켜져 있습니다. VPN 설정에서 해당 앱의 상시 VPN을 끈 다음 다시 시작하세요.",
   "openVpnSettings": "VPN 설정 열기",
-  "vpnRestrictedByAdministrator": "이 기기에서는 관리자가 VPN을 제한했습니다"
+  "vpnRestrictedByAdministrator": "이 기기에서는 관리자가 VPN을 제한했습니다",
+  "shareLogs": "로그 공유",
+  "noLogsToday": "오늘 로그가 없습니다",
+  "downloadTooLarge": "파일이 너무 커서 다운로드할 수 없습니다"
 }

@@ -323,23 +323,46 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
     }
   }
 
-  Widget _buildRow(BuildContext context, List<Proxy> proxies) {
+  // A delay sort reorders the cards, and a card keyed by its proxy keeps its
+  // focus and state instead of handing them to whichever lands in its place.
+  // mihomo lets a group list a proxy twice, so a key counts the name's repeats.
+  List<(Proxy, ValueKey<(String, int)>)> _keyedProxies() {
+    final seen = <String, int>{};
+    return [
+      for (final proxy in widget.group.all)
+        (
+          proxy,
+          ValueKey((
+            proxy.name,
+            seen.update(proxy.name, (count) => count + 1, ifAbsent: () => 0),
+          )),
+        ),
+    ];
+  }
+
+  Widget _buildCard(Proxy proxy, Key? key) {
     final group = widget.group;
+    return ProxyCard(
+      testUrl: group.testUrl,
+      type: widget.cardType,
+      groupType: group.type,
+      key: key,
+      proxy: proxy,
+      groupName: group.name,
+    );
+  }
+
+  Widget _buildRow(
+    BuildContext context,
+    List<(Proxy, ValueKey<(String, int)>)> proxies,
+  ) {
     final cardType = widget.cardType;
-    final groupName = group.name;
     final children = proxies
         .map<Widget>(
-          (proxy) => Flexible(
+          (keyed) => Flexible(
             child: SizedBox(
               height: getItemHeight(cardType),
-              child: ProxyCard(
-                testUrl: group.testUrl,
-                type: cardType,
-                groupType: group.type,
-                key: ValueKey('$groupName.${proxy.name}'),
-                proxy: proxy,
-                groupName: groupName,
-              ),
+              child: _buildCard(keyed.$1, keyed.$2),
             ),
           ),
         )
@@ -358,14 +381,37 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
     );
   }
 
+  /// The rows of [_buildRow] laid out as one grid, so a card moving to
+  /// another row keeps its element.
   Widget _buildRows(double extent) {
-    final rows = widget.group.all.chunks(widget.columns).toList();
-    return SliverFixedExtentList(
-      itemExtent: extent,
-      delegate: SliverChildBuilderDelegate(
-        (context, index) => _buildRow(context, rows[index]),
-        childCount: rows.length,
-        addAutomaticKeepAlives: false,
+    final keyed = _keyedProxies();
+    final indexOf = {
+      for (final (index, (_, key)) in keyed.indexed) key.value: index,
+    };
+    return SliverPadding(
+      padding: const EdgeInsets.only(
+        left: _headerInset,
+        right: _headerInset,
+        bottom: proxyGridSpacing,
+      ),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: widget.columns,
+          mainAxisSpacing: proxyGridSpacing,
+          crossAxisSpacing: 8,
+          mainAxisExtent: extent - proxyGridSpacing,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => SurfaceScope(
+            key: keyed[index].$2,
+            level: context.raisedSurfaceLevel,
+            child: _buildCard(keyed[index].$1, null),
+          ),
+          childCount: keyed.length,
+          addAutomaticKeepAlives: false,
+          findChildIndexCallback: (key) =>
+              key is ValueKey<(String, int)> ? indexOf[key.value] : null,
+        ),
       ),
     );
   }
@@ -373,7 +419,7 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
   /// The card reaches up behind the header's rounded bottom corners, so the
   /// two read as one while the rows unfold or fold.
   Widget _buildUnfoldingRows(double extent, ShapeDecoration decoration) {
-    final rows = widget.group.all.chunks(widget.columns).toList();
+    final rows = _keyedProxies().chunks(widget.columns).toList();
     final visible = min(
       rows.length.toDouble(),
       MediaQuery.sizeOf(context).height / extent,

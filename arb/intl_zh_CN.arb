@@ -221,7 +221,6 @@
   "go": "前往",
   "externalLink": "外部链接",
   "forkAuthor": "分支作者",
-  "otherContributors": "其他贡献者",
   "originalRepository": "原始仓库",
   "autoCloseConnections": "自动关闭连接",
   "autoCloseConnectionsDesc": "自动关闭连接会在切换代理后断开已有连接。",
@@ -262,6 +261,7 @@
   "proxyProviders": "代理集",
   "ruleProviders": "规则集",
   "providerUrlTip": "仅支持远程资源",
+  "providerReplacedTip": "编辑期间此提供者已被替换，请重新打开以编辑当前的提供者。",
   "ruleSetEmptyTip": "规则集中没有可用的条目",
   "ruleSetMixedTip": "规则集同时包含域名和 IP 段，无法判断类型",
   "ruleSetInvalidTip": "无法读取该 mrs 文件",
@@ -596,6 +596,7 @@
   "inputProxyGroupName": "输入策略组名称",
   "helperCorruptTip": "Helper 服务不可用，无法启用 TUN 模式，请重新安装 FlClashX。",
   "tunAuthorizationFailed": "虚拟网卡授权失败，已关闭。",
+  "tunStartFailed": "虚拟网卡启动失败，已关闭。",
   "sudoPasswordTitle": "输入 sudo 密码",
   "coreBlockedByPolicyTip": "Windows 拒绝运行 FlClashCore.exe（错误 {code}）。智能应用控制、AppLocker 等应用控制策略会拦截未签名程序，请在该策略中放行 FlClashX 或关闭策略后重试。",
   "coreBlockedBySmartAppControlTip": "Windows 智能应用控制拦截了未签名的 FlClashCore.exe。请打开 Windows 安全中心 → 应用和浏览器控制 → 智能应用控制设置，选择「关闭」后重新启动 FlClashX。智能应用控制关闭后无法再开启，除非重装 Windows。",
@@ -981,5 +982,8 @@
   "vpnBlockedByAnotherApp": "VPN 被其他应用阻止",
   "vpnBlockedByAnotherAppTip": "另一个 VPN 应用开启了“始终开启的 VPN”。请在 VPN 设置中为该应用关闭它，然后重新启动。",
   "openVpnSettings": "打开 VPN 设置",
-  "vpnRestrictedByAdministrator": "此设备的管理员限制了 VPN"
+  "vpnRestrictedByAdministrator": "此设备的管理员限制了 VPN",
+  "shareLogs": "分享日志",
+  "noLogsToday": "今天还没有日志",
+  "downloadTooLarge": "文件过大，无法下载"
 }

@@ -278,10 +278,13 @@ func (t *udpRouteTable) routeFor(metadata *constant.Metadata) *trafficAccount {
 	return &route.trafficAccount
 }
 
+// A closed session is looked past at once: a pick under "close connections"
+// sends the same source through a new one, on another route.
 func (r *udpRoute) recheck(now time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.route == routeUnknown || now.Sub(r.verified) < udpRouteRecheck {
+	if r.route == routeUnknown ||
+		now.Sub(r.verified) < udpRouteRecheck && statistic.DefaultManager.Get(r.trackerID) != nil {
 		return
 	}
 	tracker := findTracker(r.matches)

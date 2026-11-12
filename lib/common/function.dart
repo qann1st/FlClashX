@@ -50,6 +50,8 @@ class Debouncer {
     _operations.remove(tag)?.cancel();
     _pending.remove(tag);
   }
+
+  bool isPending(dynamic tag) => _pending.containsKey(tag);
 }
 
 class SerialTaskScheduler {

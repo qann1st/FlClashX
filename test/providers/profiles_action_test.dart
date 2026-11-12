@@ -407,6 +407,19 @@ void main() {
       expect(action.downloads, 1);
     });
 
+    test('an interval past what a date holds is never due', () async {
+      final profile = subscription().copyWith(
+        autoUpdateDuration: const Duration(hours: 2400000000),
+      );
+      final (action, _) = host(profile, ['ok', 'ok']);
+
+      final refreshed = await action.autoUpdateProfiles();
+      await action.refreshCurrentProfileAfterStart(refreshed: refreshed);
+
+      expect(refreshed, isEmpty);
+      expect(action.downloads, 1);
+    });
+
     test('a pass already under way is joined, not run again', () async {
       final profile = subscription();
       final (action, _) = host(profile, ['ok', 'ok']);

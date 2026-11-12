@@ -31,8 +31,25 @@ import '../helpers/test_profiles.dart';
 
 class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
 
-// checkAndUpdateAndCopy checks the file system before it refreshes, so its
+// isMissingFile checks the file system before setup refreshes, so its
 // failure tests need appPath to resolve to a real, writable directory.
+class _DeletingProfilesAction extends ProfilesAction {
+  @override
+  Future<Profile> download(
+    Profile profile, {
+    bool Function()? isCurrent,
+  }) async {
+    await ref.read(profilesProvider.notifier).del(profile.id);
+    return profile.copyWith(lastUpdateDate: DateTime.now());
+  }
+}
+
+class _OfflineProfilesAction extends ProfilesAction {
+  @override
+  Future<Profile> download(Profile profile, {bool Function()? isCurrent}) =>
+      Future.error(const MessageException('offline'));
+}
+
 class _ListenerHandoffFailureSetupAction extends SetupAction {
   final List<bool> coreRunningCalls = [];
 
@@ -86,15 +103,35 @@ class TestSetupAction extends SetupAction {
   final Set<bool> unansweredCoreCalls = {};
   int authorizeCalls = 0;
   AuthorizeCode authorizeResult = AuthorizeCode.none;
+  bool tunStillFailed = false;
+  void Function()? duringTunConfirmation;
+  int tunConfirmations = 0;
+
+  @override
+  Future<bool> confirmTunFailed() async {
+    tunConfirmations++;
+    final during = duringTunConfirmation;
+    duringTunConfirmation = null;
+    during?.call();
+    return tunStillFailed;
+  }
+
+  @override
+  Duration get tunRecheckDelay => const Duration(milliseconds: 10);
+
   bool needsAuthorization = true;
 
   @override
   bool get coreNeedsAuthorization => needsAuthorization;
 
   DateTime? serviceStart;
+  Completer<void>? serviceStartGate;
 
   @override
-  Future<DateTime?> serviceStartTime() async => serviceStart;
+  Future<DateTime?> serviceStartTime() async {
+    await serviceStartGate?.future;
+    return serviceStart;
+  }
 
   @override
   Duration get minApplyDebounce => const Duration(milliseconds: 100);
@@ -161,6 +198,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() {
     registerFallbackValue(const SetupParams(selectedMap: {}, testUrl: ''));
+    registerFallbackValue(
+      const ChangeProxyParams(groupName: '', proxyName: ''),
+    );
     registerFallbackValue(const SetupBase(path: '', overlay: ''));
     registerFallbackValue(
       const UpdateParams(
@@ -214,13 +254,6 @@ void main() {
   }
 
   group('setRunning gating', () {
-    test('ignores a start request before initialization completes', () async {
-      await container.read(setupActionProvider.notifier).setRunning(true);
-
-      expect(action.coreRunningCalls, isEmpty);
-      expect(container.read(runTimeProvider), isNull);
-    });
-
     test('an initialize request bypasses the init gate', () async {
       await container
           .read(setupActionProvider.notifier)
@@ -772,6 +805,75 @@ void main() {
       expect(globalState.lastConfigMd5, 'running');
       expect(container.read(isStartProvider), isTrue);
     });
+
+    test('a stop sent while the service answers is not undone', () async {
+      await mockPreferences({appliedConfigMd5Key: 'running'});
+      action.serviceStart = DateTime.now().subtract(const Duration(minutes: 1));
+      final gate = action.serviceStartGate = Completer<void>();
+      final notifier = container.read(setupActionProvider.notifier);
+
+      final initializing = notifier.initStatus();
+      await notifier.setRunning(false);
+      gate.complete();
+      await initializing;
+
+      expect(action.coreRunningCalls, [false]);
+      expect(action.applyProfileCalls, 1);
+      expect(container.read(isStartProvider), isFalse);
+    });
+  });
+
+  group('a start asked for during startup', () {
+    test('runs once startup ends', () async {
+      final notifier = container.read(setupActionProvider.notifier);
+
+      final started = notifier.setRunning(true);
+      await pumpEventQueue();
+      expect(action.coreRunningCalls, isEmpty);
+
+      container.read(initProvider.notifier).value = true;
+      expect(await started, isTrue);
+
+      expect(action.coreRunningCalls, [true]);
+      expect(container.read(isStartProvider), isTrue);
+      await notifier.setRunning(false);
+    });
+
+    test('yields to a stop given while it waited', () async {
+      final notifier = container.read(setupActionProvider.notifier);
+
+      final started = notifier.setRunning(true);
+      await notifier.setRunning(false);
+      container.read(initProvider.notifier).value = true;
+      await started;
+
+      expect(action.coreRunningCalls, [false]);
+      expect(container.read(isStartProvider), isFalse);
+    });
+  });
+
+  group('fullSetup', () {
+    test(
+      'a profile switched to during startup is applied once it ends',
+      () async {
+        final notifier = container.read(setupActionProvider.notifier);
+
+        expect(await notifier.fullSetup(), isTrue);
+        expect(action.applyProfileCalls, 0);
+
+        container.read(initProvider.notifier).value = true;
+        await pumpEventQueue();
+
+        expect(action.applyProfileCalls, 1);
+        expect(action.appliedForce, [true]);
+
+        container.read(initProvider.notifier).value = false;
+        container.read(initProvider.notifier).value = true;
+        await pumpEventQueue();
+
+        expect(action.applyProfileCalls, 1);
+      },
+    );
   });
 
   group('requestAdmin', () {
@@ -857,9 +959,178 @@ void main() {
       expect(await action.requestAdmin(true), isFalse);
       expect(action.authorizeCalls, 2);
     });
+
+    test('a TUN the Core could not open turns tun off and asks again on the '
+        'next enable', () async {
+      await AppLocalizations.load(const Locale('en'));
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      container.read(authorizedTunEnableProvider.notifier).value =
+          TunAuthorizationState.authorized;
+      action.tunStillFailed = true;
+
+      await action.tunFailed();
+
+      expect(container.read(patchClashConfigProvider).tun.enable, isFalse);
+      expect(
+        container.read(authorizedTunEnableProvider),
+        TunAuthorizationState.none,
+      );
+      await action.requestAdmin(true);
+      expect(action.authorizeCalls, 1);
+    });
+
+    test(
+      'an authorized install hands off once a TUN failed, as the Core '
+      'missing it may have been launched without the authorization',
+      () async {
+        await AppLocalizations.load(const Locale('en'));
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(enable: true));
+
+        expect(await action.requestAdmin(true), isTrue);
+        action.tunStillFailed = true;
+        await action.tunFailed();
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(enable: true));
+
+        expect(await action.requestAdmin(true), isFalse);
+        expect(action.authorizeCalls, 2);
+      },
+    );
+
+    test('a TUN failure a later push replaced changes nothing', () async {
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      container.read(authorizedTunEnableProvider.notifier).value =
+          TunAuthorizationState.authorized;
+      action.tunStillFailed = false;
+
+      await action.tunFailed();
+
+      expect(container.read(patchClashConfigProvider).tun.enable, isTrue);
+      expect(
+        container.read(authorizedTunEnableProvider),
+        TunAuthorizationState.authorized,
+      );
+    });
+
+    test('settings changed while a TUN failure was confirmed are asked '
+        'about again', () async {
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      container.read(authorizedTunEnableProvider.notifier).value =
+          TunAuthorizationState.authorized;
+      action.tunStillFailed = true;
+      action.duringTunConfirmation = () {
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(mtu: state.tun.mtu + 1));
+        // The new settings opened their TUN by the time the Core is asked again.
+        action.duringTunConfirmation = () => action.tunStillFailed = false;
+      };
+
+      await action.tunFailed();
+
+      expect(action.tunConfirmations, 2);
+      expect(container.read(patchClashConfigProvider).tun.enable, isTrue);
+    });
+
+    test('a TUN failure seen while a push waits is confirmed once it has '
+        'gone, even if it skipped the Core', () async {
+      await AppLocalizations.load(const Locale('en'));
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      action.tunStillFailed = true;
+      unawaited(action.updateConfigDebounce());
+      addTearDown(() => debouncer.cancel(FunctionTag.updateConfig));
+
+      final failed = action.tunFailed();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(action.tunConfirmations, 0);
+      debouncer.cancel(FunctionTag.updateConfig);
+      await failed;
+
+      expect(action.tunConfirmations, 1);
+      expect(container.read(patchClashConfigProvider).tun.enable, isFalse);
+    });
+
+    test('a config asked for while a TUN failure was confirmed is asked '
+        'about again', () async {
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      container.read(authorizedTunEnableProvider.notifier).value =
+          TunAuthorizationState.authorized;
+      action.tunStillFailed = true;
+      action.duringTunConfirmation = () {
+        // An override push, already through its debounce, queued behind.
+        action.applyProfileDebounce();
+        debouncer.cancel(FunctionTag.applyProfile);
+        action.duringTunConfirmation = () => action.tunStillFailed = false;
+      };
+
+      await action.tunFailed();
+
+      expect(action.tunConfirmations, 2);
+      expect(container.read(patchClashConfigProvider).tun.enable, isTrue);
+    });
+
+    test(
+      'a TUN failure reported after tun was turned off changes nothing',
+      () async {
+        container
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith.tun(enable: false));
+        container.read(authorizedTunEnableProvider.notifier).value =
+            TunAuthorizationState.authorized;
+
+        await action.tunFailed();
+
+        expect(
+          container.read(authorizedTunEnableProvider),
+          TunAuthorizationState.authorized,
+        );
+      },
+    );
   });
 
   group('updateConfig', () {
+    test('a desktop push that asked for TUN asks the Core whether it opened, '
+        'as its event can be dropped', () async {
+      await AppLocalizations.load(const Locale('en'));
+      final core = _MockCoreHandlerInterface();
+      when(() => core.updateConfig(any())).thenAnswer((_) async => '');
+      final scopedAction = TestSetupAction()..tunStillFailed = true;
+      final scoped = ProviderContainer(
+        overrides: [
+          profilesProvider.overrideWith(TestProfiles.new),
+          setupActionProvider.overrideWith(() => scopedAction),
+          coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+          patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
+        ],
+      );
+      addTearDown(scoped.dispose);
+      scoped.read(setupActionProvider.notifier);
+      scoped
+          .read(patchClashConfigProvider.notifier)
+          .update((state) => state.copyWith.tun(enable: true));
+      scoped.read(authorizedTunEnableProvider.notifier).value =
+          TunAuthorizationState.authorized;
+
+      await scopedAction.updateConfig();
+      await pumpEventQueue();
+
+      expect(scopedAction.tunConfirmations, 1);
+      expect(scoped.read(patchClashConfigProvider).tun.enable, isFalse);
+    });
+
     test('a VPN-service platform skips the request and keeps the setting, '
         'with the core tun off', () async {
       final core = _MockCoreHandlerInterface();
@@ -1274,6 +1545,90 @@ void main() {
     );
 
     test(
+      'a profile deleted while setup fetches its file stays deleted',
+      () async {
+        final profile = Profile.normal(label: 'p', url: 'http://127.0.0.1:9/');
+        final core = _MockCoreHandlerInterface();
+        when(() => core.setupConfig(any())).thenAnswer((_) async => '');
+        final scoped = ProviderContainer(
+          overrides: [
+            profilesProvider.overrideWith(() => TestProfiles([profile])),
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
+            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+            patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
+            profilesActionProvider.overrideWith(_DeletingProfilesAction.new),
+            setupActionProvider.overrideWith(SetupAction.new),
+          ],
+        );
+        addTearDown(scoped.dispose);
+
+        await scoped
+            .read(setupActionProvider.notifier)
+            .applyProfile(force: true);
+
+        expect(scoped.read(profilesProvider), isEmpty);
+      },
+    );
+
+    group('a profile changed while setup checks for its file', () {
+      final profile = Profile.normal(label: 'p', url: 'http://127.0.0.1:9/');
+
+      Future<ProviderContainer> changeDuringCheck(
+        Future<void> Function(ProviderContainer scoped) change,
+      ) async {
+        final core = _MockCoreHandlerInterface();
+        when(() => core.setupConfig(any())).thenAnswer((_) async => '');
+        final paths = Completer<void>();
+        AppPath.supportDirectory = () async {
+          await paths.future;
+          return tempDir;
+        };
+        unawaited(appPath.rebind());
+        addTearDown(() => useAppPaths(tempDir));
+        final scoped = ProviderContainer(
+          overrides: [
+            profilesProvider.overrideWith(() => TestProfiles([profile])),
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
+            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+            patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
+            profilesActionProvider.overrideWith(_OfflineProfilesAction.new),
+            setupActionProvider.overrideWith(SetupAction.new),
+          ],
+        );
+        addTearDown(scoped.dispose);
+
+        final applying = scoped
+            .read(setupActionProvider.notifier)
+            .applyProfile(force: true);
+        await pumpEventQueue();
+        await change(scoped);
+        paths.complete();
+        await applying;
+        return scoped;
+      }
+
+      test('stays deleted when the download fails', () async {
+        final scoped = await changeDuringCheck(
+          (scoped) => scoped.read(profilesProvider.notifier).del(profile.id),
+        );
+
+        expect(scoped.read(profilesProvider), isEmpty);
+      });
+
+      test('keeps the edit when the download fails', () async {
+        final scoped = await changeDuringCheck((scoped) async {
+          scoped
+              .read(profilesProvider.notifier)
+              .put(profile.copyWith(label: 'edited'));
+        });
+
+        expect(scoped.read(profilesProvider).single.label, 'edited');
+      });
+    });
+
+    test(
       'a push moves pushes as it starts and once the Core answers',
       () async {
         final profile = Profile.normal(label: 'p');
@@ -1306,6 +1661,146 @@ void main() {
         expect(setup.pushes, 2);
       },
     );
+
+    group('a pick of the user\'s made while a push waits', () {
+      Future<(ProviderContainer, _MockCoreHandlerInterface)> push({
+        String? pick,
+        Map<String, dynamic> running = const {
+          'Proxy': {'name': 'Proxy', 'type': 'Selector', 'now': 'HK-00'},
+        },
+      }) async {
+        final profile = Profile.normal(
+          label: 'p',
+        ).copyWith(selectedMap: {'Proxy': 'HK-00'});
+        final core = _MockCoreHandlerInterface();
+        final started = Completer<void>();
+        final answer = Completer<String>();
+        when(() => core.setupConfig(any())).thenAnswer((_) {
+          started.complete();
+          return answer.future;
+        });
+        when(
+          () => core.changeProxy(any()),
+        ).thenAnswer((_) async => const ChangeProxyResult());
+        when(core.getProxies).thenAnswer(
+          (_) async =>
+              ProxiesData(all: running.keys.toList(), proxies: running),
+        );
+        final scoped = ProviderContainer(
+          overrides: [
+            profilesProvider.overrideWith(() => TestProfiles([profile])),
+            currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+            setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
+            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+            patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
+            setupActionProvider.overrideWith(SetupAction.new),
+          ],
+        );
+        addTearDown(scoped.dispose);
+
+        final applying = scoped
+            .read(setupActionProvider.notifier)
+            .applyProfile(force: true);
+        await started.future;
+        if (pick != null) {
+          await scoped
+              .read(proxiesActionProvider.notifier)
+              .changeProxy(groupName: 'Proxy', proxyName: pick);
+        }
+        answer.complete('');
+        await applying;
+        return (scoped, core);
+      }
+
+      test('is sent again once the Core runs the config pushed', () async {
+        final (scoped, core) = await push(pick: 'HK-01');
+
+        verify(
+          () => core.changeProxy(
+            const ChangeProxyParams(groupName: 'Proxy', proxyName: 'HK-01'),
+          ),
+        ).called(2);
+        expect(scoped.read(currentProfileProvider)?.selectedMap, {
+          'Proxy': 'HK-01',
+        });
+      });
+
+      test('none made, the push carries every pick and sends none', () async {
+        final (_, core) = await push();
+
+        verifyNever(() => core.changeProxy(any()));
+      });
+
+      test('is not sent to a group the new config dropped', () async {
+        final (_, core) = await push(pick: 'HK-01', running: const {});
+
+        verify(() => core.changeProxy(any())).called(1);
+      });
+
+      test('is not sent again where the Core runs it already', () async {
+        final (_, core) = await push(
+          pick: 'HK-01',
+          running: const {
+            'Proxy': {'name': 'Proxy', 'type': 'Selector', 'now': 'HK-01'},
+          },
+        );
+
+        verify(() => core.changeProxy(any())).called(1);
+      });
+
+      test('is dropped once another profile is current', () async {
+        final first = Profile.normal(
+          label: 'a',
+        ).copyWith(selectedMap: {'Proxy': 'HK-01'});
+        final second = Profile.normal(
+          label: 'b',
+        ).copyWith(selectedMap: {'Proxy': 'HK-01'});
+        final core = _MockCoreHandlerInterface();
+        final running = Completer<ProxiesData>();
+        when(core.getProxies).thenAnswer((_) => running.future);
+        when(
+          () => core.changeProxy(any()),
+        ).thenAnswer((_) async => const ChangeProxyResult());
+        final scoped = ProviderContainer(
+          overrides: [
+            profilesProvider.overrideWith(() => TestProfiles([first, second])),
+            coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+          ],
+        );
+        addTearDown(scoped.dispose);
+        final current = scoped.read(currentProfileIdProvider.notifier);
+        current.value = first.id;
+
+        final resending = scoped
+            .read(proxiesActionProvider.notifier)
+            .resendPicksSince(const {'Proxy': 'HK-00'});
+        current.value = second.id;
+        running.complete(
+          const ProxiesData(
+            all: ['Proxy'],
+            proxies: {
+              'Proxy': {'name': 'Proxy', 'type': 'Selector', 'now': 'HK-00'},
+            },
+          ),
+        );
+        await resending;
+
+        verifyNever(() => core.changeProxy(any()));
+      });
+
+      test('failing again, rolls back to what the Core runs', () async {
+        final (scoped, core) = await push(pick: 'HK-01');
+        clearInteractions(core);
+        when(() => core.changeProxy(any())).thenThrow(StateError('lost'));
+        await scoped.read(proxiesActionProvider.notifier).resendPicksSince(
+          const {'Proxy': 'HK-00'},
+        );
+
+        expect(scoped.read(currentProfileProvider)?.selectedMap, {
+          'Proxy': 'HK-00',
+        });
+      });
+    });
 
     test(
       'a profile that fails to build still pushes the empty config to core',

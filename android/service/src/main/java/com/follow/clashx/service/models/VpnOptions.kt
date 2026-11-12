@@ -24,6 +24,7 @@ data class VpnOptions(
     val bypassDomain: List<String>,
     val stack: String,
     val routeAddress: List<String>,
+    val excludesAllRoutes: Boolean = false,
     val mtu: Int = 0,
     val congestionController: String? = null,
 )
@@ -51,6 +52,15 @@ data class CIDR(
     val address: InetAddress,
     val prefixLength: Int,
 )
+
+// null is the family's default route: what an empty list asks for unless Flutter's exclusions
+// left nothing, and the fallback for a list that does not parse.
+fun VpnOptions.ipv4Routes(): List<CIDR>? = familyRoutes(VpnOptions::getIpv4RouteAddress)
+
+fun VpnOptions.ipv6Routes(): List<CIDR>? = familyRoutes(VpnOptions::getIpv6RouteAddress)
+
+private fun VpnOptions.familyRoutes(routes: VpnOptions.() -> List<CIDR>): List<CIDR>? =
+    if (routeAddress.isEmpty() && !excludesAllRoutes) null else runCatching { routes() }.getOrNull()
 
 fun VpnOptions.getIpv4RouteAddress(): List<CIDR> = routeAddress
     .map(String::toCIDR)

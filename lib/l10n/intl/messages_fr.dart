@@ -752,6 +752,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "downloadBandwidth": MessageLookupByLibrary.simpleMessage(
       "Bande passante de réception",
     ),
+    "downloadTooLarge": MessageLookupByLibrary.simpleMessage(
+      "Le fichier est trop volumineux pour être téléchargé",
+    ),
     "duration": MessageLookupByLibrary.simpleMessage("Durée"),
     "edit": MessageLookupByLibrary.simpleMessage("Modifier"),
     "editDashboard": MessageLookupByLibrary.simpleMessage(
@@ -1296,6 +1299,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "no": MessageLookupByLibrary.simpleMessage("Non"),
     "noData": MessageLookupByLibrary.simpleMessage("Aucune donnée"),
     "noInfo": MessageLookupByLibrary.simpleMessage("Aucune information"),
+    "noLogsToday": MessageLookupByLibrary.simpleMessage(
+      "Aucun journal pour aujourd\'hui",
+    ),
     "noLongerRemind": MessageLookupByLibrary.simpleMessage(
       "Ne plus me le rappeler",
     ),
@@ -1353,9 +1359,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Dépôt d’origine",
     ),
     "other": MessageLookupByLibrary.simpleMessage("Autre"),
-    "otherContributors": MessageLookupByLibrary.simpleMessage(
-      "Autres contributeurs",
-    ),
     "outbound": MessageLookupByLibrary.simpleMessage("Sortant"),
     "outboundExit": MessageLookupByLibrary.simpleMessage("Sortie"),
     "outboundIp": MessageLookupByLibrary.simpleMessage("IP sortante"),
@@ -1477,6 +1480,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Version du protocole",
     ),
     "providerInUse": m68,
+    "providerReplacedTip": MessageLookupByLibrary.simpleMessage(
+      "Ce fournisseur a été remplacé pendant que vous le modifiiez. Rouvrez-le pour modifier l’actuel.",
+    ),
     "providerUrlTip": MessageLookupByLibrary.simpleMessage(
       "Seuls les fournisseurs distants sont pris en charge",
     ),
@@ -1858,6 +1864,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "shareLinksInvalid": MessageLookupByLibrary.simpleMessage(
       "Aucun proxy n’a pu être lu dans les liens",
     ),
+    "shareLogs": MessageLookupByLibrary.simpleMessage("Partager les journaux"),
     "shareQrcodeTip": MessageLookupByLibrary.simpleMessage(
       "Scannez avec FlClashX sur un autre appareil pour importer ce profil.",
     ),
@@ -2031,6 +2038,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "tunOverrideDesc": MessageLookupByLibrary.simpleMessage(
       "Les entrées ajoutées ici remplacent les réglages TUN de tous les profils ; tout ce qui n’est pas ajouté garde le réglage du profil. Les entrées qu’un profil personnalisé ajoute lui-même priment.",
+    ),
+    "tunStartFailed": MessageLookupByLibrary.simpleMessage(
+      "TUN n’a pas pu démarrer et a donc été désactivé.",
     ),
     "turnOff": MessageLookupByLibrary.simpleMessage("Désactiver"),
     "turnOn": MessageLookupByLibrary.simpleMessage("Activer"),

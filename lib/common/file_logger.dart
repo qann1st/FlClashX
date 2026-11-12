@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 
 import 'constant.dart';
 import 'path.dart';
 
 const logsDirectoryName = 'logs';
+
+typedef ArchiveRequest = ({String archivePath, List<String> files});
 
 /// Appends every log line to `logs/FlClashX_<day>.log` under the app home,
 /// starts `_<n>` files past [maxFileBytes] and drops days older than [keepDays].
@@ -17,11 +21,15 @@ class FileLogger {
     DateTime Function()? now,
     this.maxFileBytes = 10 * 1024 * 1024,
     this.keepDays = 10,
+    @visibleForTesting Future<void> Function(ArchiveRequest)? writeArchive,
   }) : _directory = directory ?? _defaultDirectory,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _writeArchiveWith =
+           writeArchive ?? ((request) => compute(_writeArchive, request));
 
   final Future<String> Function() _directory;
   final DateTime Function() _now;
+  final Future<void> Function(ArchiveRequest) _writeArchiveWith;
   final int maxFileBytes;
   final int keepDays;
 
@@ -29,6 +37,7 @@ class FileLogger {
 
   final _pending = <String>[];
   Future<void> _drain = Future.value();
+  Future<void> _archiving = Future.value();
   bool _enabled = false;
   String? _day;
   File? _file;
@@ -71,6 +80,77 @@ class FileLogger {
   }
 
   Future<void> flush() => _drain;
+
+  /// How long [archiveToday] keeps an archive for the app still reading it.
+  static const shareRetention = Duration(days: 1);
+
+  /// Zips today's files, written lines included, into [directory]; null when
+  /// today has none.
+  Future<String?> archiveToday(String directory) {
+    final archived = _archiving.then((_) => _archiveToday(directory));
+    _archiving = archived.then<void>((_) {}, onError: (_) {});
+    return archived;
+  }
+
+  Future<String?> _archiveToday(String directory) async {
+    await flush();
+    final now = _now();
+    await _pruneArchives(directory, now);
+    final today = _dayOf(now);
+    final files = <String>[];
+    await for (final entity in Directory(
+      await directoryPath,
+    ).list(followLinks: false)) {
+      final match = _dayPattern.firstMatch(basename(entity.path));
+      if (entity is File && match?.group(1) == today) {
+        files.add(entity.path);
+      }
+    }
+    if (files.isEmpty) {
+      return null;
+    }
+    final archivePath = await _freshArchivePath(directory, now);
+    await _writeArchiveWith((archivePath: archivePath, files: files..sort()));
+    return archivePath;
+  }
+
+  static const _archivePrefix = '${appName}_logs_';
+
+  Future<String> _freshArchivePath(String directory, DateTime now) async {
+    final time = [
+      now.hour,
+      now.minute,
+      now.second,
+    ].map((part) => part.toString().padLeft(2, '0')).join('-');
+    final stem = join(directory, '$_archivePrefix${_dayOf(now)}_$time');
+    var path = '$stem.zip';
+    for (var copy = 2; await File(path).exists(); copy++) {
+      path = '${stem}_$copy.zip';
+    }
+    return path;
+  }
+
+  Future<void> _pruneArchives(String directory, DateTime now) async {
+    final folder = Directory(directory);
+    if (!await folder.exists()) {
+      return;
+    }
+    await for (final entity in folder.list(followLinks: false)) {
+      final name = basename(entity.path);
+      if (entity is! File ||
+          !name.startsWith(_archivePrefix) ||
+          extension(name) != '.zip') {
+        continue;
+      }
+      try {
+        if (now.difference(await entity.lastModified()) > shareRetention) {
+          await entity.delete();
+        }
+      } on FileSystemException {
+        // Gone already or still held; the next share tries again.
+      }
+    }
+  }
 
   Future<void> dispose() async {
     await _drain;
@@ -137,6 +217,17 @@ class FileLogger {
       '${time.day.toString().padLeft(2, '0')}';
 
   static DateTime _parseDay(String day) => DateTime.parse(day);
+}
+
+Future<void> _writeArchive(ArchiveRequest request) async {
+  final encoder = ZipFileEncoder()..create(request.archivePath);
+  try {
+    for (final path in request.files) {
+      await encoder.addFile(File(path));
+    }
+  } finally {
+    await encoder.close();
+  }
 }
 
 final fileLogger = FileLogger();

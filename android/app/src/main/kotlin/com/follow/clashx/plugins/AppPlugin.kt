@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.ActivityManager
 import android.content.BroadcastReceiver
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -26,6 +27,7 @@ import androidx.core.net.toUri
 import androidx.core.view.OnApplyWindowInsetsListener
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.follow.clashx.Haptics
 import com.follow.clashx.R
 import com.follow.clashx.VPN_PERMISSION_MESSAGE
 import com.follow.clashx.common.Components
@@ -210,6 +212,17 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 result.success(true)
             }
 
+            "riseVibration" -> {
+                val durationMs = call.argument<Number>("durationMs")?.toLong() ?: 0L
+                Haptics.rise(GlobalState.application, durationMs)
+                result.success(true)
+            }
+
+            "stopVibration" -> {
+                Haptics.stop(GlobalState.application)
+                result.success(true)
+            }
+
             "openAppSettings" -> {
                 result.success(openAppSettings())
             }
@@ -222,6 +235,17 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 val path = call.argument<String>("path")
                 result.success(path != null && installApk(path))
             }
+
+            "shareFile" -> {
+                val path = call.argument<String>("path")
+                val mimeType = call.argument<String>("mimeType")
+                if (path == null || mimeType == null) {
+                    result.error("INVALID_ARGUMENT", "shareFile needs a path and a MIME type", null)
+                } else {
+                    shareFile(File(path), mimeType, result)
+                }
+            }
+
             "getLastExitInfo" -> reply(result) {
                 GlobalState.lastExitInfo()
             }
@@ -308,6 +332,27 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
             !isCurrent() -> Unit
             activity == null -> GlobalState.application.showToast(VPN_PERMISSION_MESSAGE)
             else -> channel.invokeMethod("vpnPermissionDenied", vpnRefusal)
+        }
+    }
+
+    private fun shareFile(file: File, mimeType: String, result: Result) {
+        val activity = activity
+        if (activity == null) {
+            result.error("NO_ACTIVITY", "No activity to share from", null)
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.share", file)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newRawUri(file.name, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivity(Intent.createChooser(send, null))
+            result.success(true)
+        } catch (error: Exception) {
+            result.error("PLATFORM_ERROR", error.toString(), null)
         }
     }
 
@@ -486,7 +531,16 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         requestInstalledAppsCallback.resolve(granted)
     }
 
-    fun prepareVpn(needPrepare: Boolean, callback: (Boolean) -> Unit) = onMainThread {
+    // A stop that lands while this waits for the main thread finds nothing to cancel yet.
+    fun prepareVpn(
+        needPrepare: Boolean,
+        isCurrent: () -> Boolean,
+        callback: (Boolean) -> Unit,
+    ) = onMainThread {
+        if (!isCurrent()) {
+            callback(false)
+            return@onMainThread
+        }
         vpnPrepareCallback.replace(callback, supersededValue = false)
         vpnConsentCodes.forget()
         vpnRefusal = REFUSAL_CANCELLED

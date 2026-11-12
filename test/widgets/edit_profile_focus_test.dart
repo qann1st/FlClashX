@@ -33,6 +33,7 @@ Future<FocusNode> pumpEditProfile(
   WidgetTester tester, {
   Profile? profile,
   List<Override> overrides = const [],
+  SheetType? sheetType,
 }) async {
   tester.view.physicalSize = const Size(900, 800);
   tester.view.devicePixelRatio = 1;
@@ -81,11 +82,16 @@ Future<FocusNode> pumpEditProfile(
                   pages: [
                     MaterialPage(
                       child: Builder(
-                        builder: (context) => Scaffold(
-                          body: EditProfileView(
+                        builder: (context) {
+                          final view = EditProfileView(
                             profile: profile ?? _urlProfile(),
-                          ),
-                        ),
+                          );
+                          return Scaffold(
+                            body: sheetType == null
+                                ? view
+                                : SheetProvider(type: sheetType, child: view),
+                          );
+                        },
                       ),
                     ),
                   ],

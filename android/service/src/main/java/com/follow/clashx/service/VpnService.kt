@@ -14,8 +14,8 @@ import com.follow.clashx.common.R as CommonR
 import com.follow.clashx.core.Core
 import com.follow.clashx.service.models.CIDR
 import com.follow.clashx.service.models.VpnOptions
-import com.follow.clashx.service.models.getIpv4RouteAddress
-import com.follow.clashx.service.models.getIpv6RouteAddress
+import com.follow.clashx.service.models.ipv4Routes
+import com.follow.clashx.service.models.ipv6Routes
 import com.follow.clashx.service.models.toCIDR
 import com.follow.clashx.service.models.tunMtu
 import com.follow.clashx.service.models.tunOptions
@@ -179,11 +179,7 @@ class VpnService : SystemVpnService(), ManagedService {
     private fun Builder.addAddressAndRoutes(options: VpnOptions) {
         val ipv4Address = IPV4_ADDRESS.toCIDR()
         addAddress(ipv4Address.address, ipv4Address.prefixLength)
-        addRoutes(
-            routes = options::getIpv4RouteAddress,
-            fallbackAddress = NET_ANY,
-            routeAll = options.routeAddress.isEmpty(),
-        )
+        addRoutes(options.ipv4Routes(), fallbackAddress = NET_ANY)
 
         if (options.ipv6) {
             try {
@@ -192,28 +188,19 @@ class VpnService : SystemVpnService(), ManagedService {
             } catch (_: Exception) {
                 GlobalState.log("IPv6 VPN address is not supported")
             }
-            addRoutes(
-                routes = options::getIpv6RouteAddress,
-                fallbackAddress = NET_ANY6,
-                routeAll = options.routeAddress.isEmpty(),
-            )
+            addRoutes(options.ipv6Routes(), fallbackAddress = NET_ANY6)
         }
     }
 
     // Flutter lists every family it routes, so a family missing from a
     // non-empty list is one whose routes were all excluded.
-    private fun Builder.addRoutes(
-        routes: () -> List<CIDR>,
-        fallbackAddress: String,
-        routeAll: Boolean,
-    ) {
-        val routeList = runCatching(routes).getOrNull()
-        if (routeAll || routeList == null) {
+    private fun Builder.addRoutes(routes: List<CIDR>?, fallbackAddress: String) {
+        if (routes == null) {
             addRoute(fallbackAddress, 0)
             return
         }
         try {
-            routeList.forEach { route ->
+            routes.forEach { route ->
                 addRoute(route.address, route.prefixLength)
             }
         } catch (_: Exception) {

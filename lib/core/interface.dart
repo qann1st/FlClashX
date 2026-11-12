@@ -51,7 +51,11 @@ mixin CoreInterface {
 
   Future<String> dumpRuleSet(String path);
 
-  Future<RuleSetInfo> compileRuleSet(String name, {String url = ''});
+  Future<RuleSetInfo> compileRuleSet(
+    String name, {
+    String url = '',
+    bool skipCertVerify = false,
+  });
 
   Future<Delay?> asyncTestDelay(String url, String proxyName, Duration timeout);
 
@@ -77,6 +81,8 @@ mixin CoreInterface {
 
   Future<bool> restartListener();
 
+  Future<bool> getTunFailed();
+
   Future<List<ExternalProvider>> getExternalProviders();
 
   Future<ExternalProvider?> getExternalProvider(String externalProviderName);
@@ -85,6 +91,8 @@ mixin CoreInterface {
 
   Future<String> sideLoadExternalProvider({
     required String providerName,
+    required String path,
+    required String type,
     required String data,
   });
 
@@ -386,10 +394,14 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  Future<RuleSetInfo> compileRuleSet(String name, {String url = ''}) async {
+  Future<RuleSetInfo> compileRuleSet(
+    String name, {
+    String url = '',
+    bool skipCertVerify = false,
+  }) async {
     final data = await _invokeMethod<Map<String, dynamic>>(
       method: CoreMethod.compileRuleSet,
-      arguments: {'name': name, 'url': url},
+      arguments: {'name': name, 'url': url, 'skip-cert-verify': skipCertVerify},
     );
     if (data == null) {
       throw const CoreMethodException(
@@ -488,11 +500,18 @@ abstract class CoreHandlerInterface with CoreInterface {
   @override
   Future<String> sideLoadExternalProvider({
     required String providerName,
+    required String path,
+    required String type,
     required String data,
   }) async {
     return _invokeMessage(
       method: CoreMethod.sideLoadExternalProvider,
-      arguments: {'providerName': providerName, 'data': data},
+      arguments: {
+        'providerName': providerName,
+        'path': path,
+        'type': type,
+        'data': data,
+      },
     );
   }
 
@@ -603,6 +622,11 @@ abstract class CoreHandlerInterface with CoreInterface {
   @override
   Future<bool> restartListener() async {
     return await stopListener() && await startListener();
+  }
+
+  @override
+  Future<bool> getTunFailed() async {
+    return await _invokeMethod<bool>(method: CoreMethod.getTunFailed) ?? false;
   }
 
   @override

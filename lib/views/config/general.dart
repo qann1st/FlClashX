@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/plugins/app.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/config/on_demand.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -246,6 +250,51 @@ class OpenLogsFolderItem extends StatelessWidget {
       leading: const GlyphIcon(AppGlyphs.openExternal),
       title: Text(context.appLocalizations.openLogsFolder),
       onTap: _open,
+    );
+  }
+}
+
+class ShareLogsItem extends StatefulWidget {
+  const ShareLogsItem({super.key});
+
+  @override
+  State<ShareLogsItem> createState() => _ShareLogsItemState();
+}
+
+class _ShareLogsItemState extends State<ShareLogsItem> {
+  var _sharing = false;
+
+  Future<void> _share() async {
+    if (_sharing) {
+      return;
+    }
+    _sharing = true;
+    final appLocalizations = context.appLocalizations;
+    try {
+      final shared = await globalState.safeRun(() async {
+        final directory = Directory(await appPath.shareDirPath);
+        await directory.create(recursive: true);
+        final archive = await fileLogger.archiveToday(directory.path);
+        if (archive == null) {
+          return false;
+        }
+        await app?.shareFile(archive, mimeType: 'application/zip');
+        return true;
+      }, title: appLocalizations.shareLogs);
+      if (shared == false) {
+        dialogs.showNotifier(appLocalizations.noLogsToday);
+      }
+    } finally {
+      _sharing = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem(
+      leading: const GlyphIcon(AppGlyphs.export),
+      title: Text(context.appLocalizations.shareLogs),
+      onTap: _share,
     );
   }
 }
@@ -525,6 +574,7 @@ class GeneralView extends ConsumerWidget {
         update: (state, value) => state.copyWith(openLogs: value),
       ),
       if (system.isDesktop) const OpenLogsFolderItem(),
+      if (system.isAndroid) const ShareLogsItem(),
       const ReturnToProviderItem(),
       const ResetAppItem(),
     ];

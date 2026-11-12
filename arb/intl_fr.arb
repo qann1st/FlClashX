@@ -221,7 +221,6 @@
   "go": "Aller",
   "externalLink": "Lien externe",
   "forkAuthor": "Auteur du fork",
-  "otherContributors": "Autres contributeurs",
   "originalRepository": "Dépôt d’origine",
   "autoCloseConnections": "Fermer les connexions automatiquement",
   "autoCloseConnectionsDesc": "La fermeture automatique coupe les connexions ouvertes lorsque vous changez de proxy.",
@@ -262,6 +261,7 @@
   "proxyProviders": "Fournisseurs de proxys",
   "ruleProviders": "Fournisseurs de règles",
   "providerUrlTip": "Seuls les fournisseurs distants sont pris en charge",
+  "providerReplacedTip": "Ce fournisseur a été remplacé pendant que vous le modifiiez. Rouvrez-le pour modifier l’actuel.",
   "ruleSetEmptyTip": "Le jeu de règles ne contient aucune entrée exploitable",
   "ruleSetMixedTip": "Le jeu de règles mélange des domaines et des plages d’IP : son type est indéterminable",
   "ruleSetInvalidTip": "Ce fichier mrs est illisible",
@@ -596,6 +596,7 @@
   "inputProxyGroupName": "Saisissez le nom du groupe de proxys",
   "helperCorruptTip": "Service Helper indisponible ; le mode TUN ne peut pas être activé. Réinstallez FlClashX pour le rétablir.",
   "tunAuthorizationFailed": "TUN n’a pas pu être autorisé et a donc été désactivé.",
+  "tunStartFailed": "TUN n’a pas pu démarrer et a donc été désactivé.",
   "sudoPasswordTitle": "Saisissez votre mot de passe pour sudo",
   "coreBlockedByPolicyTip": "Windows a refusé d’exécuter FlClashCore.exe (erreur {code}). Une stratégie de contrôle des applications, telle que Smart App Control ou AppLocker, bloque les programmes non signés ; autorisez FlClashX dans cette stratégie ou désactivez-la, puis réessayez.",
   "coreBlockedBySmartAppControlTip": "Windows Smart App Control a bloqué FlClashCore.exe car il n’est pas signé. Ouvrez Sécurité Windows → Contrôle des applications et du navigateur → Paramètres de Smart App Control, choisissez Désactivé, puis relancez FlClashX. Smart App Control ne peut pas être réactivé sans réinstaller Windows.",
@@ -981,5 +982,8 @@
   "vpnBlockedByAnotherApp": "VPN bloqué par une autre app",
   "vpnBlockedByAnotherAppTip": "Une autre app VPN a le « VPN permanent » activé. Désactivez-le pour cette app dans les paramètres VPN, puis relancez.",
   "openVpnSettings": "Ouvrir les paramètres VPN",
-  "vpnRestrictedByAdministrator": "L'administrateur de cet appareil restreint le VPN"
+  "vpnRestrictedByAdministrator": "L'administrateur de cet appareil restreint le VPN",
+  "shareLogs": "Partager les journaux",
+  "noLogsToday": "Aucun journal pour aujourd'hui",
+  "downloadTooLarge": "Le fichier est trop volumineux pour être téléchargé"
 }

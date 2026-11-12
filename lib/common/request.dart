@@ -8,7 +8,7 @@ import 'package:dio/io.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/state.dart';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show compute, visibleForTesting;
 
 class Request {
   late final Dio dio;
@@ -23,21 +23,28 @@ class Request {
   Request() {
     dio = Dio(BaseOptions(headers: {'User-Agent': browserUa}));
     _clashDio = Dio();
-    _clashDio.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        client.findProxy = (Uri uri) {
-          client.userAgent = globalState.ua;
-          final read = _read;
-          if (read == null) {
-            return 'DIRECT';
-          }
-          return FlClashHttpOverrides.findProxyForReader(read, uri);
-        };
-        return client;
-      },
-    );
+    _clashDio.httpClientAdapter = _proxiedAdapter();
   }
+
+  IOHttpClientAdapter _proxiedAdapter() => IOHttpClientAdapter(
+    createHttpClient: () {
+      final client = HttpClient();
+      client.findProxy = (Uri uri) {
+        client.userAgent = globalState.ua;
+        final read = _read;
+        if (read == null) {
+          return 'DIRECT';
+        }
+        return FlClashHttpOverrides.findProxyForReader(read, uri);
+      };
+      return client;
+    },
+  );
+
+  /// The adapter keeps the first HttpClient it makes, under whatever
+  /// HttpOverrides held then; a test that changes them starts a new one.
+  @visibleForTesting
+  void resetClient() => _clashDio.httpClientAdapter = _proxiedAdapter();
 
   Future<Response<T>> _download<T>(
     String url,
@@ -47,14 +54,32 @@ class Request {
   }) {
     final target = downloadTarget(url);
     final cancelToken = CancelToken();
+    var oversized = false;
     return _clashDio
         .getUri<T>(
           target.uri,
           options: Options(
             responseType: responseType,
             headers: {...headers, ...target.headers},
+            // Nothing asks for a range, so a 206 is a cut-off copy.
+            validateStatus: (status) =>
+                status != null &&
+                status >= 200 &&
+                status < 300 &&
+                status != HttpStatus.partialContent,
           ),
           cancelToken: cancelToken,
+          onReceiveProgress: (received, total) {
+            if (received > maxDownloadBytes || total > maxDownloadBytes) {
+              oversized = true;
+              cancelToken.cancel();
+            }
+          },
+        )
+        .catchError(
+          (Object _) =>
+              throw MessageException(currentAppLocalizations.downloadTooLarge),
+          test: (_) => oversized,
         )
         .timeout(
           timeout,
@@ -133,20 +158,66 @@ HostFailure hostFailureOf(Object error) {
 
 /// Some subscription servers send a gzip or zlib body without saying so in
 /// Content-Encoding, which is the only signal dart:io decompresses on.
-Uint8List decompressUnlabeled(Uint8List bytes) {
-  final codec = switch (bytes) {
-    [0x1f, 0x8b, ...] => gzip,
-    [0x78, final flags, ...] when (0x78 << 8 | flags) % 31 == 0 => zlib,
-    _ => null,
-  };
+Future<Uint8List> decompressDownload(Uint8List bytes) async {
+  if (_unlabeledCodecOf(bytes) == null) {
+    return bytes;
+  }
+  final inflated = await compute(decompressUnlabeled, bytes);
+  if (inflated == null) {
+    throw MessageException(currentAppLocalizations.downloadTooLarge);
+  }
+  return inflated;
+}
+
+@visibleForTesting
+Uint8List? decompressUnlabeled(
+  Uint8List bytes, {
+  int limit = maxDownloadBytes,
+}) {
+  final codec = _unlabeledCodecOf(bytes);
   if (codec == null) {
     return bytes;
   }
+  final output = _CappedSink(limit);
   try {
-    return Uint8List.fromList(codec.decode(bytes));
+    codec.decoder.startChunkedConversion(output)
+      ..add(bytes)
+      ..close();
+  } on _OutputTooLarge {
+    return null;
   } on FormatException {
     return bytes;
   }
+  return output.bytes.takeBytes();
+}
+
+Codec<List<int>, List<int>>? _unlabeledCodecOf(Uint8List bytes) =>
+    switch (bytes) {
+      [0x1f, 0x8b, ...] => gzip,
+      [0x78, final flags, ...] when (0x78 << 8 | flags) % 31 == 0 => zlib,
+      _ => null,
+    };
+
+final class _OutputTooLarge implements Exception {
+  const _OutputTooLarge();
+}
+
+final class _CappedSink implements Sink<List<int>> {
+  _CappedSink(this.limit);
+
+  final int limit;
+  final bytes = BytesBuilder(copy: false);
+
+  @override
+  void add(List<int> chunk) {
+    if (bytes.length + chunk.length > limit) {
+      throw const _OutputTooLarge();
+    }
+    bytes.add(chunk);
+  }
+
+  @override
+  void close() {}
 }
 
 /// dart:io turns [Uri.userInfo] into Basic credentials still percent-encoded.

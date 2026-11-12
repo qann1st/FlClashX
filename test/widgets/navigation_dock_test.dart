@@ -292,52 +292,61 @@ void main() {
   });
 
   for (final (quality, lifted) in [
-    (LiquidGlassQuality.standard, 2),
+    (LiquidGlassQuality.standard, 1),
     (LiquidGlassQuality.ultra, 3),
   ]) {
-    testWidgets('on ${quality.name} glass the dock and a lifted lens are panes '
-        'of glass', (tester) async {
-      tester.view.physicalSize = _mobileSize;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      await tester.pumpWidget(
-        TestApp(
-          wrapInProviderScope: true,
-          homeBuilder: (child) => Scaffold(
-            body: Align(
-              alignment: Alignment.bottomCenter,
-              child: LiquidGlassScope(
-                enabled: true,
-                quality: quality,
-                child: child,
+    testWidgets(
+      'on ${quality.name} glass the dock is a pane, and a lifted lens '
+      'adds ${lifted - 1}',
+      (tester) async {
+        tester.view.physicalSize = _mobileSize;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          TestApp(
+            wrapInProviderScope: true,
+            homeBuilder: (child) => Scaffold(
+              body: Align(
+                alignment: Alignment.bottomCenter,
+                child: LiquidGlassScope(
+                  enabled: true,
+                  quality: quality,
+                  child: child,
+                ),
               ),
             ),
+            child: NavigationDock(
+              destinations: const [
+                NavigationDockDestination(
+                  glyph: AppGlyphs.dashboard,
+                  label: 'a',
+                ),
+                NavigationDockDestination(
+                  glyph: AppGlyphs.settings,
+                  label: 'b',
+                ),
+              ],
+              selectedIndex: 0,
+              onSelected: (_) {},
+            ),
           ),
-          child: NavigationDock(
-            destinations: const [
-              NavigationDockDestination(glyph: AppGlyphs.dashboard, label: 'a'),
-              NavigationDockDestination(glyph: AppGlyphs.settings, label: 'b'),
-            ],
-            selectedIndex: 0,
-            onSelected: (_) {},
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      final glass = find.byType(LiquidGlass);
-      expect(glass, findsOneWidget);
+        );
+        await tester.pumpAndSettle();
+        final glass = find.byType(LiquidGlass);
+        expect(glass, findsOneWidget);
 
-      final gesture = await tester.startGesture(
-        tester.getCenter(find.text('b')),
-      );
-      await tester.pumpAndSettle();
-      expect(glass, findsNWidgets(lifted));
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.text('b')),
+        );
+        await tester.pumpAndSettle();
+        expect(glass, findsNWidgets(lifted));
 
-      await gesture.up();
-      await tester.pumpAndSettle();
-      expect(glass, findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(glass, findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('the bar swells under a pointer and stretches past its end', (

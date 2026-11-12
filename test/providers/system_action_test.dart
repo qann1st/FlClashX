@@ -1,16 +1,21 @@
 import 'dart:async';
-import 'dart:ui' show Brightness, Color;
+import 'dart:convert';
+import 'dart:ui' show Brightness, Color, Locale;
 
-import 'package:fl_clash/common/app_ports.dart';
-import 'package:fl_clash/common/preferences.dart';
+import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/config.dart';
+import 'package:fl_clash/models/state.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/actions/system_exit.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/database.dart';
+import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/preferences.dart';
 import '../helpers/test_profiles.dart';
@@ -52,6 +57,11 @@ class TestSystemAction extends SystemAction {
 }
 
 class _PersistenceSystemAction extends SystemAction {
+  bool sharedState = false;
+
+  @override
+  bool get savesSharedState => sharedState;
+
   Future<void> persist() => savePreferences();
 }
 
@@ -311,6 +321,47 @@ void main() {
         Config.fromJson((await preferences.getConfigMap())!).windowProps,
         current,
       );
+    },
+  );
+
+  test(
+    'saving on exit writes VPN options the shared-state debounce still holds',
+    () async {
+      await AppLocalizations.load(const Locale('en'));
+      await mockPreferences();
+      final action = _PersistenceSystemAction()..sharedState = true;
+      final container = ProviderContainer(
+        overrides: [
+          profilesProvider.overrideWith(TestProfiles.new),
+          systemActionProvider.overrideWith(() => action),
+        ],
+      );
+      globalState.container = container;
+      addTearDown(container.dispose);
+      container.listen(sharedStateProvider, (_, _) {});
+      container
+          .read(vpnSettingProvider.notifier)
+          .update((state) => state.copyWith(ipv6: !state.ipv6));
+      final ipv6 = container.read(vpnSettingProvider).ipv6;
+      var saved = false;
+      debouncer.call(
+        FunctionTag.saveSharedFile,
+        () => saved = true,
+        duration: const Duration(milliseconds: 50),
+      );
+
+      container.read(systemActionProvider.notifier);
+      await action.persist();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(saved, isFalse);
+      final stored = SharedState.fromJson(
+        json.decode(
+              (await SharedPreferences.getInstance()).getString('sharedState')!,
+            )
+            as Map<String, Object?>,
+      );
+      expect(stored.vpnOptions?.ipv6, ipv6);
     },
   );
 

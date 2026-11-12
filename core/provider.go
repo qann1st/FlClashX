@@ -292,9 +292,14 @@ func handleUpdateExternalProvider(name string) error {
 	})
 }
 
+// The host edits a provider by name, and an apply may have put another one
+// under that name since it read the file.
 func handleSideLoadExternalProvider(params *SideLoadParams) error {
 	name := params.ProviderName
 	return updateExternalProvider(name, func(p cp.Provider) *MethodError {
+		if view, err := toExternalProvider(p); err != nil || view.Path != params.Path || view.Type != params.Type {
+			return providerError("provider_replaced", name, errors.New("external provider was replaced"))
+		}
 		if err := sideUpdateExternalProvider(p, []byte(params.Data)); err != nil {
 			return providerError("provider_update_error", name, err)
 		}
@@ -310,7 +315,10 @@ func handleDumpRuleSet(path string) (string, error) {
 	var errs []error
 	for _, behavior := range []cp.RuleBehavior{cp.Domain, cp.IPCIDR} {
 		var text strings.Builder
-		err := rp.ConvertToMrs(buf, behavior, cp.MrsRule, &text)
+		err := checkMrs(buf, behavior)
+		if err == nil {
+			err = rp.ConvertToMrs(buf, behavior, cp.MrsRule, &text)
+		}
 		if err == nil {
 			return text.String(), nil
 		}

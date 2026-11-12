@@ -23,18 +23,20 @@ abstract interface class DesktopCoreLauncherResolver {
 
 final class DirectCoreLauncher implements CoreProcessLauncher {
   final CoreProcessStarter _startProcess;
-  final String corePath;
+  final Future<String> Function() _corePath;
 
   DirectCoreLauncher({CoreProcessStarter? startProcess, String? corePath})
     : _startProcess = startProcess ?? Process.start,
-      corePath = corePath ?? appPath.corePath;
+      _corePath = corePath == null
+          ? system.launchableCorePath
+          : (() async => corePath);
 
   @override
   Future<CoreProcessLease> start({
     required String sessionId,
     required String address,
   }) async {
-    final process = await _startProcess(corePath, [address]);
+    final process = await _startProcess(await _corePath(), [address]);
     final lease = DirectCoreLease(sessionId: sessionId, process: process);
     process.stdout.listen((_) {});
     process.stderr.listen((data) {

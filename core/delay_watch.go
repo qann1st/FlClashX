@@ -31,16 +31,18 @@ type delayWatch struct {
 
 var delayWatcher delayWatch
 
+// Applies and host reactivation start it concurrently; one lock over the
+// replacement keeps a second start from orphaning the first one's watcher.
 func startDelayWatch() {
-	stopDelayWatch()
+	delayWatcher.mu.Lock()
+	defer delayWatcher.mu.Unlock()
+	delayWatcher.stopLocked()
 	if !hostActive.Load() {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	delayWatcher.reset(time.Now())
-	delayWatcher.mu.Lock()
+	delayWatcher.lastChange = time.Now()
 	delayWatcher.cancel = cancel
-	delayWatcher.mu.Unlock()
 	go delayWatcher.run(ctx)
 }
 
@@ -62,9 +64,13 @@ func (w *delayWatch) interval(now time.Time) time.Duration {
 func stopDelayWatch() {
 	delayWatcher.mu.Lock()
 	defer delayWatcher.mu.Unlock()
-	if delayWatcher.cancel != nil {
-		delayWatcher.cancel()
-		delayWatcher.cancel = nil
+	delayWatcher.stopLocked()
+}
+
+func (w *delayWatch) stopLocked() {
+	if w.cancel != nil {
+		w.cancel()
+		w.cancel = nil
 	}
 }
 

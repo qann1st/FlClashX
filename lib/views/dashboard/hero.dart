@@ -550,61 +550,65 @@ class _ConnectButton extends ConsumerWidget {
       child: Semantics(
         button: true,
         label: label,
-        child: SizedBox(
-          width: double.infinity,
-          height: _connectHeight,
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(end: isStart ? 1 : 0),
-            duration: duration,
-            curve: Curves.easeInOut,
-            builder: (context, progress, _) {
-              final ink = Color.lerp(
-                colorScheme.onPrimary,
-                colorScheme.primary,
-                progress,
-              )!;
-              final content = suspended
-                  ? const GlyphIcon(AppGlyphs.wifiOff, size: 26, fill: 1)
-                  : isStart
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      spacing: 10,
-                      children: [
-                        const GlyphIcon(AppGlyphs.stop, size: 22, fill: 1),
-                        Text(
-                          getTimeText(runTime),
-                          style: DashboardText.figure(
-                            context,
-                            AppTextStyle.headline,
-                            color: ink,
+        child: RisingHold(
+          enabled: system.isAndroid,
+          onHeld: toggle,
+          child: SizedBox(
+            width: double.infinity,
+            height: _connectHeight,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(end: isStart ? 1 : 0),
+              duration: duration,
+              curve: Curves.easeInOut,
+              builder: (context, progress, _) {
+                final ink = Color.lerp(
+                  colorScheme.onPrimary,
+                  colorScheme.primary,
+                  progress,
+                )!;
+                final content = suspended
+                    ? const GlyphIcon(AppGlyphs.wifiOff, size: 26, fill: 1)
+                    : isStart
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 10,
+                        children: [
+                          const GlyphIcon(AppGlyphs.stop, size: 22, fill: 1),
+                          Text(
+                            getTimeText(runTime),
+                            style: DashboardText.figure(
+                              context,
+                              AppTextStyle.headline,
+                              color: ink,
+                            ),
                           ),
-                        ),
-                      ],
-                    )
-                  : GlyphIcon(AppGlyphs.playPause(0), size: 28, fill: 1);
-              return FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.primary.withValues(
-                    alpha: 1 - progress,
+                        ],
+                      )
+                    : GlyphIcon(AppGlyphs.playPause(0), size: 28, fill: 1);
+                return FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary.withValues(
+                      alpha: 1 - progress,
+                    ),
+                    foregroundColor: ink,
+                    side: BorderSide(
+                      color: colorScheme.primary.withValues(alpha: progress),
+                      width: 1.5,
+                    ),
                   ),
-                  foregroundColor: ink,
-                  side: BorderSide(
-                    color: colorScheme.primary.withValues(alpha: progress),
-                    width: 1.5,
+                  onPressed: toggle,
+                  child: AnimatedSwitcher(
+                    duration: duration,
+                    switchInCurve: Curves.easeInOut,
+                    switchOutCurve: Curves.easeInOut,
+                    child: KeyedSubtree(
+                      key: ValueKey((isStart, suspended)),
+                      child: content,
+                    ),
                   ),
-                ),
-                onPressed: toggle,
-                child: AnimatedSwitcher(
-                  duration: duration,
-                  switchInCurve: Curves.easeInOut,
-                  switchOutCurve: Curves.easeInOut,
-                  child: KeyedSubtree(
-                    key: ValueKey((isStart, suspended)),
-                    child: content,
-                  ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),

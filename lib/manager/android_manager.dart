@@ -118,6 +118,15 @@ class _AndroidContainerState extends ConsumerState<AndroidManager>
     super.onServiceStopped();
   }
 
+  /// An excluded SSID keeps the run while the service is down.
+  @override
+  void onServiceStopRequested() {
+    if (ref.read(isStartProvider)) {
+      unawaited(ref.read(setupActionProvider.notifier).setRunning(false));
+    }
+    super.onServiceStopRequested();
+  }
+
   @override
   Widget build(BuildContext context) {
     return widget.child;

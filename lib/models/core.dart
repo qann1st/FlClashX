@@ -87,6 +87,7 @@ abstract class VpnOptions with _$VpnOptions {
     required List<String> bypassDomain,
     required String stack,
     @Default([]) List<String> routeAddress,
+    @Default(false) bool excludesAllRoutes,
     @Default(0) int mtu,
     @Default('') String congestionController,
   }) = _VpnOptions;
@@ -96,6 +97,11 @@ abstract class VpnOptions with _$VpnOptions {
 }
 
 extension VpnOptionsExt on VpnOptions {
+  /// What the service runs: a VPN Always-on asked for keeps the tunnel's settings.
+  VpnOptions effectiveWhen({required bool vpnDemandedBySystem}) =>
+      (vpnDemandedBySystem && !enable ? copyWith(enable: true) : this)
+          .effective;
+
   /// Only what `ServiceController.start` and `VpnService.handleStart` read.
   VpnOptions get effective {
     if (!enable) {
@@ -303,12 +309,12 @@ extension CoreMemoryStatsExt on CoreMemoryStats {
 
 SubscriptionInfo? subscriptionInfoFormCore(Map<String, Object?>? json) {
   if (json == null) return null;
-  return SubscriptionInfo(
-    upload: (json['Upload'] as num?)?.toInt() ?? 0,
-    download: (json['Download'] as num?)?.toInt() ?? 0,
-    total: (json['Total'] as num?)?.toInt() ?? 0,
-    expire: (json['Expire'] as num?)?.toInt() ?? 0,
-  );
+  return SubscriptionInfo.fromJson({
+    'upload': json['Upload'],
+    'download': json['Download'],
+    'total': json['Total'],
+    'expire': json['Expire'],
+  });
 }
 
 @freezed

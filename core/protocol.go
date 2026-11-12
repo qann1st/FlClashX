@@ -68,6 +68,7 @@ const (
 	clearEffectMethod              CoreMethod = "clearEffect"
 	watchRouteMethod               CoreMethod = "watchRoute"
 	checkRoutesMethod              CoreMethod = "checkRoutes"
+	getTunFailedMethod             CoreMethod = "getTunFailed"
 )
 
 type MessageType string
@@ -83,6 +84,7 @@ const (
 	RouteChangedMessage   MessageType = "routeChanged"
 	DialerLoopMessage     MessageType = "dialerLoop"
 	RequestTrafficMessage MessageType = "requestTraffic"
+	TunFailedMessage      MessageType = "tunFailed"
 )
 
 type Message struct {
@@ -165,12 +167,16 @@ type tunSchema struct {
 
 type SideLoadParams struct {
 	ProviderName string `json:"providerName"`
+	Path         string `json:"path"`
+	Type         string `json:"type"`
 	Data         string `json:"data"`
 }
 
+// The certificate policy comes with the request: a profile compiles its rule sets before any setup.
 type CompileRuleSetParams struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+	Name           string `json:"name"`
+	URL            string `json:"url"`
+	SkipCertVerify bool   `json:"skip-cert-verify"`
 }
 
 type RuleSetInfo struct {

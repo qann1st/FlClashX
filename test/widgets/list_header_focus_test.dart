@@ -195,7 +195,7 @@ void main() {
   testWidgets('revealed proxy stays below the pinned header', (tester) async {
     await pumpListLayout(tester, size: const Size(600, 400), proxyCount: 30);
 
-    final proxyFinder = find.byKey(const ValueKey('Selector.Proxy 3')).first;
+    final proxyFinder = find.byKey(const ValueKey(('Proxy 3', 0))).first;
     final targetContext = tester.element(proxyFinder);
     final scrollable = Scrollable.of(targetContext);
     final viewportTop = tester.getTopLeft(find.byWidget(scrollable.widget)).dy;

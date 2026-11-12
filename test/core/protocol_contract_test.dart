@@ -214,7 +214,12 @@ void main() {
         <Object?>[],
       ],
     });
-    await handler.sideLoadExternalProvider(providerName: 'provider', data: 'x');
+    await handler.sideLoadExternalProvider(
+      providerName: 'provider',
+      path: '/providers/provider.yaml',
+      type: 'Proxy',
+      data: 'x',
+    );
     await handler.asyncTestDelay(
       'https://example.com',
       'DIRECT',
@@ -232,6 +237,12 @@ void main() {
       expect(handler.calls[method], isA<Map>());
     }
     expect(handler.calls[CoreMethod.clearEffect], 42);
+    expect(handler.calls[CoreMethod.sideLoadExternalProvider], {
+      'providerName': 'provider',
+      'path': '/providers/provider.yaml',
+      'type': 'Proxy',
+      'data': 'x',
+    });
   });
 
   test('validateFilters sends the filters and reads one error each', () async {
@@ -270,11 +281,13 @@ void main() {
       final info = await handler.compileRuleSet(
         'abc',
         url: 'https://example.com/r.list',
+        skipCertVerify: true,
       );
 
       expect(handler.calls[CoreMethod.compileRuleSet], {
         'name': 'abc',
         'url': 'https://example.com/r.list',
+        'skip-cert-verify': true,
       });
       expect(info, (
         behavior: RuleProviderBehavior.ipcidr,

@@ -1,5 +1,6 @@
 import 'package:fl_clash/ui/context.dart';
 import 'package:fl_clash/ui/liquid_glass.dart';
+import 'package:fl_clash/ui/outer_shadow.dart';
 import 'package:fl_clash/ui/shape.dart';
 import 'package:fl_clash/ui/surface.dart';
 import 'package:material_ui/material_ui.dart';
@@ -28,14 +29,22 @@ class FrostedSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!LiquidGlassScope.of(context)) {
-      return Container(
+      final opaque = color.a == 1;
+      final surface = Container(
         clipBehavior: clipBehavior,
         decoration: ShapeDecoration(
           color: color,
           shape: RoundedSuperellipseBorder(borderRadius: radius),
-          shadows: shadows.isEmpty ? null : shadows,
+          shadows: shadows.isEmpty || opaque ? null : shadows,
         ),
         child: child,
+      );
+      if (shadows.isEmpty || !opaque) {
+        return surface;
+      }
+      return CustomPaint(
+        painter: SurfaceShadowPainter(corners: radius, shadows: shadows),
+        child: surface,
       );
     }
     final quality = LiquidGlassScope.qualityOf(context);

@@ -221,7 +221,6 @@
   "go": "Перейти",
   "externalLink": "Внешняя ссылка",
   "forkAuthor": "Автор форка",
-  "otherContributors": "Другие участники",
   "originalRepository": "Оригинальный репозиторий",
   "autoCloseConnections": "Автозакрытие соединений",
   "autoCloseConnectionsDesc": "Автозакрытие соединений обрывает открытые соединения при смене прокси.",
@@ -262,6 +261,7 @@
   "proxyProviders": "Провайдеры прокси",
   "ruleProviders": "Провайдеры правил",
   "providerUrlTip": "Поддерживаются только удалённые ресурсы",
+  "providerReplacedTip": "Этот провайдер был заменён, пока вы его редактировали. Откройте его снова, чтобы изменить текущий.",
   "ruleSetEmptyTip": "В наборе правил нет пригодных записей",
   "ruleSetMixedTip": "Набор правил смешивает домены и диапазоны IP, поэтому его тип не определить",
   "ruleSetInvalidTip": "Не удаётся прочитать этот файл mrs",
@@ -596,6 +596,7 @@
   "inputProxyGroupName": "Введите название группы прокси",
   "helperCorruptTip": "Служба Helper недоступна, поэтому TUN-режим включить нельзя. Переустановите FlClashX.",
   "tunAuthorizationFailed": "Не удалось получить права для TUN, поэтому он выключен.",
+  "tunStartFailed": "Не удалось запустить TUN, поэтому он выключен.",
   "sudoPasswordTitle": "Введите пароль для sudo",
   "coreBlockedByPolicyTip": "Windows отказалась запускать FlClashCore.exe (ошибка {code}). Политики контроля приложений, такие как Smart App Control или AppLocker, блокируют неподписанные программы; разрешите FlClashX в этой политике или отключите её и повторите попытку.",
   "coreBlockedBySmartAppControlTip": "Smart App Control в Windows заблокировал неподписанный FlClashCore.exe. Откройте Безопасность Windows → Управление приложениями и браузером → Параметры Smart App Control, выберите «Выкл.» и снова запустите FlClashX. Повторно включить Smart App Control без переустановки Windows нельзя.",
@@ -981,5 +982,8 @@
   "vpnBlockedByAnotherApp": "VPN блокирует другое приложение",
   "vpnBlockedByAnotherAppTip": "У другого VPN-приложения включена «Постоянная VPN». Отключите её для этого приложения в настройках VPN и запустите снова.",
   "openVpnSettings": "Открыть настройки VPN",
-  "vpnRestrictedByAdministrator": "VPN на этом устройстве ограничен администратором"
+  "vpnRestrictedByAdministrator": "VPN на этом устройстве ограничен администратором",
+  "shareLogs": "Поделиться логами",
+  "noLogsToday": "За сегодня логов нет",
+  "downloadTooLarge": "Файл слишком большой для загрузки"
 }

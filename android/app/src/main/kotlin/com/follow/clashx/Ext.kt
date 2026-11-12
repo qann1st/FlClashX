@@ -97,9 +97,3 @@ private fun isExpired(file: File): Boolean {
 inline fun <reified T : FlutterPlugin> FlutterEngine.plugin(): T? {
     return plugins.get(T::class.java) as T?
 }
-
-fun MethodChannel.invokeMethodOnMainThread(method: String, arguments: Any? = null) {
-    Handler(Looper.getMainLooper()).post {
-        invokeMethod(method, arguments)
-    }
-}

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.resume
 
@@ -57,10 +58,23 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
     @Volatile
     private var pendingVpnPreparation: (() -> Unit)? = null
 
+    // A stop cancels only a consent it can see, so a start checks and asks under the same lock.
+    private val vpnPreparationLock = Any()
+
     @Volatile
     private var transition: RunState? = null
 
+    // Commands mint requests under it, so none checked against a handed-off start loses a stop.
+    private val commandLock = Any()
+
+    // Starts handed to Flutter and not answered yet; a stopped one refuses the command it returns as.
+    private val flutterStarts = mutableListOf<RunRequest>()
+
+    private val mutableVpnDemanded = MutableStateFlow(false)
+
     val runState = mutableRunState.asStateFlow()
+
+    val vpnDemandedBySystem = mutableVpnDemanded.asStateFlow()
 
     val isRunRequested: Boolean
         get() = arbiter.isRunningRequested
@@ -101,7 +115,10 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
         val tile = host.tile()
         if (tile != null) {
-            tile.handleStart()
+            val request = synchronized(commandLock) {
+                createRequest(running = true).also { flutterStarts += it }
+            }
+            tile.handleStart { settleFlutterStart(request) }
             return
         }
         startFromPreferences()
@@ -109,37 +126,76 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
 
     suspend fun handleStopAction() {
         if (!isRunRequested) {
+            // An excluded SSID stops the service while Flutter's run goes on; a stop still ends it.
+            host.notifyStopRequested()
             return
         }
         host.showToast(sharedState.stopTip)
-        requestStop().await()
+        val request = synchronized(commandLock) { createStopRequest() }
+        stop(request)
         host.notifyStopped()
     }
 
-    suspend fun handleVpnRevokeAction() {
-        if (host.runtime?.vpn != true) {
-            return
+    suspend fun handleVpnStartRequested() {
+        mutableVpnDemanded.value = true
+        when {
+            !isRunRequested -> handleStartAction()
+            host.runtime?.vpn == false -> requestStart().await()
         }
-        handleStopAction()
+    }
+
+    /** A revoke cancels the VPN Always-on asked for even before it is up; a proxy run stays. */
+    suspend fun handleVpnRevokeAction() {
+        when {
+            host.runtime?.vpn == true -> handleStopAction()
+            !mutableVpnDemanded.compareAndSet(expect = true, update = false) -> Unit
+            host.runtime == null -> handleStopAction()
+            else -> {
+                val request = synchronized(commandLock) { createRequest(running = true) }
+                abandonVpnPreparation()
+                launchStart(request).await()
+            }
+        }
+    }
+
+    fun dropFlutterStart() {
+        synchronized(commandLock) { flutterStarts.toList() }.forEach(::settleFlutterStart)
     }
 
     fun requestStart(): Deferred<Boolean> {
-        if (isStartedAs(sharedState.vpnOptions)) {
-            return CompletableDeferred(true)
+        val request = synchronized(commandLock) {
+            val handedOff = takeFlutterStart()
+            when {
+                handedOff != null && !arbiter.isLatestRequest(handedOff) ->
+                    return refuseStoppedStart()
+                handedOff != null && isCurrent(handedOff) -> handedOff
+                isStartedAs(sharedState.vpnOptions) -> return CompletableDeferred(true)
+                else -> createRequest(running = true)
+            }
         }
-        val outcome = launchStart(createRequest(running = true))
+        val outcome = launchStart(request)
         return host.scope.async { outcome.await() == StartOutcome.STARTED }
     }
 
     fun requestStop(): Deferred<Boolean> {
-        val request = createRequest(running = false)
+        val request = synchronized(commandLock) {
+            flutterStarts.clear()
+            createStopRequest()
+        }
         return host.scope.async { stop(request) }
     }
 
     // An owed restart outlives its request, so a start that overtakes it cannot adopt the old run.
     fun requestRestart(): Deferred<Boolean> {
-        restartsRequested.incrementAndGet()
-        val outcome = launchStart(createRequest(running = true))
+        val request = synchronized(commandLock) {
+            val handedOff = takeFlutterStart()
+            if (handedOff != null && !arbiter.isLatestRequest(handedOff)) {
+                return refuseStoppedStart()
+            }
+            restartsRequested.incrementAndGet()
+            createRequest(running = true)
+        }
+        val outcome = launchStart(request)
         return host.scope.async { outcome.await() == StartOutcome.STARTED }
     }
 
@@ -148,9 +204,40 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         applySharedState()
     }
 
+    private fun takeFlutterStart(): RunRequest? {
+        val live = flutterStarts.firstOrNull(arbiter::isLatestRequest)
+        if (live == null) {
+            return flutterStarts.removeFirstOrNull()
+        }
+        flutterStarts.clear()
+        return live
+    }
+
+    // Flutter answers a handed-off start once done with it; one it never sent back was declined.
+    private fun settleFlutterStart(request: RunRequest) {
+        val declined = synchronized(commandLock) { flutterStarts.remove(request) }
+        if (declined) {
+            host.scope.launch { abandon(request) }
+        }
+    }
+
+    private fun refuseStoppedStart(): Deferred<Boolean> = host.scope.async {
+        reconcileStopped()
+        host.notifyStopped()
+        false
+    }
+
+    private fun createStopRequest(): RunRequest {
+        mutableVpnDemanded.value = false
+        return createRequest(running = false)
+    }
+
     // No new request for a settled run: one refused at a prompt would take the service down.
     private fun isStartedAs(options: VpnOptions?): Boolean =
-        runState.value == RunState.STARTED && host.runtime?.vpn == options?.enable
+        runState.value == RunState.STARTED && host.runtime?.vpn == options?.let(::demanded)?.enable
+
+    private fun demanded(options: VpnOptions): VpnOptions =
+        if (mutableVpnDemanded.value && !options.enable) options.copy(enable = true) else options
 
     // The intent is claimed before the Core is set up, so a second action that lands meanwhile
     // toggles this start off instead of racing a second setup against it.
@@ -224,16 +311,22 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
     }
 
     private suspend fun start(request: RunRequest): StartOutcome {
-        val started = try {
-            startPreparationLock.withLock { runStart(request) }
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            host.log("Unable to process service start request: $error")
-            false
-        }
+        val started = attemptStart(request) && (!owesVpn(request) || attemptStart(request))
         return if (started) StartOutcome.STARTED else abandon(request)
     }
+
+    private suspend fun attemptStart(request: RunRequest): Boolean = try {
+        startPreparationLock.withLock { runStart(request) }
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        host.log("Unable to process service start request: $error")
+        false
+    }
+
+    // Always-on can ask for the VPN after this start read its options as a proxy run.
+    private fun owesVpn(request: RunRequest): Boolean =
+        mutableVpnDemanded.value && host.runtime?.vpn == false && isCurrent(request)
 
     private suspend fun abandon(request: RunRequest): StartOutcome {
         val dropped = arbiter.resetToStopped(request)
@@ -249,8 +342,8 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         if (!isCurrent(request)) {
             return false
         }
-        val options = sharedState.vpnOptions ?: return false
-        if (!prepareVpn(options)) {
+        val options = sharedState.vpnOptions?.let(::demanded) ?: return false
+        if (!prepareVpn(request, options)) {
             if (isCurrent(request)) {
                 val app = host.app()
                 if (app == null) {
@@ -346,31 +439,41 @@ internal class ServiceStateMachine(private val host: ServiceStateHost) {
         }
     }
 
-    private suspend fun prepareVpn(options: VpnOptions): Boolean {
+    private suspend fun prepareVpn(request: RunRequest, options: VpnOptions): Boolean {
         val app = host.app()
             ?: return !options.enable || host.isVpnPermissionGranted()
         return suspendCancellableCoroutine { continuation ->
+            val answered = AtomicBoolean()
             val callback: (Boolean) -> Unit = { granted ->
-                pendingVpnPreparation = null
-                if (continuation.isActive) {
-                    continuation.resume(granted)
+                if (answered.compareAndSet(false, true)) {
+                    pendingVpnPreparation = null
+                    if (continuation.isActive) {
+                        continuation.resume(granted)
+                    }
                 }
-            }
-            pendingVpnPreparation = {
-                app.cancelVpnPreparation(callback)
-                callback(false)
             }
             continuation.invokeOnCancellation {
                 pendingVpnPreparation = null
                 app.cancelVpnPreparation(callback)
             }
-            app.prepareVpn(options.enable, callback)
+            synchronized(vpnPreparationLock) {
+                if (!isCurrent(request)) {
+                    callback(false)
+                    return@synchronized
+                }
+                pendingVpnPreparation = {
+                    app.cancelVpnPreparation(callback)
+                    callback(false)
+                }
+                app.prepareVpn(options.enable, { isCurrent(request) }, callback)
+            }
         }
     }
 
     private fun abandonVpnPreparation() {
-        val abandon = pendingVpnPreparation ?: return
-        pendingVpnPreparation = null
+        val abandon = synchronized(vpnPreparationLock) {
+            pendingVpnPreparation.also { pendingVpnPreparation = null }
+        } ?: return
         abandon()
     }
 

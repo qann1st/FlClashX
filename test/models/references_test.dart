@@ -178,6 +178,20 @@ void main() {
       expect(renamed.renamedProxies({'New, Proxy;1': 'Old'}), overrides);
     });
 
+    test(
+      'a proxy named past an encoded & is renamed where mihomo reads it',
+      () {
+        const server = 'https://1.1.1.1/dns-query#ecs=1.2.3.4/24%26Old';
+        const unrelated = 'https://1.1.1.1/dns-query#ecs=1.2.3.4%2F24%26Kept';
+
+        final renamed = renamedDnsServer(server, {'Old': 'New 1'});
+
+        expect(dnsServerProxies(renamed), ['New 1']);
+        expect(renamed, 'https://1.1.1.1/dns-query#ecs=1.2.3.4/24&New%201');
+        expect(renamedDnsServer(unrelated, {'Old': 'New'}), unrelated);
+      },
+    );
+
     test('a server written to the profile but turned off names nothing', () {
       final overrides = _serverSites['cfg.NameServer']!;
       expect(overrides.copyWith(dnsOverrideKeys: {}).dnsProxies, isEmpty);

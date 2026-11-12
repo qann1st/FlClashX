@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:collection/collection.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -192,7 +194,7 @@ extension ProxyGroupExt on ProxyGroup {
   /// What [definitionYaml] leaves out, such as an option added without a
   /// value, was never there to remove, so it stays.
   ProxyGroup withDefinitionYaml(String content) {
-    final document = _plainYaml(loadYaml(content));
+    final document = plainYaml(loadYaml(content));
     if (document is! Map<String, Object?> ||
         (document['name'] is! String && document['name'] is! num) ||
         document['type'] is! String) {
@@ -1191,6 +1193,15 @@ extension TunExt on Tun {
     return subtractCidrsTask(routeAddress, excluded, wholeWhenEmpty: true);
   }
 
+  /// [vpnRouteAddress] is empty for the default route too; only exclusions
+  /// that leave nothing make it mean no route at all.
+  bool excludesEveryRoute(
+    List<String> routes, {
+    required bool bypassPrivateRoute,
+  }) =>
+      routes.isEmpty &&
+      excludedRoutes(bypassPrivateRoute: bypassPrivateRoute).isNotEmpty;
+
   Map<String, Object?> get coreJson {
     final json = toJson();
     return {
@@ -1379,15 +1390,6 @@ extension DnsOverrideExt on Dns {
   }
 }
 
-Object? _plainYaml(Object? node) => switch (node) {
-  YamlMap() => {
-    for (final entry in node.entries)
-      entry.key.toString(): _plainYaml(entry.value),
-  },
-  YamlList() => [for (final item in node) _plainYaml(item)],
-  _ => node,
-};
-
 Map<String, Object?> _overrideJson<K extends OverrideKey>(
   Map<String, Object?> json,
   List<K> values,
@@ -1437,7 +1439,7 @@ Set<K>? _applyOverrideYaml<K extends OverrideKey>(
   required String section,
   String Function(String field)? normalizeField,
 }) {
-  final document = _plainYaml(loadYaml(content));
+  final document = plainYaml(loadYaml(content));
   if (document == null) {
     return null;
   }
@@ -1908,6 +1910,23 @@ extension RuleExt on Rule {
 
   /// The core rejects the whole config over one of these, taking the profile
   /// down with it, so they are caught before the rule can be saved.
+  /// What keeps the rule from being saved, if anything.
+  RuleSaveIssue? get saveIssue {
+    if (ruleAction == RuleAction.SUB_RULE) {
+      return RuleSaveIssue.subRule;
+    }
+    if (payloadError != null) {
+      return RuleSaveIssue.payload;
+    }
+    if (ruleAction != RuleAction.MATCH && realContent?.isNotEmpty != true) {
+      return RuleSaveIssue.emptyContent;
+    }
+    if (realTarget?.isNotEmpty != true) {
+      return RuleSaveIssue.emptyTarget;
+    }
+    return null;
+  }
+
   RulePayloadError? get payloadError {
     final payload = realContent?.trim() ?? '';
     if (payload.isEmpty) {
@@ -1972,15 +1991,43 @@ String _ruleScalar(String value) {
   return "'${value.replaceAll("'", "''")}'";
 }
 
+/// A rule list a quick edit read: its rules, or the first line that cannot be
+/// saved, with the rule on it where the line reads as one.
+typedef CheckedRuleList = ({List<Rule> rules, ({int line, Rule? rule})? issue});
+
+/// The whole check of a quick edit, run off the UI isolate as it grows with
+/// the list; a sub-rule line is left out, as the list editor never lists one.
+CheckedRuleList checkRuleList(({String content, List<Rule> previous}) input) {
+  final rules = <Rule>[];
+  try {
+    for (final (:line, :rule) in decodeRuleList(
+      input.content,
+      previous: input.previous,
+    )) {
+      if (rule.ruleAction == RuleAction.SUB_RULE) {
+        continue;
+      }
+      if (rule.saveIssue != null) {
+        return (rules: const [], issue: (line: line, rule: rule));
+      }
+      rules.add(rule);
+    }
+  } on RuleLineException catch (error) {
+    return (rules: const [], issue: (line: error.line, rule: null));
+  }
+  return (rules: rules, issue: null);
+}
+
 final _rulesHeader = RegExp(r'^rules\s*[:：]$', caseSensitive: false);
 
 List<({int line, Rule rule})> decodeRuleList(
   String content, {
   Iterable<Rule> previous = const [],
 }) {
-  final unusedIds = <String, List<int>>{};
+  // A queue hands out a duplicate's ids without shifting the rest down.
+  final unusedIds = <String, Queue<int>>{};
   for (final rule in previous) {
-    unusedIds.putIfAbsent(rule.rawValue, () => []).add(rule.id);
+    unusedIds.putIfAbsent(rule.rawValue, Queue.new).add(rule.id);
   }
   return [
     for (final (index, line) in content.split('\n').indexed)
@@ -2012,14 +2059,16 @@ Object? _loadScalar(String text) {
   }
 }
 
-Rule _ruleAt(String value, int line, Map<String, List<int>> unusedIds) {
+Rule _ruleAt(String value, int line, Map<String, Queue<int>> unusedIds) {
   final type = value.split(',').first.trim().toUpperCase();
   if (!RuleAction.values.any((action) => action.value == type)) {
     throw RuleLineException(line);
   }
   final rule = Rule.parse(value);
   final ids = unusedIds[rule.rawValue];
-  return ids == null || ids.isEmpty ? rule : rule.copyWith(id: ids.removeAt(0));
+  return ids == null || ids.isEmpty
+      ? rule
+      : rule.copyWith(id: ids.removeFirst());
 }
 
 /// Mirrors mihomo's newIntRanges: `80`, `80-90`, and `/` or `,` between them.

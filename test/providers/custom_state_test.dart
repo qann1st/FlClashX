@@ -1292,6 +1292,18 @@ void main() {
     expect(proxy.withType('ss'), same(proxy));
   });
 
+  test('many links sharing a name are numbered in one pass', () {
+    final taken = <String>{'Node-02'};
+    final names = [
+      for (var i = 0; i < 20000; i++) freeProxyName('Node', taken),
+    ];
+
+    expect(names.take(4), ['Node', 'Node-01', 'Node-03', 'Node-04']);
+    expect(names.last, 'Node-20000');
+    expect(names.toSet(), hasLength(names.length));
+    expect(freeProxyName('Other', taken), 'Other');
+  });
+
   test('imported links take names no proxy holds yet', () {
     final proxies = importedCustomProxies(
       [

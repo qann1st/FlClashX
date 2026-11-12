@@ -1,7 +1,6 @@
 package com.follow.clashx.plugins
 
 import com.follow.clashx.common.Components
-import com.follow.clashx.invokeMethodOnMainThread
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -19,8 +18,15 @@ class TilePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         channel.setMethodCallHandler(null)
     }
 
-    fun handleStart() {
-        channel.invokeMethodOnMainThread("start")
+    fun handleStart(onAnswered: () -> Unit) {
+        val answered = object : MethodChannel.Result {
+            override fun success(result: Any?) = onAnswered()
+
+            override fun error(code: String, message: String?, details: Any?) = onAnswered()
+
+            override fun notImplemented() = onAnswered()
+        }
+        channel.invokeMethod("start", null, answered)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {

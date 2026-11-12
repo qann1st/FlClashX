@@ -26,19 +26,6 @@ const _forkAuthors = [
   ),
 ];
 
-const _contributors = [
-  Person(
-    avatar: 'assets/images/avatar/kastov.jpg',
-    name: 'kastov',
-    link: 'https://github.com/kastov',
-  ),
-  Person(
-    avatar: 'assets/images/avatar/katsukibtw.jpg',
-    name: 'katsukibtw',
-    link: 'https://github.com/katsukibtw',
-  ),
-];
-
 const _upstreamRepository = 'chen08209/FlClash';
 const _coreRepository = 'legiz-ru/Prizrak-Core';
 const _telegram = 'https://t.me/flclashx';
@@ -152,10 +139,6 @@ class AboutView extends ConsumerWidget {
           generateSection(
             title: appLocalizations.forkAuthor,
             items: const [_PeopleRow(people: _forkAuthors)],
-          ),
-          generateSection(
-            title: appLocalizations.otherContributors,
-            items: const [_PeopleRow(people: _contributors)],
           ),
         ],
       ),

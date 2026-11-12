@@ -93,6 +93,75 @@ void main() {
     expect(find.text(GroupType.URLTest.name), findsNothing);
   });
 
+  testWidgets('a proxy moved to another row keeps the focus, a repeat too', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(500, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final profile = Profile.normal().copyWith(
+      currentGroupName: 'Selector',
+      unfoldSet: {'Selector'},
+    );
+    Group ordered(List<int> order) => Group(
+      name: 'Selector',
+      type: GroupType.Selector,
+      hidden: false,
+      now: 'P-0',
+      all: [for (final i in order) Proxy(name: 'P-$i', type: 'ss')],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        profilesProvider.overrideWith(() => TestProfiles([profile])),
+        currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+        groupsProvider.overrideWithBuild(
+          (_, _) => [
+            ordered([0, 1, 2, 1]),
+          ],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    globalState.container = container;
+    container
+        .read(viewSizeProvider.notifier)
+        .update((_) => const Size(500, 1000));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TestApp(child: ProxiesView()),
+      ),
+    );
+    container
+        .read(proxiesStyleSettingProvider.notifier)
+        .update((state) => state.copyWith(type: ProxiesType.list));
+    await tester.pumpAndSettle();
+    Focus.of(
+      tester.element(
+        find.descendant(of: find.byType(ProxyCard), matching: find.text('P-0')),
+      ),
+    ).requestFocus();
+    await tester.pump();
+
+    container.read(groupsProvider.notifier).value = [
+      ordered([2, 1, 1, 0]),
+    ];
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.descendant(of: find.byType(ProxyCard), matching: find.text('P-1')),
+      findsNWidgets(2),
+    );
+    final focused = FocusManager.instance.primaryFocus!.context!;
+    expect(
+      focused.findAncestorWidgetOfExactType<ProxyCard>()?.proxy.name,
+      'P-0',
+    );
+  });
+
   testWidgets('the list scrolls its rows under the bar, pinning the header '
       'at its foot', (tester) async {
     tester.view.physicalSize = const Size(500, 1000);

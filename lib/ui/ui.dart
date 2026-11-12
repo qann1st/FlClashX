@@ -46,6 +46,7 @@ export 'navigator_resizable.dart';
 export 'navigator.dart';
 export 'null_status.dart';
 export 'open_container.dart';
+export 'outer_shadow.dart';
 export 'page_transition.dart';
 export 'paged_sheet.dart';
 export 'pop_scope.dart';

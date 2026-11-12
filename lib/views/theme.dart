@@ -35,7 +35,10 @@ class ThemeView extends StatelessWidget {
             child: _ThemeStyleItem(),
           ),
           const SizedBox(height: 16),
-          const _ThemeModeItem(),
+          const ManagedSetting(
+            settingKey: 'view.app.theme',
+            child: _ThemeModeItem(),
+          ),
           const SizedBox(height: 16),
           const ManagedSetting(
             settingKey: 'view.app.black',

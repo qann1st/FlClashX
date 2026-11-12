@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show lerpDouble;
+import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -610,7 +610,11 @@ class ShapeBadge extends StatelessWidget {
           children: [
             ClipPath(
               clipper: ShapeClipper(path: path, rotation: rotation),
-              clipBehavior: Clip.antiAliasWithSaveLayer,
+              // MSAA clips each sample whole; without it the flag's stacked
+              // stripes would each blend into the clip's soft edge.
+              clipBehavior: ImageFilter.isShaderFilterSupported
+                  ? Clip.antiAlias
+                  : Clip.antiAliasWithSaveLayer,
               child: background,
             ),
             if (child != null) Center(child: child),

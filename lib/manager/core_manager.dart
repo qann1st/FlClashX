@@ -145,6 +145,12 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   }
 
   @override
+  void onTunFailed() {
+    unawaited(ref.read(setupActionProvider.notifier).tunFailed());
+    super.onTunFailed();
+  }
+
+  @override
   void onRequest(TrackerInfo trackerInfo) async {
     ref.read(requestsProvider.notifier).addRequest(trackerInfo);
     ref.read(requestCountProvider.notifier).update((count) => count + 1);

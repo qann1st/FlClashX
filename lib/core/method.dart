@@ -55,6 +55,7 @@ enum CoreMethod {
   updateDns,
   watchRoute,
   checkRoutes,
+  getTunFailed,
 }
 
 class CoreMethodCall {

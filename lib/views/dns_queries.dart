@@ -88,7 +88,7 @@ class _DnsQueriesViewState extends ConsumerState<DnsQueriesView>
   }
 
   void _updateDnsQueriesThrottler() {
-    throttler.call(FunctionTag.dnsQueries, () {
+    throttler.call((FunctionTag.dnsQueries, this), () {
       if (!mounted) {
         return;
       }

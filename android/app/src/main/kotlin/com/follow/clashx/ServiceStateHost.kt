@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.content.ContextCompat
 import com.follow.clashx.common.GlobalState
 import com.follow.clashx.models.SharedState
@@ -49,6 +51,8 @@ internal interface ServiceStateHost {
 
     fun notifyStopped()
 
+    fun notifyStopRequested()
+
     suspend fun quickSetup(initParams: String, setupParams: String): Result<String>
 
     suspend fun startService(options: VpnOptions): Boolean
@@ -57,7 +61,7 @@ internal interface ServiceStateHost {
 }
 
 internal fun interface TileGateway {
-    fun handleStart()
+    fun handleStart(onAnswered: () -> Unit)
 }
 
 internal interface AppGateway {
@@ -65,7 +69,8 @@ internal interface AppGateway {
 
     fun requestLocalNetworkPermission(callback: (Boolean) -> Unit)
 
-    fun prepareVpn(enable: Boolean, callback: (Boolean) -> Unit)
+    /** [isCurrent] is asked again on the main thread, right before the consent opens. */
+    fun prepareVpn(enable: Boolean, isCurrent: () -> Boolean, callback: (Boolean) -> Unit)
 
     fun cancelVpnPreparation(callback: (Boolean) -> Unit)
 
@@ -76,6 +81,7 @@ internal interface AppGateway {
 internal object AndroidServiceStateHost : ServiceStateHost {
     @Volatile
     private var flutterEngine: FlutterEngine? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override val scope: CoroutineScope
         get() = GlobalState
@@ -93,10 +99,12 @@ internal object AndroidServiceStateHost : ServiceStateHost {
         flutterEngine = engine
     }
 
-    fun detachFlutterEngine(engine: FlutterEngine) {
-        if (flutterEngine === engine) {
-            flutterEngine = null
+    fun detachFlutterEngine(engine: FlutterEngine): Boolean {
+        if (flutterEngine !== engine) {
+            return false
         }
+        flutterEngine = null
+        return true
     }
 
     override fun log(message: String) = GlobalState.log(message)
@@ -118,8 +126,15 @@ internal object AndroidServiceStateHost : ServiceStateHost {
                 Manifest.permission.ACCESS_LOCAL_NETWORK,
             ) == PackageManager.PERMISSION_GRANTED
 
-    override fun tile(): TileGateway? = flutterEngine?.plugin<TilePlugin>()?.let { plugin ->
-        TileGateway(plugin::handleStart)
+    // Detach runs on the main thread too, so a start sent from it never meets a destroyed engine.
+    override fun tile(): TileGateway? {
+        val engine = flutterEngine ?: return null
+        val plugin = engine.plugin<TilePlugin>() ?: return null
+        return TileGateway { onAnswered ->
+            mainHandler.post {
+                if (flutterEngine === engine) plugin.handleStart(onAnswered) else onAnswered()
+            }
+        }
     }
 
     override fun app(): AppGateway? = flutterEngine?.plugin<AppPlugin>()?.let { plugin ->
@@ -130,8 +145,11 @@ internal object AndroidServiceStateHost : ServiceStateHost {
             override fun requestLocalNetworkPermission(callback: (Boolean) -> Unit) =
                 plugin.requestLocalNetworkPermission(callback)
 
-            override fun prepareVpn(enable: Boolean, callback: (Boolean) -> Unit) =
-                plugin.prepareVpn(enable, callback)
+            override fun prepareVpn(
+                enable: Boolean,
+                isCurrent: () -> Boolean,
+                callback: (Boolean) -> Unit,
+            ) = plugin.prepareVpn(enable, isCurrent, callback)
 
             override fun cancelVpnPreparation(callback: (Boolean) -> Unit) =
                 plugin.cancelVpnPreparation(callback)
@@ -143,6 +161,10 @@ internal object AndroidServiceStateHost : ServiceStateHost {
 
     override fun notifyStopped() {
         flutterEngine?.plugin<ServicePlugin>()?.notifyStopped()
+    }
+
+    override fun notifyStopRequested() {
+        flutterEngine?.plugin<ServicePlugin>()?.notifyStopRequested()
     }
 
     override suspend fun quickSetup(initParams: String, setupParams: String): Result<String> =

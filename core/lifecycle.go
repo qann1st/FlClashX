@@ -14,6 +14,7 @@ import (
 	"github.com/metacubex/mihomo/hub/executor"
 	"github.com/metacubex/mihomo/listener"
 	LC "github.com/metacubex/mihomo/listener/config"
+	"github.com/metacubex/mihomo/listener/tproxy"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
 
@@ -70,16 +71,12 @@ func handleStopListener() bool {
 	return true
 }
 
-// The listeners are the core's own, handed [trafficTunnel]. mihomo's apply
-// opens none while the core is stopped (see mihomoConfig) and, while it
-// runs, re-creates only what changed; those it created are re-created here
-// onto the accounting tunnel, which an unchanged listener keeps.
 func updateListeners(cfg *config.Config) {
 	if cfg == nil || !isRunning.Load() {
 		return
 	}
 	general := cfg.General
-	listener.PatchInboundListeners(cfg.Listeners, trafficTunnel, true)
+	patchNamedListeners(cfg.Listeners)
 
 	listener.SetAllowLan(general.AllowLan)
 	inbound.SetSkipAuthPrefixes(general.SkipAuthPrefixes)
@@ -95,14 +92,40 @@ func updateListeners(cfg *config.Config) {
 	listener.ReCreateShadowSocks(general.ShadowSocksConfig, trafficTunnel)
 	listener.ReCreateVmess(general.VmessConfig, trafficTunnel)
 	listener.ReCreateTuic(general.TuicServer, trafficTunnel)
+	patchForwardTunnels(cfg.Tunnels)
 	if !isAndroid {
-		listener.ReCreateTun(general.Tun, trafficTunnel)
+		openTun(general.Tun, trafficTunnel)
+		if general.Tun.Enable && !tunListening() {
+			sendMessage(TunFailedMessage, nil)
+		}
 	}
+	openedShadowSocks, openedVmess = general.ShadowSocksConfig, general.VmessConfig
+	updateIPTables(cfg)
+}
+
+// mihomo only logs a TUN it could not open, and goes on without one.
+var (
+	openTun      = listener.ReCreateTun
+	tunListening = func() bool { return listener.GetTunConf().Enable }
+)
+
+// A tunFailed event may describe a config a later push replaced, so the host
+// confirms it once its own pushes have landed.
+func handleGetTunFailed() bool {
+	configMu.Lock()
+	defer configMu.Unlock()
+	return !isAndroid && isRunning.Load() && currentConfig != nil &&
+		currentConfig.General.Tun.Enable && !tunListening()
 }
 
 // mihomo closes a listener re-created with nothing to listen on.
 func stopListeners() {
+	tproxy.CleanupTProxyIPTables()
+	openedShadowSocks, openedVmess = "", ""
+	patchNamedListeners(nil)
+	patchForwardTunnels(nil)
 	listener.PatchInboundListeners(nil, trafficTunnel, true)
+	closeMihomoTunnels()
 	listener.ReCreateHTTP(0, trafficTunnel)
 	listener.ReCreateSocks(0, trafficTunnel)
 	listener.ReCreateRedir(0, trafficTunnel)

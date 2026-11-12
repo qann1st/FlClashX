@@ -906,6 +906,42 @@ void main() {
     );
   });
 
+  test(
+    'exclusions that leave no route route nothing, not everything',
+    () async {
+      await AppLocalizations.load(const Locale('en'));
+      container.listen(sharedStateProvider, (_, _) {});
+      container
+          .read(networkSettingProvider.notifier)
+          .update((state) => state.copyWith(bypassPrivateRoute: false));
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              tun: state.tun.copyWith(
+                routeExcludeAddress: const ['0.0.0.0/0', '::/0'],
+              ),
+            ),
+          );
+      await container.read(vpnOptionsProvider.future);
+      var vpnOptions = container.read(sharedStateProvider).vpnOptions!;
+      expect(vpnOptions.routeAddress, isEmpty);
+      expect(vpnOptions.excludesAllRoutes, isTrue);
+
+      container
+          .read(patchClashConfigProvider.notifier)
+          .update(
+            (state) => state.copyWith(
+              tun: state.tun.copyWith(routeExcludeAddress: []),
+            ),
+          );
+      await container.read(vpnOptionsProvider.future);
+      vpnOptions = container.read(sharedStateProvider).vpnOptions!;
+      expect(vpnOptions.routeAddress, isEmpty);
+      expect(vpnOptions.excludesAllRoutes, isFalse);
+    },
+  );
+
   test('only the route lists recompute the VPN routes', () async {
     final computed = <List<String>?>[];
     container.listen(

@@ -111,6 +111,19 @@ void main() {
       expect(info.total, 10737418240);
       expect(info.expire, 0);
     });
+
+    test('an expiry past the last date there is reads as none', () {
+      const last = 8640000000000;
+      for (final (expire, kept) in [(last, last), (last + 1, 0), (-5, 0)]) {
+        final fromHeader = SubscriptionInfo.formHString('expire=$expire');
+        final stored = SubscriptionInfo.fromJson({'expire': expire});
+
+        for (final info in [fromHeader, stored]) {
+          expect(info.expire, kept, reason: 'expire=$expire');
+          expect(() => info.expireDate, returnsNormally);
+        }
+      }
+    });
   });
 
   group('Profile factories', () {

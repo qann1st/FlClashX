@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import '../setup.dart' as setup;
@@ -82,6 +83,36 @@ hooks:
         setup.artifactName('android', 'arm64-v8a', '.apk'),
         'FlClashX-android-arm64-v8a.apk',
       );
+    });
+
+    test('signs the code inside the macOS app before the app', () {
+      final root = Directory.systemTemp.createTempSync('setup_sign');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final app = p.join(root.path, 'FlClashX.app');
+      String at(String path) => p.joinAll([app, ...path.split('/')]);
+      for (final dir in [
+        'Contents/Frameworks/FlutterMacOS.framework',
+        'Contents/Frameworks/App.framework',
+        'Contents/Library/LoginItems/Helper.app',
+        'Contents/Resources/plugin.bundle',
+      ]) {
+        Directory(at(dir)).createSync(recursive: true);
+      }
+      for (final file in [
+        'Contents/MacOS/FlClashX',
+        'Contents/MacOS/FlClashCore',
+        'Contents/Frameworks/Info.plist',
+      ]) {
+        File(at(file)).createSync(recursive: true);
+      }
+
+      expect(setup.macosSigningOrder(app), [
+        at('Contents/Frameworks/App.framework'),
+        at('Contents/Frameworks/FlutterMacOS.framework'),
+        at('Contents/Library/LoginItems/Helper.app'),
+        at('Contents/MacOS/FlClashCore'),
+        app,
+      ]);
     });
 
     test('a release tag is the app version, else the pubspec one', () {

@@ -15,13 +15,19 @@ part 'generated/profile.g.dart';
 typedef ValidateConfig =
     Future<String> Function(String path, String ageSecretKey);
 
+/// Past DateTime's last moment, 8.64e15 ms, an expiry would throw where shown.
+const _maxExpireSeconds = 8640000000000;
+
+int _validExpire(num seconds) =>
+    seconds > 0 && seconds <= _maxExpireSeconds ? seconds.toInt() : 0;
+
 @freezed
 abstract class SubscriptionInfo with _$SubscriptionInfo {
   const factory SubscriptionInfo({
     @Default(0) int upload,
     @Default(0) int download,
     @Default(0) int total,
-    @Default(0) int expire,
+    @JsonKey(fromJson: _validExpire) @Default(0) int expire,
   }) = _SubscriptionInfo;
 
   factory SubscriptionInfo.fromJson(Map<String, Object?> json) =>
@@ -42,7 +48,7 @@ abstract class SubscriptionInfo with _$SubscriptionInfo {
       upload: map['upload'] ?? 0,
       download: map['download'] ?? 0,
       total: map['total'] ?? 0,
-      expire: map['expire'] ?? 0,
+      expire: _validExpire(map['expire'] ?? 0),
     );
   }
 
@@ -164,6 +170,14 @@ extension ProfileExtension on Profile {
 
   String get updatingKey => 'profile_$id';
 
+  // In milliseconds: an interval a panel sent may pass DateTime's last moment.
+  bool? get isAutoUpdateDue => switch (lastUpdateDate) {
+    null => null,
+    final last =>
+      last.millisecondsSinceEpoch + autoUpdateDuration.inMilliseconds <
+          DateTime.now().millisecondsSinceEpoch,
+  };
+
   /// The database keeps [lastUpdateDate] only to the second.
   ({
     String url,
@@ -181,18 +195,8 @@ extension ProfileExtension on Profile {
     },
   );
 
-  Future<Profile?> checkAndUpdateAndCopy({
-    required ValidateConfig validate,
-  }) async {
-    if (type != ProfileType.url) {
-      return null;
-    }
-    final mFile = await _getFile(false);
-    if (await mFile.exists()) {
-      return null;
-    }
-    return update(validate: validate);
-  }
+  Future<bool> get isMissingFile async =>
+      type == ProfileType.url && !await (await _getFile(false)).exists();
 
   Future<File> _getFile([bool autoCreate = true]) async {
     final path = await appPath.getProfilePath(id.toString());
@@ -298,7 +302,7 @@ extension ProfileExtension on Profile {
       autoUpdateDuration:
           ProviderHeaders(providerHeaders).updateInterval ?? autoUpdateDuration,
     ).saveFile(
-      decompressUnlabeled(response.data ?? Uint8List(0)),
+      await decompressDownload(response.data ?? Uint8List(0)),
       validate: validate,
       isCurrent: isCurrent,
     );

@@ -9,6 +9,7 @@ import 'package:fl_clash/ui/cursor.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/metrics.dart';
 import 'package:fl_clash/ui/motion.dart';
+import 'package:fl_clash/ui/outer_shadow.dart';
 import 'package:fl_clash/ui/shape.dart';
 import 'package:fl_clash/ui/surface.dart';
 import 'package:fl_clash/ui/typography.dart';
@@ -2944,11 +2945,15 @@ class _RenderPopupMenuCard extends RenderProxyBox {
       final canvas = context.canvas;
       final surface = shape.shift(offset);
       final corners = AppRadius.all(radius);
-      for (final shadow in _shadows) {
-        canvas.drawRSuperellipse(
-          corners.toRSuperellipse(rect.shift(offset + shadow.offset)),
-          shadow.toPaint(),
-        );
+      if (_fill.a == 1) {
+        paintSurfaceShadows(canvas, rect.shift(offset), corners, _shadows);
+      } else {
+        for (final shadow in _shadows) {
+          canvas.drawRSuperellipse(
+            corners.toRSuperellipse(rect.shift(offset + shadow.offset)),
+            shadow.toPaint(),
+          );
+        }
       }
       canvas.drawPath(surface, Paint()..color = _fill);
     } else if (_bare) {

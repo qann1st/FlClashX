@@ -1756,16 +1756,6 @@ class AppLocalizations {
     return Intl.message('Fork author', name: 'forkAuthor', desc: '', args: []);
   }
 
-  /// `Other contributors`
-  String get otherContributors {
-    return Intl.message(
-      'Other contributors',
-      name: 'otherContributors',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Original repository`
   String get originalRepository {
     return Intl.message(
@@ -2071,6 +2061,16 @@ class AppLocalizations {
     return Intl.message(
       'Only remote providers are supported',
       name: 'providerUrlTip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This provider was replaced while you edited it. Reopen it to edit the current one.`
+  String get providerReplacedTip {
+    return Intl.message(
+      'This provider was replaced while you edited it. Reopen it to edit the current one.',
+      name: 'providerReplacedTip',
       desc: '',
       args: [],
     );
@@ -4886,6 +4886,16 @@ class AppLocalizations {
     return Intl.message(
       'TUN could not be authorized, so it was turned off.',
       name: 'tunAuthorizationFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `TUN could not start, so it was turned off.`
+  String get tunStartFailed {
+    return Intl.message(
+      'TUN could not start, so it was turned off.',
+      name: 'tunStartFailed',
       desc: '',
       args: [],
     );
@@ -8257,6 +8267,31 @@ class AppLocalizations {
     return Intl.message(
       'VPN is restricted on this device by its administrator',
       name: 'vpnRestrictedByAdministrator',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Share logs`
+  String get shareLogs {
+    return Intl.message('Share logs', name: 'shareLogs', desc: '', args: []);
+  }
+
+  /// `There are no logs for today`
+  String get noLogsToday {
+    return Intl.message(
+      'There are no logs for today',
+      name: 'noLogsToday',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The file is too large to download`
+  String get downloadTooLarge {
+    return Intl.message(
+      'The file is too large to download',
+      name: 'downloadTooLarge',
       desc: '',
       args: [],
     );

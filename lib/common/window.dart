@@ -14,6 +14,7 @@ class Window implements WindowPort {
   static const _tintOpacity = 0.5;
   static Window? _instance;
   bool _supportsPosition = false;
+  bool _canPosition = false;
   bool _menuBarMode = false;
   WindowEffect? _blurEffect;
   late final WindowVisibilityController _visibility =
@@ -52,16 +53,10 @@ class Window implements WindowPort {
       }
     }
     await desktopWindow.ensureInitialized();
-    _supportsPosition = !system.isMacOS;
-    if (system.isLinux) {
-      _supportsPosition = await desktopWindow.isPositionSupported();
-    }
     if (!system.isMacOS || version > 10) {
       await desktopWindow.setTitleBarStyle(TitleBarStyle.hidden);
     }
-    await desktopWindow.setSize(props.savedSize ?? await _defaultSize());
-    await desktopWindow.setMinimumSize(const Size(380, 400));
-    await _windowPosition(props);
+    await placeWindow(props);
     await desktopWindow.setPreventClose(true);
     if (menuBarMode) {
       await setMenuBarMode(true);
@@ -80,31 +75,56 @@ class Window implements WindowPort {
     await desktopWindow.setSkipTaskbar(enabled);
   }
 
-  Future<Size> _defaultSize() async {
+  /// A window goes back where it was left while its title bar is on a screen.
+  /// Otherwise it opens at the top of the primary work area, no taller than it:
+  /// centered, a window taller than a small screen put the bar it is dragged
+  /// by above the screen, out of reach.
+  @visibleForTesting
+  Future<void> placeWindow(WindowProps props) async {
+    _canPosition = !system.isLinux || await desktopWindow.isPositionSupported();
+    _supportsPosition = _canPosition && !system.isMacOS;
+    final Rect workArea;
+    final List<Display> displays;
     try {
-      final display = await screenRetriever.getPrimaryDisplay();
-      return fittedWindowSize(display.visibleSize ?? display.size);
+      displays = await screenRetriever.getAllDisplays();
+      workArea = workAreaOf(await screenRetriever.getPrimaryDisplay());
     } catch (_) {
-      return defaultWindowSize;
+      await _resize(props.savedSize ?? defaultWindowSize);
+      return;
+    }
+    final restored =
+        _supportsPosition && props.left != null && props.top != null
+        ? restoredWindowPosition(
+            props,
+            displays: displays,
+            currentScale: system.isWindows ? _windowScale : null,
+          )
+        : null;
+    if (restored != null) {
+      await _resize(props.size);
+      await desktopWindow.setPosition(restored);
+      return;
+    }
+    final size = switch (props.savedSize) {
+      final saved? => Size(
+        math.min(saved.width, workArea.width),
+        math.min(saved.height, workArea.height),
+      ),
+      null => fittedWindowSize(workArea.size),
+    };
+    await _resize(size);
+    if (_canPosition) {
+      await desktopWindow.setPosition(topOfWorkArea(size, workArea));
     }
   }
 
-  Future<void> _windowPosition(WindowProps props) async {
-    if (!_supportsPosition) {
-      return;
-    }
-    final position = props.left == null || props.top == null
-        ? null
-        : restoredWindowPosition(
-            props,
-            displays: await screenRetriever.getAllDisplays(),
-            currentScale: system.isWindows ? _windowScale : null,
-          );
-    if (position == null) {
-      await desktopWindow.setAlignment(Alignment.center);
-    } else {
-      await desktopWindow.setPosition(position);
-    }
+  /// Windows holds a resize to the minimum size, so on a work area smaller
+  /// than that the minimum gives way to the size the window was fitted to.
+  Future<void> _resize(Size size) async {
+    await desktopWindow.setMinimumSize(
+      Size(math.min(380, size.width), math.min(400, size.height)),
+    );
+    await desktopWindow.setSize(size);
   }
 
   double get _windowScale =>
@@ -237,6 +257,19 @@ class Window implements WindowPort {
   }
 }
 
+/// What a display leaves windows, the menu bar, Dock and taskbar taken out.
+@visibleForTesting
+Rect workAreaOf(Display display) =>
+    (display.visiblePosition ?? Offset.zero) &
+    (display.visibleSize ?? display.size);
+
+/// Centered across [workArea], against its top edge.
+@visibleForTesting
+Offset topOfWorkArea(Size window, Rect workArea) => Offset(
+  workArea.left + math.max(0, workArea.width - window.width) / 2,
+  workArea.top,
+);
+
 /// Keeps a margin of the work area around a first window on a small screen.
 @visibleForTesting
 Size fittedWindowSize(Size visible) => Size(
@@ -246,6 +279,7 @@ Size fittedWindowSize(Size visible) => Size(
 
 /// On Windows the plugin scales by the window's monitor and screen_retriever by
 /// each display's own, so only physical pixels compare across mixed scales.
+/// The window is dragged by its top, so that is what has to be on a screen.
 @visibleForTesting
 Offset? restoredWindowPosition(
   WindowProps props, {
@@ -254,24 +288,25 @@ Offset? restoredWindowPosition(
 }) {
   final savedScale = currentScale == null ? 1.0 : props.scale ?? currentScale;
   final topLeft = Offset(props.left!, props.top!) * savedScale;
-  final bottomRight =
-      topLeft + props.size.bottomRight(Offset.zero) * savedScale;
+  final titleBar =
+      topLeft +
+      Offset(props.size.width / 2, math.min(props.size.height, 32) / 2) *
+          savedScale;
   final isVisible = displays.any((display) {
-    final position = display.visiblePosition;
-    if (position == null) {
+    if (display.visiblePosition == null) {
       return false;
     }
     final scale = currentScale == null
         ? 1.0
         : display.scaleFactor?.toDouble() ?? 1.0;
-    final bounds = position & display.size;
+    final bounds = workAreaOf(display);
     final physical = Rect.fromLTRB(
       bounds.left * scale,
       bounds.top * scale,
       bounds.right * scale,
       bounds.bottom * scale,
     );
-    return physical.contains(topLeft) || physical.contains(bottomRight);
+    return physical.contains(titleBar);
   });
   return isVisible ? topLeft / (currentScale ?? 1.0) : null;
 }

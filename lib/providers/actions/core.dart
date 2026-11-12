@@ -9,6 +9,8 @@ class CoreAction extends _$CoreAction {
 
   int _requestedRestartRevision = 0;
   Future<bool>? _restartOperation;
+  int _restartsBegun = 0;
+  bool _relaunchRequested = false;
   int _failedRestarts = 0;
   DateTime? _crashRestartedAt;
   bool _restartingAfterCrash = false;
@@ -39,11 +41,16 @@ class CoreAction extends _$CoreAction {
   }
 
   Future<void> startCore() async {
+    final restartsBegun = _restartsBegun;
     ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
     try {
       final result = await startLifecycle();
       await _applyLifecycleResult(result);
     } catch (error) {
+      // A restart begun since, such as one answering a crash in init, owns it.
+      if (restartsBegun != _restartsBegun) {
+        return;
+      }
       ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
       dialogs.showNotifier(error.toString(), level: MessageLevel.error);
     }
@@ -60,22 +67,14 @@ class CoreAction extends _$CoreAction {
   }
 
   // Nothing in lib/ calls CoreController.stop(); only close() (app exit)
-  // supersedes a start/restart. statusFirst lets onCrash catch a crash
+  // supersedes a start/restart. Connected first lets onCrash catch a crash
   // during initCore itself (it early-returns unless status is connected).
-  Future<bool> _applyLifecycleResult(
-    CoreLifecycleResult result, {
-    bool statusFirst = false,
-  }) async {
+  Future<bool> _applyLifecycleResult(CoreLifecycleResult result) async {
     if (result.outcome == CoreLifecycleOutcome.superseded) {
       return false;
     }
-    if (statusFirst) {
-      ref.read(coreStatusProvider.notifier).value = CoreStatus.connected;
-      await initCore();
-    } else {
-      await initCore();
-      ref.read(coreStatusProvider.notifier).value = CoreStatus.connected;
-    }
+    ref.read(coreStatusProvider.notifier).value = CoreStatus.connected;
+    await initCore();
     return true;
   }
 
@@ -161,8 +160,17 @@ class CoreAction extends _$CoreAction {
       return activeOperation;
     }
 
+    _restartsBegun++;
     final operation = _runRestartWorker(running: running);
     _restartOperation = operation;
+    return operation;
+  }
+
+  Future<bool>? requestRelaunch() {
+    final operation = _restartOperation;
+    if (operation != null) {
+      _relaunchRequested = true;
+    }
     return operation;
   }
 
@@ -184,28 +192,33 @@ class CoreAction extends _$CoreAction {
         await stopping;
         await _core.shutdown();
       }
-      final result = await restartLifecycle();
-      if (!await _applyLifecycleResult(result, statusFirst: true)) {
-        return false;
-      }
-
-      var appliedRevision = 0;
       var applied = true;
-      while (appliedRevision < _requestedRestartRevision) {
-        final revision = _requestedRestartRevision;
-        applied = await _restoreRunning(
-          setupAction,
-          wasRunning: wasRunning,
-          runRequested: running,
-          observedIntent: runIntent,
-        );
-        appliedRevision = revision;
-      }
+      do {
+        _relaunchRequested = false;
+        ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
+        final result = await restartLifecycle();
+        if (!await _applyLifecycleResult(result)) {
+          return false;
+        }
+        var appliedRevision = 0;
+        while (appliedRevision < _requestedRestartRevision &&
+            !_relaunchRequested) {
+          final revision = _requestedRestartRevision;
+          applied = await _restoreRunning(
+            setupAction,
+            wasRunning: wasRunning,
+            runRequested: running,
+            observedIntent: runIntent,
+          );
+          appliedRevision = revision;
+        }
+      } while (_relaunchRequested);
       return applied;
     } catch (_) {
       ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
       rethrow;
     } finally {
+      _relaunchRequested = false;
       _restartOperation = null;
     }
   }

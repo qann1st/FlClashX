@@ -112,6 +112,7 @@ flutter:
       platforms: [ windows ]
   shaders:
     - shaders/liquid_glass.frag
+    - shaders/liquid_glass_flat.frag
   fonts:
     - family: JetBrainsMono
       fonts:

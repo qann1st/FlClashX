@@ -133,7 +133,7 @@ void main() {
     tester,
   ) async {
     await pumpList(tester);
-    final card = find.byKey(const ValueKey('G0.G0-0')).first;
+    final card = find.byKey(const ValueKey(('G0-0', 0))).first;
     final before = tester.widget(card);
 
     container.read(proxiesActionProvider.notifier).updateCurrentUnfoldSet({
@@ -370,7 +370,7 @@ void main() {
       unfoldSet: const {'G0'},
     );
 
-    final subCard = find.byKey(const ValueKey('G0.Sub')).first;
+    final subCard = find.byKey(const ValueKey(('Sub', 0))).first;
     expect(
       find.descendant(
         of: subCard,

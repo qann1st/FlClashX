@@ -103,6 +103,22 @@ class IconSetsDao extends DatabaseAccessor<Database> with _$IconSetsDaoMixin {
       b.insertAllOnConflictUpdate(iconSets, items);
     });
   }
+
+  void setAllWithBatch(Batch batch, Iterable<IconSet> items) {
+    iconSets.setAll(
+      batch,
+      items.map((item) => item.toCompanion()),
+      deleteFilter: (_) => const Constant(true),
+      preDelete: true,
+    );
+  }
+
+  void putAllWithBatch(Batch batch, Iterable<IconSet> items) {
+    batch.insertAllOnConflictUpdate(
+      iconSets,
+      items.map((item) => item.toCompanion()),
+    );
+  }
 }
 
 extension RawIconSetExt on RawIconSet {

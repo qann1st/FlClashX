@@ -13,6 +13,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.StandardMethodCodec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -24,6 +25,7 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private lateinit var scope: CoroutineScope
     private val gson = Gson()
     private var commandRevision = 0
+    private var demandWatch: Job? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -68,6 +70,13 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun initialize(result: MethodChannel.Result) {
+        // From init on, when Flutter's handler is surely set: the flow repeats its value first.
+        demandWatch?.cancel()
+        demandWatch = scope.launch(Dispatchers.Main) {
+            ServiceState.vpnDemandedBySystem.collect { demanded ->
+                channel.invokeMethod("vpnDemanded", demanded)
+            }
+        }
         NetworkObserver.start()
         ServiceController.setEventListener(::sendEvent)
             .onSuccess { result.success("") }
@@ -107,10 +116,8 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             result.success("Invalid shared state")
             return
         }
-        scope.launch {
-            ServiceState.syncSharedState(state)
-            result.success("")
-        }
+        ServiceState.syncSharedState(state)
+        result.success("")
     }
 
     private fun start(call: MethodCall, result: MethodChannel.Result) {
@@ -136,6 +143,15 @@ class ServicePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         scope.launch(Dispatchers.Main) {
             if (!ServiceState.isRunRequested) {
                 channel.invokeMethod("stopped", commandRevision)
+            }
+        }
+    }
+
+    // A start Flutter sent while this waited for the main thread is newer than the stop.
+    fun notifyStopRequested() {
+        scope.launch(Dispatchers.Main) {
+            if (!ServiceState.isRunRequested) {
+                channel.invokeMethod("stopRequested", commandRevision)
             }
         }
     }

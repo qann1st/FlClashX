@@ -240,6 +240,7 @@ Future<VpnOptions> vpnOptions(Ref ref) async {
       (state) => (
         bypassDomain: state.bypassDomain,
         authenticated: state.authentication.credentials.isNotEmpty,
+        bypassPrivateRoute: state.bypassPrivateRoute,
       ),
     ),
   );
@@ -250,7 +251,8 @@ Future<VpnOptions> vpnOptions(Ref ref) async {
   );
   final vpnSetting = ref.watch(vpnSettingProvider);
   final safeMode = ref.watch(safeModeProvider);
-  final routeAddress = ref.watch(vpnRouteAddressProvider.future);
+  final androidSecure = ref.watch(androidSecureProvider);
+  final routeAddress = await ref.watch(vpnRouteAddressProvider.future);
   final tun = clashConfig.tun;
   return VpnOptions(
     enable: vpnSetting.enable && !safeMode,
@@ -261,7 +263,7 @@ Future<VpnOptions> vpnOptions(Ref ref) async {
         vpnSetting.systemProxy &&
         !networkSetting.authenticated &&
         !safeMode &&
-        !ref.watch(androidSecureProvider),
+        !androidSecure,
     port: clashConfig.mixedPort,
     ipv6: vpnSetting.ipv6,
     dnsHijacking: vpnSetting.dnsHijacking,
@@ -271,7 +273,11 @@ Future<VpnOptions> vpnOptions(Ref ref) async {
     ),
     allowBypass: vpnSetting.allowBypass,
     bypassDomain: networkSetting.bypassDomain,
-    routeAddress: await routeAddress,
+    routeAddress: routeAddress,
+    excludesAllRoutes: tun.excludesEveryRoute(
+      routeAddress,
+      bypassPrivateRoute: networkSetting.bypassPrivateRoute,
+    ),
     mtu: tun.mtu,
     congestionController: tun.congestionController,
   );

@@ -91,9 +91,15 @@ func handleGetProxies() ProxiesData {
 		return p.Type(), true
 	})
 
+	held := heldGroups()
 	views := make(map[string]any, len(proxies))
 	for name, proxy := range proxies {
-		views[name] = proxyView(proxy)
+		view := proxyView(proxy)
+		// The host reads a pin as the user's; a held one is the core's.
+		if group, ok := view.(map[string]any); ok && held[name] == proxy {
+			group["fixed"] = ""
+		}
+		views[name] = view
 	}
 	return ProxiesData{All: names, Proxies: views}
 }
@@ -173,6 +179,7 @@ func handleChangeProxy(params *ChangeProxyParams) *ChangeProxyResult {
 	} else if err := selector.Set(params.ProxyName); err != nil {
 		return &ChangeProxyResult{Message: err.Error()}
 	}
+	userPicked(params.GroupName)
 	changed := selector.Now() != before
 	refreshRouteLocked(routeUnchanged)
 	return &ChangeProxyResult{Changed: changed}

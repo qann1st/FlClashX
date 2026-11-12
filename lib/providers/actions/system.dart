@@ -86,7 +86,17 @@ class SystemAction extends _$SystemAction {
       }
     }
     await preferences.saveConfig(ref.read(configProvider));
+    if (savesSharedState) {
+      // The save AndroidManager debounces would die with the engine.
+      debouncer.cancel(FunctionTag.saveSharedFile);
+      await ref.read(vpnOptionsProvider.future);
+      await preferences.saveShareState(ref.read(sharedStateProvider));
+    }
   }
+
+  /// A Quick Settings start without Flutter reads the VPN options from it.
+  @protected
+  bool get savesSharedState => system.isAndroid;
 
   @protected
   Future<void> closeWindow() async {

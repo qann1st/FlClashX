@@ -405,13 +405,18 @@ Future<void> _packageMacos(_Build build) async {
     'build/macos/Build/Products/Release',
     '$_appName.app',
   );
+  final identity = Platform.environment['APPLE_DEVELOPER_ID'] ?? '';
+  if (identity.isNotEmpty) {
+    await _signMacosApp(build, app, identity);
+  }
   final staging = Directory(p.join(build.rootDir, 'build', 'dmg'));
   if (staging.existsSync()) staging.deleteSync(recursive: true);
   staging.createSync(recursive: true);
   // Without a signing identity create-dmg still writes the image, then exits
-  // non-zero over the signature it could not add; the release job signs later.
+  // non-zero over the signature it could not add.
   final code = await build.run('create-dmg', [
     '--overwrite',
+    if (identity.isNotEmpty) '--no-code-sign',
     '--dmg-title',
     _appName,
     app,
@@ -422,10 +427,12 @@ Future<void> _packageMacos(_Build build) async {
       .whereType<File>()
       .where((file) => file.path.endsWith('.dmg'))
       .toList();
-  if (created.isEmpty) {
+  if (created.isEmpty || (identity.isNotEmpty && code != 0)) {
     throw ProcessException('create-dmg', const [], 'no DMG was created', code);
   }
-  if (code != 0) {
+  if (identity.isNotEmpty) {
+    await _codesign(build, identity, created.first.path);
+  } else if (code != 0) {
     stderr.writeln('create-dmg exited with $code; the DMG is unsigned.');
   }
   build.copy(
@@ -433,6 +440,83 @@ Future<void> _packageMacos(_Build build) async {
     build.dist(artifactName('macos', build.arch, '.dmg')),
   );
   staging.deleteSync(recursive: true);
+}
+
+List<String> macosSigningOrder(String app) {
+  final contents = p.join(app, 'Contents');
+  List<String> entries(String dir, bool Function(String path) take) {
+    final directory = Directory(p.join(contents, dir));
+    if (!directory.existsSync()) return [];
+    return [
+      for (final entry in directory.listSync())
+        if (take(entry.path)) entry.path,
+    ]..sort();
+  }
+
+  return [
+    ...entries(
+      'Frameworks',
+      (path) => path.endsWith('.framework') || path.endsWith('.dylib'),
+    ),
+    ...entries(
+      p.join('Library', 'LoginItems'),
+      (path) => path.endsWith('.app'),
+    ),
+    ...entries('MacOS', (path) => p.basename(path) != _appName),
+    app,
+  ];
+}
+
+Future<void> _signMacosApp(_Build build, String app, String identity) async {
+  final entitlements = {
+    // Xcode's ad-hoc signature carries get-task-allow, which notarization rejects.
+    app: 'Release.entitlements',
+    // EasyTier's wazero makes the writable pages it compiled into executable.
+    p.join(app, 'Contents', 'MacOS', 'FlClashCore'): 'Core.entitlements',
+  };
+  for (final code in macosSigningOrder(app)) {
+    final file = entitlements[code];
+    await _codesign(build, identity, code, [
+      '--options=runtime',
+      if (file != null) ...[
+        '--entitlements',
+        p.join(build.rootDir, 'macos', 'Runner', file),
+      ] else
+        '--preserve-metadata=entitlements',
+    ]);
+  }
+  await build.mustRun('codesign', [
+    '--verify',
+    '--deep',
+    '--strict',
+    '--verbose=2',
+    app,
+  ]);
+}
+
+Future<void> _codesign(
+  _Build build,
+  String identity,
+  String path, [
+  List<String> options = const [],
+]) async {
+  final arguments = [
+    '--force',
+    '--timestamp',
+    '--sign',
+    identity,
+    ...options,
+    path,
+  ];
+  // Apple's timestamp service turns a request away now and then.
+  for (var attempt = 1; ; attempt++) {
+    final code = await build.run('codesign', arguments);
+    if (code == 0) return;
+    if (attempt == 3) {
+      throw ProcessException('codesign', arguments, 'exit code $code', code);
+    }
+    await Future<void>.delayed(Duration(seconds: 5 * attempt));
+  }
 }
 
 Future<void> _packageWindows(_Build build, Set<String> targets) async {
@@ -783,6 +867,8 @@ Future<void> _packageAppImage(_Build build, String bundle) async {
     Directory(appDir).deleteSync(recursive: true);
   }
   final usr = p.join(appDir, 'usr');
+  // Flutter opens <exe dir>/lib/libapp.so, so the bundle keeps its libraries
+  // reachable from beside the executable.
   await build.copyTree(bundle, p.join(usr, 'bin'));
   final bundledLib = Directory(p.join(usr, 'bin', 'lib'));
   if (bundledLib.existsSync()) {

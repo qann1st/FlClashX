@@ -17,9 +17,17 @@ Profile? currentProfile(Ref ref) {
 
 @riverpod
 List<ProfileOffer> profileOffers(Ref ref) {
-  return ref.watch(
-    currentProfileProvider.select((profile) => visibleOffersOf(profile)),
-  );
+  final profile = ref.watch(currentProfileProvider);
+  final now = DateTime.now();
+  if (nextOfferChange(profile, now) case final at?) {
+    // A second past the threshold, where the day count has dropped to it.
+    final timer = Timer(
+      at.difference(now) + const Duration(seconds: 1),
+      ref.invalidateSelf,
+    );
+    ref.onDispose(timer.cancel);
+  }
+  return visibleOffersOf(profile, now: now);
 }
 
 @riverpod

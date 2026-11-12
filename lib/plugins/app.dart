@@ -138,6 +138,17 @@ class App {
     return methodChannel.invokeMethod<bool>('tip', {'message': '$message'});
   }
 
+  /// A vibration that grows from barely felt to full strength over [duration].
+  Future<void> riseVibration(Duration duration) async {
+    await methodChannel.invokeMethod<bool>('riseVibration', {
+      'durationMs': duration.inMilliseconds,
+    });
+  }
+
+  Future<void> stopVibration() async {
+    await methodChannel.invokeMethod<bool>('stopVibration');
+  }
+
   Future<bool?> initShortcuts() async {
     return methodChannel.invokeMethod<bool>('initShortcuts', {
       'start': currentAppLocalizations.start,
@@ -177,6 +188,13 @@ class App {
 
   Future<bool?> openVpnSettings() async {
     return methodChannel.invokeMethod<bool>('openVpnSettings');
+  }
+
+  Future<void> shareFile(String path, {required String mimeType}) async {
+    await methodChannel.invokeMethod<bool>('shareFile', {
+      'path': path,
+      'mimeType': mimeType,
+    });
   }
 
   Future<AppExitInfo?> getLastExitInfo() async {

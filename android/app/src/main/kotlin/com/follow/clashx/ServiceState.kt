@@ -9,14 +9,19 @@ object ServiceState {
 
     val runState = machine.runState
 
+    val vpnDemandedBySystem = machine.vpnDemandedBySystem
+
     val isRunRequested: Boolean
         get() = machine.isRunRequested
 
     fun attachFlutterEngine(engine: FlutterEngine) =
         AndroidServiceStateHost.attachFlutterEngine(engine)
 
-    fun detachFlutterEngine(engine: FlutterEngine) =
-        AndroidServiceStateHost.detachFlutterEngine(engine)
+    fun detachFlutterEngine(engine: FlutterEngine) {
+        if (AndroidServiceStateHost.detachFlutterEngine(engine)) {
+            machine.dropFlutterStart()
+        }
+    }
 
     suspend fun handleToggleAction() = machine.handleToggleAction()
 
@@ -25,6 +30,8 @@ object ServiceState {
     suspend fun handleStopAction() = machine.handleStopAction()
 
     suspend fun handleVpnRevokeAction() = machine.handleVpnRevokeAction()
+
+    suspend fun handleVpnStartRequested() = machine.handleVpnStartRequested()
 
     suspend fun awaitRunTime(): Long = machine.awaitRunTime()
 

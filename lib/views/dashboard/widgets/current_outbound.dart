@@ -641,71 +641,78 @@ class _StartToggleState extends ConsumerState<_StartToggle>
         button: true,
         enabled: enabled,
         label: tooltip,
-        child: InkResponse(
-          mouseCursor: clickableCursor,
-          onTap: enabled ? _toggle : null,
-          onHover: (value) => setState(() => _hovered = value),
-          onHighlightChanged: (value) => setState(() => _pressed = value),
-          onFocusChange: (value) => setState(() => _focused = value),
-          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-          splashFactory: NoSplash.splashFactory,
-          child: ElasticPress(
-            enabled: enabled,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: _overlay),
-              duration: stateDuration,
-              builder: (_, overlay, child) => AnimatedBuilder(
-                animation: _progress,
-                builder: (_, child) {
-                  final progress = _progress.value;
-                  final color = Color.alphaBlend(
-                    ink.withValues(alpha: overlay),
-                    fill,
-                  );
-                  return CustomPaint(
-                    painter: _MorphPainter(
-                      progress: progress,
-                      color: glass ? null : color,
-                      shadow: enabled
-                          ? colorScheme.primary.withValues(alpha: 0.3)
-                          : Colors.transparent,
-                      ring: _focused
-                          ? focusRingSide(colorScheme, standsOff: true)
-                          : null,
-                    ),
-                    child: glass
-                        ? LiquidGlass(
-                            style: LiquidGlassStyle.tinted(colorScheme, color),
-                            clipper: _MorphClipper(progress),
-                            pressed: _pressed,
-                            child: child,
-                          )
-                        : child,
-                  );
-                },
-                child: child,
-              ),
-              child: SizedBox.square(
-                dimension: size,
-                child: Center(
-                  child: widget.suspended
-                      ? GlyphIcon(
-                          AppGlyphs.wifiOff,
-                          size: size * 0.34,
-                          color: ink,
-                          fill: 1,
-                        )
-                      : TweenAnimationBuilder<double>(
-                          tween: Tween(end: widget.running ? 1 : 0),
-                          duration: _morphDuration,
-                          curve: Curves.easeOutBack,
-                          builder: (_, progress, _) => GlyphIcon(
-                            AppGlyphs.playPause(progress),
+        child: RisingHold(
+          enabled: enabled && system.isAndroid,
+          onHeld: _toggle,
+          child: InkResponse(
+            mouseCursor: clickableCursor,
+            onTap: enabled ? _toggle : null,
+            onHover: (value) => setState(() => _hovered = value),
+            onHighlightChanged: (value) => setState(() => _pressed = value),
+            onFocusChange: (value) => setState(() => _focused = value),
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            splashFactory: NoSplash.splashFactory,
+            child: ElasticPress(
+              enabled: enabled,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(end: _overlay),
+                duration: stateDuration,
+                builder: (_, overlay, child) => AnimatedBuilder(
+                  animation: _progress,
+                  builder: (_, child) {
+                    final progress = _progress.value;
+                    final color = Color.alphaBlend(
+                      ink.withValues(alpha: overlay),
+                      fill,
+                    );
+                    return CustomPaint(
+                      painter: _MorphPainter(
+                        progress: progress,
+                        color: glass ? null : color,
+                        shadow: enabled
+                            ? colorScheme.primary.withValues(alpha: 0.3)
+                            : Colors.transparent,
+                        ring: _focused
+                            ? focusRingSide(colorScheme, standsOff: true)
+                            : null,
+                      ),
+                      child: glass
+                          ? LiquidGlass(
+                              style: LiquidGlassStyle.tinted(
+                                colorScheme,
+                                color,
+                              ),
+                              clipper: _MorphClipper(progress),
+                              pressed: _pressed,
+                              child: child,
+                            )
+                          : child,
+                    );
+                  },
+                  child: child,
+                ),
+                child: SizedBox.square(
+                  dimension: size,
+                  child: Center(
+                    child: widget.suspended
+                        ? GlyphIcon(
+                            AppGlyphs.wifiOff,
                             size: size * 0.34,
                             color: ink,
                             fill: 1,
+                          )
+                        : TweenAnimationBuilder<double>(
+                            tween: Tween(end: widget.running ? 1 : 0),
+                            duration: _morphDuration,
+                            curve: Curves.easeOutBack,
+                            builder: (_, progress, _) => GlyphIcon(
+                              AppGlyphs.playPause(progress),
+                              size: size * 0.34,
+                              color: ink,
+                              fill: 1,
+                            ),
                           ),
-                        ),
+                  ),
                 ),
               ),
             ),

@@ -4,6 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -94,4 +97,45 @@ func TestDelayWatchSlowsDownWhileNothingArrives(t *testing.T) {
 	if got := watch.interval(time.Now()); got != delayWatchFastInterval {
 		t.Fatalf("interval after a new record = %v, want %v", got, delayWatchFastInterval)
 	}
+}
+
+func runningDelayWatches() int {
+	buf := make([]byte, 1<<16)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			return strings.Count(string(buf[:n]), ".(*delayWatch).run(")
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+}
+
+func waitForDelayWatches(t *testing.T, want int, after string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for runningDelayWatches() != want {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d delay watches run %s, want %d", runningDelayWatches(), after, want)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestConcurrentStartsLeaveOneDelayWatchForTheStop(t *testing.T) {
+	t.Cleanup(stopDelayWatch)
+	stopDelayWatch()
+	waitForDelayWatches(t, 0, "before the starts")
+	var starts sync.WaitGroup
+	for range 64 {
+		starts.Add(1)
+		go func() {
+			defer starts.Done()
+			startDelayWatch()
+		}()
+	}
+	starts.Wait()
+	waitForDelayWatches(t, 1, "after concurrent starts")
+
+	stopDelayWatch()
+	waitForDelayWatches(t, 0, "after the stop")
 }

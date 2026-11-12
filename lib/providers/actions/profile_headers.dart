@@ -21,8 +21,14 @@ ProfileHeaderSettings profileHeaderSettingsOf(Profile? profile) {
 
 String? profileHeadersUpdateOf(Profile? profile) => switch (profile) {
   null => null,
-  final profile => '${profile.id}@${profile.fileRevision.lastUpdateSeconds}',
+  final profile =>
+    '${profile.id}@${profile.fileRevision.lastUpdateSeconds}'
+        '#${_headersDigest(profile.providerHeaders)}',
 };
+
+String _headersDigest(Map<String, String> headers) => json.encode([
+  for (final name in headers.keys.toList()..sort()) [name, headers[name]],
+]).toMd5();
 
 /// Lands once per update of, or switch to, a profile; edits in between stay.
 @Riverpod(keepAlive: true)
@@ -81,6 +87,8 @@ class ProfileHeadersAction extends _$ProfileHeadersAction {
             .update(
               (state) => state.copyWith(
                 style: asked('view.app.board', view.board) ?? state.style,
+                themeMode:
+                    asked('view.app.theme', view.themeMode) ?? state.themeMode,
                 liquidGlass:
                     asked('view.app.glass', view.liquidGlass) ??
                     state.liquidGlass,

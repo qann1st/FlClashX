@@ -3,6 +3,7 @@ package core
 import (
 	"io"
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -73,5 +74,31 @@ func TestTrafficAccountKeepsLookingForATrackerRegisteredAfterTheBurst(t *testing
 	}
 	if account.up != 0 {
 		t.Fatalf("%d bytes still waiting after the session was attributed", account.up)
+	}
+}
+
+func TestAUdpSourceMovesToTheSessionThatReplacedAClosedOne(t *testing.T) {
+	metadata := &constant.Metadata{
+		NetWork: constant.UDP,
+		SrcIP:   netip.MustParseAddr("198.18.0.1"),
+		SrcPort: 40000,
+	}
+	t.Cleanup(func() {
+		udpRoutes.mu.Lock()
+		delete(udpRoutes.routes, metadata.SourceAddrPort())
+		udpRoutes.mu.Unlock()
+	})
+	first := registerTracker(t, metadata)
+	udpRoutes.routeFor(metadata).add(1, 0)
+
+	_ = first.Close()
+	if account := udpRoutes.routeFor(metadata); account.route != routeUnknown {
+		t.Fatalf("route %d kept for a closed session with nothing in its place", account.route)
+	}
+	second := registerTracker(t, metadata)
+	account := udpRoutes.routeFor(metadata)
+	account.add(1, 0)
+	if account.trackerID != second.ID() {
+		t.Fatalf("tracker %q, want the replacing session %q", account.trackerID, second.ID())
 	}
 }

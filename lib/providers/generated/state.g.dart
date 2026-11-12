@@ -514,7 +514,7 @@ final class VpnOptionsProvider
   }
 }
 
-String _$vpnOptionsHash() => r'77d917623fd452e04688752b33b11a192136905e';
+String _$vpnOptionsHash() => r'cd24ac77805f282960c2df9059cba254d3140df2';
 
 @ProviderFor(AccessControlState)
 final accessControlStateProvider = AccessControlStateProvider._();
@@ -3587,7 +3587,7 @@ final class ProfileOffersProvider
   }
 }
 
-String _$profileOffersHash() => r'6d4147a0be2bd1d10f34d9a60987e64eb9379183';
+String _$profileOffersHash() => r'ce9e8f25444b20e4f1143bf7eec4779059827189';
 
 @ProviderFor(globalModeAllowed)
 final globalModeAllowedProvider = GlobalModeAllowedProvider._();

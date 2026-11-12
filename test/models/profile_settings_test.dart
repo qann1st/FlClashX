@@ -45,6 +45,22 @@ void main() {
     },
   );
 
+  test('a geo interval the update timer cannot count is not taken', () {
+    for (final interval in [0, -6, 1000000, 3000000, double.infinity]) {
+      final synced = syncProfileSettings(
+        _tuned,
+        {'geo-update-interval': interval},
+        const ['geo-update-interval'],
+      );
+
+      expect(
+        synced.geoUpdateInterval,
+        const PatchClashConfig().geoUpdateInterval,
+        reason: '$interval',
+      );
+    }
+  });
+
   test('every named key is taken, converted to the app types', () {
     final synced = syncProfileSettings(
       const PatchClashConfig(),

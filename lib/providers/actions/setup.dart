@@ -47,6 +47,10 @@ class SetupAction extends _$SetupAction {
   var _lastPushDuration = Duration.zero;
   var _pendingForceApply = false;
   var _pushes = 0;
+  var _tunMissed = false;
+  var _configRequests = 0;
+  var _setupAfterInit = false;
+  Completer<void>? _initialized;
 
   /// Moves as each config push starts and again once the Core answers it.
   int get pushes => _pushes;
@@ -61,6 +65,16 @@ class SetupAction extends _$SetupAction {
       appSettingProvider.select((state) => state.showTrayTitle),
       (_, _) => _syncRuntimeTicker(),
     );
+    ref.listen(initProvider, (_, initialized) {
+      if (initialized) {
+        _initialized?.complete();
+        _initialized = null;
+      }
+      if (initialized && _setupAfterInit) {
+        _setupAfterInit = false;
+        unawaited(fullSetup());
+      }
+    });
   }
 
   bool get _isTrafficShown =>
@@ -84,7 +98,11 @@ class SetupAction extends _$SetupAction {
       _setupParams.copyWith(selectedMap: const {});
 
   Future<bool> fullSetup() async {
-    if (!ref.read(initProvider)) return true;
+    // Startup may already be applying the profile this replaces.
+    if (!ref.read(initProvider)) {
+      _setupAfterInit = true;
+      return true;
+    }
     ref.read(proxiesActionProvider.notifier).cancelDelayTests();
     ref.read(delayDataSourceProvider.notifier).value = {};
     final setupResult = applyProfile(force: true);
@@ -158,9 +176,18 @@ class SetupAction extends _$SetupAction {
     if (!globalState.needInitStatus) {
       return;
     }
-    _startTime = await serviceStartTime();
+    final intent = _latestRunRequest;
+    final startTime = await serviceStartTime();
+    final appliedMd5 = startTime != null && startTime.isBeforeNow
+        ? await preferences.getAppliedConfigMd5()
+        : null;
+    if (!identical(_latestRunRequest, intent)) {
+      await globalState.safeRun(() => applyProfile(force: true));
+      return;
+    }
+    _startTime = startTime;
     if (_isRunning) {
-      globalState.lastConfigMd5 = await preferences.getAppliedConfigMd5();
+      globalState.lastConfigMd5 = appliedMd5;
       await _run(true, initialize: true, resume: true);
     } else if (ref.read(appSettingProvider).autoRun) {
       await setRunning(true, initialize: true);
@@ -169,9 +196,16 @@ class SetupAction extends _$SetupAction {
     }
   }
 
-  Future<bool> setRunning(bool running, {bool initialize = false}) {
+  Future<bool> setRunning(bool running, {bool initialize = false}) async {
     if (running && !initialize && !ref.read(initProvider)) {
-      return Future.value(true);
+      // A start from Quick Settings, automation or Always-on can arrive while
+      // startup is still deciding the run; it waits for that, and yields to
+      // whatever command startup or the user gave since.
+      final before = _latestRunRequest;
+      await (_initialized ??= Completer<void>()).future;
+      if (!identical(_latestRunRequest, before)) {
+        return true;
+      }
     }
     return _run(running, initialize: running && initialize);
   }
@@ -222,6 +256,7 @@ class SetupAction extends _$SetupAction {
       _rollbackRunning(request);
       rethrow;
     }
+    _reconcileTun();
     final applied = await inputsApplied();
     if (_isCurrent(request) && !applied) {
       applyProfileDebounce(force: true, silence: true);
@@ -372,6 +407,7 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<void> updateConfigDebounce() async {
+    _configRequests++;
     debouncer.call(FunctionTag.updateConfig, updateConfig);
   }
 
@@ -390,6 +426,7 @@ class SetupAction extends _$SetupAction {
 
   @visibleForTesting
   Future<void> updateConfig() async {
+    _configRequests++;
     await globalState.safeRun(() async {
       final patchConfig = ref.read(patchClashConfigProvider);
       final shouldContinueSetup = await requestAdmin(patchConfig.tun.enable);
@@ -411,6 +448,7 @@ class SetupAction extends _$SetupAction {
         );
       });
       if (message.isNotEmpty) throw MessageException(message);
+      _reconcileTun();
     });
   }
 
@@ -423,6 +461,7 @@ class SetupAction extends _$SetupAction {
   Duration get maxApplyDebounce => const Duration(seconds: 10);
 
   void applyProfileDebounce({bool silence = false, bool force = false}) {
+    _configRequests++;
     _pendingForceApply |= force;
     debouncer.call(
       FunctionTag.applyProfile,
@@ -530,6 +569,7 @@ class SetupAction extends _$SetupAction {
     bool force = false,
     Future<void> Function()? preloadInvoke,
   }) async {
+    _configRequests++;
     final result = await _setupScheduler.run(() {
       return _setupConfig(
         force: force,
@@ -542,6 +582,7 @@ class SetupAction extends _$SetupAction {
       );
     });
     if (result != _SetupTaskResult.handoffToCoreRestart) {
+      if (result == _SetupTaskResult.completed) _reconcileTun();
       return result;
     }
     // Release the current serial task before restartCore reapplies the profile.
@@ -550,13 +591,59 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<bool> _restartCoreAfterAuthorization() async {
+    _tunMissed = false;
+    final coreAction = ref.read(coreActionProvider.notifier);
+    // Awaited from inside its own restore, the restart would wait on itself.
+    final underWay = coreAction.requestRelaunch();
+    if (underWay != null) {
+      unawaited(underWay.then((_) {}, onError: (_) => _reopenAuthorization()));
+      return true;
+    }
     try {
-      return await ref.read(coreActionProvider.notifier).restartCore();
+      return await coreAction.restartCore();
     } catch (_) {
-      ref.read(authorizedTunEnableProvider.notifier).value =
-          TunAuthorizationState.none;
+      _reopenAuthorization();
       rethrow;
     }
+  }
+
+  void _reopenAuthorization() {
+    ref.read(authorizedTunEnableProvider.notifier).value =
+        TunAuthorizationState.none;
+  }
+
+  /// The Core goes on without a TUN it could not open; the next enable
+  /// authorizes again, as the authorization the Core ran under did not hold.
+  Future<void> tunFailed() async {
+    while (true) {
+      final tun = ref.read(patchClashConfigProvider).tun;
+      final profileId = ref.read(currentProfileIdProvider);
+      final requests = _configRequests;
+      if (!tun.enable) return;
+      // A push still waiting may open the TUN, or skip the Core as unchanged
+      // and report nothing, so the Core is asked once it has gone.
+      if (_pushWaiting) {
+        await Future<void>.delayed(tunRecheckDelay);
+        continue;
+      }
+      if (!await confirmTunFailed()) return;
+      // A config asked for meanwhile may sit behind the answer, unpushed.
+      if (!_pushWaiting &&
+          requests == _configRequests &&
+          ref.read(patchClashConfigProvider).tun == tun &&
+          ref.read(currentProfileIdProvider) == profileId) {
+        break;
+      }
+    }
+    _tunMissed = true;
+    _reopenAuthorization();
+    ref
+        .read(patchClashConfigProvider.notifier)
+        .update((state) => state.copyWith.tun(enable: false));
+    dialogs.showNotifier(
+      currentAppLocalizations.tunStartFailed,
+      level: MessageLevel.error,
+    );
   }
 
   /// With a base, [BuiltProfile.yaml] is only the overlay the Core applies.
@@ -740,6 +827,33 @@ class SetupAction extends _$SetupAction {
     );
   }
 
+  /// The event may describe a push a later one replaced.
+  @protected
+  Future<bool> confirmTunFailed() => _setupScheduler.run(_core.getTunFailed);
+
+  /// A Core drops the event for a TUN it could not open once its queue is
+  /// full, so a push that asked for TUN asks after it as well.
+  void _reconcileTun() {
+    if (!ref.mounted ||
+        !coreNeedsAuthorization ||
+        ref.read(safeModeProvider) ||
+        !ref.read(patchClashConfigProvider).tun.enable) {
+      return;
+    }
+    unawaited(
+      tunFailed().catchError((Object error) {
+        commonPrint.log('TUN check failed: $error', logLevel: LogLevel.warning);
+      }),
+    );
+  }
+
+  bool get _pushWaiting =>
+      debouncer.isPending(FunctionTag.updateConfig) ||
+      debouncer.isPending(FunctionTag.applyProfile);
+
+  @protected
+  Duration get tunRecheckDelay => const Duration(milliseconds: 300);
+
   @protected
   Future<AuthorizeCode> authorizeCore() {
     return system.authorizeCore();
@@ -773,7 +887,9 @@ class SetupAction extends _$SetupAction {
         return false;
       case AuthorizeCode.none:
         authorizationNotifier.value = TunAuthorizationState.authorized;
-        return true;
+        // A fallback launch, or one from before the install, ran the Core
+        // that missed the TUN without the authorization now in place.
+        return !_tunMissed;
       case AuthorizeCode.error:
         authorizationNotifier.value = TunAuthorizationState.none;
         ref
@@ -812,14 +928,14 @@ class SetupAction extends _$SetupAction {
   }) async {
     var profile = ref.read(currentProfileProvider) ?? recoverMissingProfile();
     // A refresh failure is surfaced by safeRun; setup keeps the old profile.
-    final nextProfile = await globalState.safeRun(
-      () => profile?.checkAndUpdateAndCopy(
-        validate: (path, key) => _core.validateProfile(path, key),
-      ),
-    );
-    if (nextProfile != null) {
-      profile = nextProfile;
-      ref.read(profilesProvider.notifier).put(nextProfile);
+    if (profile case final missing? when await missing.isMissingFile) {
+      await globalState.safeRun(
+        () => ref
+            .read(profilesActionProvider.notifier)
+            .fetchMissingFile(missing.id),
+      );
+      final current = ref.read(currentProfileProvider);
+      profile = current;
     }
     commonPrint.log('setup ===> ${profile?.realLabel}');
     final patchConfig = ref.read(patchClashConfigProvider);
@@ -907,6 +1023,11 @@ class SetupAction extends _$SetupAction {
         _appliedInputs = inputs;
         if (system.isAndroid) {
           await preferences.saveAppliedConfigMd5(yamlMd5);
+        }
+        if (profile?.id == ref.read(currentProfileIdProvider)) {
+          await ref
+              .read(proxiesActionProvider.notifier)
+              .resendPicksSince(setupParams.selectedMap);
         }
         await onUpdated?.call();
       },

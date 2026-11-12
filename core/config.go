@@ -262,6 +262,7 @@ func applyConfig(params *SetupParams) error {
 	defer configMu.Unlock()
 
 	setTestURL(params.TestURL)
+	skipCertVerify.Store(params.SkipCertVerify)
 	cfg, err := loadSetupConfig(params)
 	if err != nil {
 		// The fallback is what keeps the listeners serving while the host
@@ -284,38 +285,17 @@ func applyConfig(params *SetupParams) error {
 	// its pick, and again after, as ForceSet also drops what URLTest cached
 	// while its providers were still empty.
 	patchSelectGroup(cfg.Proxies, params.SelectedMap)
+	carried := carriedPicks()
 	currentConfig = cfg
 	hub.ApplyConfig(mihomoConfig(cfg))
 	afterApply(cfg)
 	patchSelectGroup(cfg.Proxies, params.SelectedMap)
+	holdPicks(cfg.Proxies, carried, params.SelectedMap)
 	bumpRouteEpoch()
 	updateListeners(cfg)
 	reconcileGeoUpdater()
 	scheduleLoadMemoryRelease()
 	return err
-}
-
-// mihomo's apply opens the listeners and the TUN its config names, with
-// its own tunnel. Stopped, the core hands it a config that names none, so
-// nothing opens until the core starts them itself; running, the real one,
-// which re-creates only a listener whose address changed.
-func mihomoConfig(cfg *config.Config) *config.Config {
-	general := *cfg.General
-	if !isRunning.Load() {
-		general.Port, general.SocksPort, general.RedirPort = 0, 0, 0
-		general.TProxyPort, general.MixedPort = 0, 0
-		general.ShadowSocksConfig, general.VmessConfig = "", ""
-		general.TuicServer = LC.TuicServer{}
-	}
-	if !isRunning.Load() || isAndroid {
-		general.Tun = LC.Tun{}
-	}
-	shadow := *cfg
-	shadow.General = &general
-	if !isRunning.Load() {
-		shadow.Listeners = nil
-	}
-	return &shadow
 }
 
 // mihomo loads the providers inside its apply and installs fresh
@@ -387,6 +367,9 @@ func updateConfig(params *UpdateParams) error {
 	patchController(params)
 	if params.Authentication != nil {
 		applyAuthentication(currentConfig, *params.Authentication)
+	}
+	if params.SkipCertVerify != nil {
+		skipCertVerify.Store(*params.SkipCertVerify)
 	}
 	updateListeners(currentConfig)
 	for geoType, link := range params.GeoXUrl {
