@@ -29,6 +29,7 @@ class _StalledHttpClient extends Fake implements HttpClient {
 /// flutter_test answers every request with a 400 unless a zone asks for a
 /// real client.
 class _RealHttpOverrides extends HttpOverrides {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 

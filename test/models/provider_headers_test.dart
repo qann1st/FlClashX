@@ -510,7 +510,14 @@ void main() {
     }).closeConnectionsScope;
 
     test('related, true and yes ask for the changed group alone', () {
-      for (final value in ['related', ' Related ', 'true', 'TRUE', 'yes', '1']) {
+      for (final value in [
+        'related',
+        ' Related ',
+        'true',
+        'TRUE',
+        'yes',
+        '1',
+      ]) {
         expect(scopeOf(value), CloseConnectionsScope.related, reason: value);
       }
     });

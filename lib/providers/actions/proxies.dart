@@ -416,7 +416,10 @@ class ProxiesAction extends _$ProxiesAction {
       return;
     }
     try {
-      final scope = ref.read(currentProfileProvider)?.headers.closeConnectionsScope;
+      final scope = ref
+          .read(currentProfileProvider)
+          ?.headers
+          .closeConnectionsScope;
       if (scope == CloseConnectionsScope.related) {
         await _core.closeConnectionsForGroup(groupName);
       } else if (scope == CloseConnectionsScope.all ||
