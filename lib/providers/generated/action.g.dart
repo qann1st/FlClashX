@@ -93,7 +93,7 @@ final class ManagedSettingsActionProvider
 }
 
 String _$managedSettingsActionHash() =>
-    r'276a17ac316848bd3b1f6762c1bb8136f401eca0';
+    r'367a45084033c5e495f876b75d5f42cd4b316709';
 
 abstract class _$ManagedSettingsAction extends $Notifier<void> {
   void build();
@@ -150,7 +150,7 @@ final class ProfileHeadersActionProvider
 }
 
 String _$profileHeadersActionHash() =>
-    r'9949f5bedf6a22bed892c8640f0a3c902ce72458';
+    r'1db71a57ec61a6991119ce7417e0ecdaaa366533';
 
 /// Lands once per update of, or switch to, a profile; edits in between stay.
 
@@ -215,7 +215,7 @@ final class ProfileSettingsActionProvider
 }
 
 String _$profileSettingsActionHash() =>
-    r'4b184684e26874e785fadeb1b3408f3016a07b89';
+    r'40b94638cb68d399eb5c1cdc48b7d55e5b82fdaf';
 
 /// The current subscription's or file's config keys become the app's
 /// settings on every update and switch (see [syncProfileSettings]); a custom
@@ -321,7 +321,7 @@ final class BackupActionProvider extends $NotifierProvider<BackupAction, void> {
   }
 }
 
-String _$backupActionHash() => r'03b7856547a7ca3041d0aa90aaccc3d9d9b5c9a7';
+String _$backupActionHash() => r'54fd2237cdf91158849fbb967ad1ac5f22880709';
 
 abstract class _$BackupAction extends $Notifier<void> {
   void build();
@@ -629,7 +629,7 @@ final class ProfilesActionProvider
   }
 }
 
-String _$profilesActionHash() => r'910612974ffe932f7dadbf5586149bd69836d64f';
+String _$profilesActionHash() => r'3ba2c82763ac5f144d74e9070f845d269903e8ed';
 
 abstract class _$ProfilesAction extends $Notifier<void> {
   void build();
@@ -681,7 +681,7 @@ final class ScriptsActionProvider
   }
 }
 
-String _$scriptsActionHash() => r'f4ec8e120ae8163e4b7bb78636c30d75264de87d';
+String _$scriptsActionHash() => r'a0be6f9a3292dc5d3dca11dc2e4215bd868fbf72';
 
 abstract class _$ScriptsAction extends $Notifier<void> {
   void build();

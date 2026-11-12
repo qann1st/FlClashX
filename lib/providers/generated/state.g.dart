@@ -669,7 +669,12 @@ final class GenColorSchemeProvider
     with $Provider<ColorScheme> {
   GenColorSchemeProvider._({
     required GenColorSchemeFamily super.from,
-    required (Brightness, {Color? color, bool ignoreConfig, bool? pureBlack})
+    required (
+      ui.Brightness, {
+      ui.Color? color,
+      bool ignoreConfig,
+      bool? pureBlack,
+    })
     super.argument,
   }) : super(
          retry: null,
@@ -698,7 +703,12 @@ final class GenColorSchemeProvider
   ColorScheme create(Ref ref) {
     final argument =
         this.argument
-            as (Brightness, {Color? color, bool ignoreConfig, bool? pureBlack});
+            as (
+              ui.Brightness, {
+              ui.Color? color,
+              bool ignoreConfig,
+              bool? pureBlack,
+            });
     return genColorScheme(
       ref,
       argument.$1,
@@ -733,7 +743,7 @@ final class GenColorSchemeFamily extends $Family
     with
         $FunctionalFamilyOverride<
           ColorScheme,
-          (Brightness, {Color? color, bool ignoreConfig, bool? pureBlack})
+          (ui.Brightness, {ui.Color? color, bool ignoreConfig, bool? pureBlack})
         > {
   GenColorSchemeFamily._()
     : super(
@@ -745,8 +755,8 @@ final class GenColorSchemeFamily extends $Family
       );
 
   GenColorSchemeProvider call(
-    Brightness brightness, {
-    Color? color,
+    ui.Brightness brightness, {
+    ui.Color? color,
     bool ignoreConfig = false,
     bool? pureBlack,
   }) => GenColorSchemeProvider._(
@@ -814,8 +824,8 @@ String _$windowBlurRequestHash() => r'90b7a731689db7fa39d979866c428843b1073cf8';
 final currentBrightnessProvider = CurrentBrightnessProvider._();
 
 final class CurrentBrightnessProvider
-    extends $FunctionalProvider<Brightness, Brightness, Brightness>
-    with $Provider<Brightness> {
+    extends $FunctionalProvider<ui.Brightness, ui.Brightness, ui.Brightness>
+    with $Provider<ui.Brightness> {
   CurrentBrightnessProvider._()
     : super(
         from: null,
@@ -832,19 +842,19 @@ final class CurrentBrightnessProvider
 
   @$internal
   @override
-  $ProviderElement<Brightness> $createElement($ProviderPointer pointer) =>
+  $ProviderElement<ui.Brightness> $createElement($ProviderPointer pointer) =>
       $ProviderElement(pointer);
 
   @override
-  Brightness create(Ref ref) {
+  ui.Brightness create(Ref ref) {
     return currentBrightness(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Brightness value) {
+  Override overrideWithValue(ui.Brightness value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<Brightness>(value),
+      providerOverride: $SyncValueProvider<ui.Brightness>(value),
     );
   }
 }
@@ -947,7 +957,7 @@ final class ManagedSettingsProvider
   }
 }
 
-String _$managedSettingsHash() => r'379040e4fabaaf5fda571757e4b660fb6eb16b83';
+String _$managedSettingsHash() => r'd02135e4338443f4bcf446eeee0949500f70fa35';
 
 @ProviderFor(settingOwned)
 final settingOwnedProvider = SettingOwnedFamily._();
@@ -2860,6 +2870,92 @@ final class UnfoldSetProvider
 
 String _$unfoldSetHash() => r'59a5b417611533069462ddf31eca080ab2f74ac9';
 
+/// The distinct flags in [groupName]'s proxy names, nested groups four deep.
+
+@ProviderFor(groupFlags)
+final groupFlagsProvider = GroupFlagsFamily._();
+
+/// The distinct flags in [groupName]'s proxy names, nested groups four deep.
+
+final class GroupFlagsProvider
+    extends $FunctionalProvider<List<String>, List<String>, List<String>>
+    with $Provider<List<String>> {
+  /// The distinct flags in [groupName]'s proxy names, nested groups four deep.
+  GroupFlagsProvider._({
+    required GroupFlagsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'groupFlagsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$groupFlagsHash();
+
+  @override
+  String toString() {
+    return r'groupFlagsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<String>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  List<String> create(Ref ref) {
+    final argument = this.argument as String;
+    return groupFlags(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<String>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is GroupFlagsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$groupFlagsHash() => r'33b04ed65fba683e121d7472f5791234abf3c2d0';
+
+/// The distinct flags in [groupName]'s proxy names, nested groups four deep.
+
+final class GroupFlagsFamily extends $Family
+    with $FunctionalFamilyOverride<List<String>, String> {
+  GroupFlagsFamily._()
+    : super(
+        retry: null,
+        name: r'groupFlagsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The distinct flags in [groupName]'s proxy names, nested groups four deep.
+
+  GroupFlagsProvider call(String groupName) =>
+      GroupFlagsProvider._(argument: groupName, from: this);
+
+  @override
+  String toString() => r'groupFlagsProvider';
+}
+
 @ProviderFor(realSelectedProxyState)
 final realSelectedProxyStateProvider = RealSelectedProxyStateFamily._();
 
@@ -3730,13 +3826,13 @@ final panelBackdropImageProvider = PanelBackdropImageProvider._();
 final class PanelBackdropImageProvider
     extends
         $FunctionalProvider<
-          AsyncValue<ImageProvider<Object>?>,
-          ImageProvider<Object>?,
-          FutureOr<ImageProvider<Object>?>
+          AsyncValue<PanelBackdropImage?>,
+          PanelBackdropImage?,
+          FutureOr<PanelBackdropImage?>
         >
     with
-        $FutureModifier<ImageProvider<Object>?>,
-        $FutureProvider<ImageProvider<Object>?> {
+        $FutureModifier<PanelBackdropImage?>,
+        $FutureProvider<PanelBackdropImage?> {
   /// The backdrop picture from the disk cache, fetched once per url and
   /// served from there afterwards, offline included. A fetch that fails, as one
   /// does while a profile switch restarts the Core's listener, is retried.
@@ -3756,18 +3852,18 @@ final class PanelBackdropImageProvider
 
   @$internal
   @override
-  $FutureProviderElement<ImageProvider<Object>?> $createElement(
+  $FutureProviderElement<PanelBackdropImage?> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<ImageProvider<Object>?> create(Ref ref) {
+  FutureOr<PanelBackdropImage?> create(Ref ref) {
     return panelBackdropImage(ref);
   }
 }
 
 String _$panelBackdropImageHash() =>
-    r'95f84637742e4e488a298c973bd39e7ca1cf78b0';
+    r'b64b3fbddba23aa30d060b29ddf0cc51bfa1195f';
 
 /// Where the panel's logo lies on disk, kept as its backdrop is so it shows
 /// at launch without the network.

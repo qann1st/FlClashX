@@ -635,26 +635,6 @@ class AppLocalizations {
     );
   }
 
-  /// `Verify TLS certificates`
-  String get checkCertificate {
-    return Intl.message(
-      'Verify TLS certificates',
-      name: 'checkCertificate',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `With TLS verification off, subscriptions and backups are open to man-in-the-middle attacks.`
-  String get checkCertificateDesc {
-    return Intl.message(
-      'With TLS verification off, subscriptions and backups are open to man-in-the-middle attacks.',
-      name: 'checkCertificateDesc',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Access control`
   String get accessControl {
     return Intl.message(
@@ -1701,6 +1681,11 @@ class AppLocalizations {
     return Intl.message('Compact', name: 'compact', desc: '', args: []);
   }
 
+  /// `Single line`
+  String get oneline {
+    return Intl.message('Single line', name: 'oneline', desc: '', args: []);
+  }
+
   /// `Tab`
   String get tab {
     return Intl.message('Tab', name: 'tab', desc: '', args: []);
@@ -1846,11 +1831,26 @@ class AppLocalizations {
     );
   }
 
-  /// `Liquid Glass simplified until restart: this device can't keep up.`
+  /// `Liquid Glass simplified for good: this device can't keep up.`
   String get liquidGlassReduced {
     return Intl.message(
-      'Liquid Glass simplified until restart: this device can\'t keep up.',
+      'Liquid Glass simplified for good: this device can\'t keep up.',
       name: 'liquidGlassReduced',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Vibration`
+  String get vibration {
+    return Intl.message('Vibration', name: 'vibration', desc: '', args: []);
+  }
+
+  /// `Touch feedback, the hold-to-toggle buzz and the pulse at launch.`
+  String get vibrationDesc {
+    return Intl.message(
+      'Touch feedback, the hold-to-toggle buzz and the pulse at launch.',
+      name: 'vibrationDesc',
       desc: '',
       args: [],
     );

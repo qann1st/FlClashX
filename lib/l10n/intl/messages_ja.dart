@@ -392,10 +392,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "changelogFixes": MessageLookupByLibrary.simpleMessage("不具合修正"),
     "changelogPerformance": MessageLookupByLibrary.simpleMessage("パフォーマンス"),
     "changelogReverts": MessageLookupByLibrary.simpleMessage("取り消し"),
-    "checkCertificate": MessageLookupByLibrary.simpleMessage("TLS証明書を検証"),
-    "checkCertificateDesc": MessageLookupByLibrary.simpleMessage(
-      "TLS 証明書の検証を無効にすると、サブスクリプションとバックアップが中間者攻撃にさらされます。",
-    ),
     "checkUpdate": MessageLookupByLibrary.simpleMessage("更新を確認"),
     "checkUpdateError": MessageLookupByLibrary.simpleMessage("すでに最新バージョンです"),
     "cipher": MessageLookupByLibrary.simpleMessage("暗号方式"),
@@ -912,7 +908,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "link": MessageLookupByLibrary.simpleMessage("リンク"),
     "liquidGlass": MessageLookupByLibrary.simpleMessage("リキッドグラス"),
     "liquidGlassReduced": MessageLookupByLibrary.simpleMessage(
-      "描画が追いつかないため、再起動までリキッドグラスを簡略化しました。",
+      "描画が追いつかないため、リキッドグラスを簡略化したままにします。",
     ),
     "list": MessageLookupByLibrary.simpleMessage("リスト"),
     "listen": MessageLookupByLibrary.simpleMessage("リッスン"),
@@ -1071,6 +1067,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "オンデマンドは、除外した Wi-Fi に接続している間プロキシを一時停止します。",
     ),
+    "oneline": MessageLookupByLibrary.simpleMessage("1行"),
     "onlyStatisticsProxy": MessageLookupByLibrary.simpleMessage(
       "プロキシトラフィックのみ集計",
     ),
@@ -1655,6 +1652,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "usedTraffic": MessageLookupByLibrary.simpleMessage("使用済みトラフィック"),
     "username": MessageLookupByLibrary.simpleMessage("ユーザー名"),
     "value": MessageLookupByLibrary.simpleMessage("値"),
+    "vibration": MessageLookupByLibrary.simpleMessage("バイブレーション"),
+    "vibrationDesc": MessageLookupByLibrary.simpleMessage(
+      "タップの触覚フィードバック、長押し切り替えと起動時の振動。",
+    ),
     "view": MessageLookupByLibrary.simpleMessage("表示"),
     "virtualIpv4": MessageLookupByLibrary.simpleMessage("仮想 IPv4"),
     "vividStyle": MessageLookupByLibrary.simpleMessage("ビビッド"),

@@ -22,6 +22,7 @@ import 'package:fl_clash/providers/state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:path/path.dart' show dirname;
 import 'package:riverpod/riverpod.dart';
 
 import '../helpers/app_paths.dart';
@@ -398,6 +399,163 @@ void main() {
         expect(setupAction.applyCount, 0);
       },
     );
+
+    Future<
+      ({
+        ProviderContainer container,
+        ScriptsAction action,
+        List<Completer<String>> bodies,
+        Script remote,
+      })
+    >
+    heldScriptUpdate() async {
+      final root = await Directory.systemTemp.createTemp('scripts_action_');
+      addTearDown(() => root.delete(recursive: true));
+      await useAppPaths(root);
+      final container = scriptsContainer(
+        Profile.normal(),
+        ApplyRecordingSetupAction(),
+      );
+      final action = container.read(scriptsActionProvider.notifier);
+      final bodies = <Completer<String>>[];
+      action.download = (_) {
+        final body = Completer<String>();
+        bodies.add(body);
+        return body.future;
+      };
+      final remote = script(1, url: 'https://example.com/s.js');
+      await action.saveScript(remote, 'v1');
+      return (
+        container: container,
+        action: action,
+        bodies: bodies,
+        remote: remote,
+      );
+    }
+
+    Future<List<String>> leftovers(Script script) async {
+      final dir = Directory(dirname(await script.path));
+      return [
+        for (final entity in dir.listSync())
+          if (entity.path.endsWith('.download')) entity.path,
+      ];
+    }
+
+    test(
+      'a finished download writes the body and keeps the saved label',
+      () async {
+        final held = await heldScriptUpdate();
+        final update = held.action.updateScript(held.remote);
+        await pumpEventQueue();
+        held.bodies.single.complete('v2');
+        await update;
+
+        expect(await held.remote.content, 'v2');
+        expect(
+          held.container.read(scriptsProvider).value?.single.label,
+          'Script 1',
+        );
+        expect(await leftovers(held.remote), isEmpty);
+      },
+    );
+
+    test('a save made during the download outlives it', () async {
+      final held = await heldScriptUpdate();
+      final update = held.action.updateScript(held.remote);
+      await pumpEventQueue();
+      final save = held.action.saveScript(
+        held.remote.copyWith(label: 'Edited'),
+        'edited',
+      );
+      held.bodies.single.complete('downloaded');
+      await Future.wait([update, save]);
+
+      expect(await held.remote.content, 'edited');
+      expect(
+        held.container.read(scriptsProvider).value?.single.label,
+        'Edited',
+      );
+      expect(
+        held.container.read(isUpdatingProvider(held.remote.updatingKey)),
+        isFalse,
+      );
+      expect(await leftovers(held.remote), isEmpty);
+    });
+
+    test('a download started during a save waits for it and yields', () async {
+      final held = await heldScriptUpdate();
+      final writing = Completer<void>();
+      held.action.write = (script, content) async {
+        await writing.future;
+        return script.save(content);
+      };
+      final save = held.action.saveScript(
+        held.remote.copyWith(label: 'Edited'),
+        'edited',
+      );
+      final update = held.action.updateScript(held.remote);
+      await pumpEventQueue();
+      held.bodies.single.complete('downloaded');
+      await pumpEventQueue();
+      expect(await held.remote.content, 'v1');
+
+      writing.complete();
+      await Future.wait([save, update]);
+
+      expect(await held.remote.content, 'edited');
+      expect(
+        held.container.read(scriptsProvider).value?.single.label,
+        'Edited',
+      );
+      expect(await leftovers(held.remote), isEmpty);
+    });
+
+    test('only the latest of overlapping downloads is published', () async {
+      final held = await heldScriptUpdate();
+      final first = held.action.updateScript(held.remote);
+      await pumpEventQueue();
+      final second = held.action.updateScript(held.remote);
+      await pumpEventQueue();
+
+      held.bodies[0].complete('first');
+      await first;
+      expect(await held.remote.content, 'v1');
+
+      held.bodies[1].complete('second');
+      await second;
+      expect(await held.remote.content, 'second');
+      expect(await leftovers(held.remote), isEmpty);
+    });
+
+    test(
+      'an older download finishing last does not replace a newer one',
+      () async {
+        final held = await heldScriptUpdate();
+        final first = held.action.updateScript(held.remote);
+        await pumpEventQueue();
+        final second = held.action.updateScript(held.remote);
+        await pumpEventQueue();
+
+        held.bodies[1].complete('second');
+        await second;
+        held.bodies[0].complete('first');
+        await first;
+
+        expect(await held.remote.content, 'second');
+        expect(await leftovers(held.remote), isEmpty);
+      },
+    );
+
+    test('a script deleted during the download stays deleted', () async {
+      final held = await heldScriptUpdate();
+      final update = held.action.updateScript(held.remote);
+      await pumpEventQueue();
+      held.container.read(scriptsProvider.notifier).del(held.remote.id);
+      held.bodies.single.complete('downloaded');
+      await update;
+
+      expect(held.container.read(scriptsProvider).value, isEmpty);
+    });
   });
 
   group('GeoResourceAction', () {
@@ -1646,6 +1804,11 @@ class _MemoryScripts extends Scripts {
   @override
   void put(Script script) {
     state = AsyncData([...value.where((item) => item.id != script.id), script]);
+  }
+
+  @override
+  void del(int id) {
+    state = AsyncData([...value.where((item) => item.id != id)]);
   }
 }
 

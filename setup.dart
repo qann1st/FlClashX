@@ -639,6 +639,13 @@ String renderInnoSetup(
     'EXECUTABLE_NAME': (config['executable_name'] ?? '$_appName.exe') as String,
     'LANGUAGES': languages.join('\n'),
     'RUN_FLAGS': privileges == 'admin' ? 'runascurrentuser' : '',
+    'CLEAR_PROXY_SCRIPT': p.join(
+      rootDir,
+      'windows',
+      'packaging',
+      'exe',
+      'clear_stale_proxy.ps1',
+    ),
   };
   var rendered = template;
   values.forEach((key, value) {
@@ -884,6 +891,20 @@ Future<void> _packageAppImage(_Build build, String bundle) async {
       build.copy(source, p.join(usr, 'lib', p.basename(source)));
     }
   }
+  final trayPlugin = p.join(bundle, 'lib', 'libtray_plugin.so');
+  final ldd = Process.runSync('ldd', [trayPlugin]);
+  final indicatorLibraries = appIndicatorLibraries(ldd.stdout.toString());
+  if (indicatorLibraries.isEmpty) {
+    throw ProcessException(
+      'ldd',
+      [trayPlugin],
+      'the tray plugin links no AppIndicator library to bundle',
+      1,
+    );
+  }
+  for (final library in indicatorLibraries) {
+    build.copy(library, p.join(usr, 'lib', p.basename(library)));
+  }
   final icon = p.join(build.rootDir, 'assets', 'images', 'icon.png');
   build.copy(
     icon,
@@ -1045,6 +1066,16 @@ Future<int> _ensureLinuxDependencies() async {
 
 String appImageToolArch(String arch) {
   return arch == 'arm64' ? 'aarch64' : 'x86_64';
+}
+
+/// The tray links AppIndicator, which most desktops without one installed
+/// cannot load; the AppImage carries it and the libraries it pulls in.
+List<String> appIndicatorLibraries(String lddOutput) {
+  final library = RegExp(
+    r'^\s*(lib(?:ayatana-)?(?:appindicator|indicator|ido|dbusmenu)\S*)\s+=>\s+(\S+)',
+    multiLine: true,
+  );
+  return [for (final match in library.allMatches(lddOutput)) match.group(2)!];
 }
 
 /// The continuous appimagetool spells arm64 `arm_aarch64` in `ARCH`; given

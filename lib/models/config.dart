@@ -252,9 +252,13 @@ abstract class AppSettingProps with _$AppSettingProps {
     @Default(RestoreStrategy.compatible) RestoreStrategy restoreStrategy,
     @Default(true) bool showTrayTitle,
     @Default(true) bool monochromeTrayIcon,
-    @Default(true) bool checkCertificate,
+    // Retired from the settings: a stored or restored false is never read back.
+    @JsonKey(includeFromJson: false, includeToJson: false)
+    @Default(true)
+    bool checkCertificate,
     @Default(defaultFilters) List<Filter> filters,
     @Default(false) bool hideIp,
+    @Default(true) bool vibration,
     @Default(false) bool editorLineWrap,
     @Default(EditorFontSize.standard) EditorFontSize editorFontSize,
     @Default([]) List<String> serviceOrder,
@@ -434,6 +438,7 @@ ProxyCardType proxyCardTypeSafeFromJson(Object? cardType) {
     'loose' || 'expand' => ProxyCardType.loose,
     'standard' || 'shrink' => ProxyCardType.standard,
     'compact' || 'min' => ProxyCardType.compact,
+    'oneline' => ProxyCardType.oneline,
     _ => ProxyCardType.standard,
   };
 }

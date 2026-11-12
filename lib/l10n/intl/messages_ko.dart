@@ -382,10 +382,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "changelogFixes": MessageLookupByLibrary.simpleMessage("버그 수정"),
     "changelogPerformance": MessageLookupByLibrary.simpleMessage("성능"),
     "changelogReverts": MessageLookupByLibrary.simpleMessage("되돌림"),
-    "checkCertificate": MessageLookupByLibrary.simpleMessage("TLS 인증서 검증"),
-    "checkCertificateDesc": MessageLookupByLibrary.simpleMessage(
-      "TLS 검증을 끄면 구독과 백업이 중간자 공격에 노출됩니다.",
-    ),
     "checkUpdate": MessageLookupByLibrary.simpleMessage("업데이트 확인"),
     "checkUpdateError": MessageLookupByLibrary.simpleMessage("이미 최신 버전입니다"),
     "cipher": MessageLookupByLibrary.simpleMessage("암호화 방식"),
@@ -892,7 +888,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "link": MessageLookupByLibrary.simpleMessage("링크"),
     "liquidGlass": MessageLookupByLibrary.simpleMessage("Liquid Glass"),
     "liquidGlassReduced": MessageLookupByLibrary.simpleMessage(
-      "기기가 따라가지 못해 다시 시작할 때까지 Liquid Glass를 단순화했습니다.",
+      "기기가 따라가지 못해 Liquid Glass를 계속 단순화합니다.",
     ),
     "list": MessageLookupByLibrary.simpleMessage("목록"),
     "listen": MessageLookupByLibrary.simpleMessage("수신"),
@@ -1049,6 +1045,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "필요 시 실행은 제외된 Wi-Fi에서 프록시를 일시 중지합니다.",
     ),
+    "oneline": MessageLookupByLibrary.simpleMessage("한 줄"),
     "onlyStatisticsProxy": MessageLookupByLibrary.simpleMessage("프록시 트래픽만 집계"),
     "openLogsFolder": MessageLookupByLibrary.simpleMessage("로그 폴더 열기"),
     "openVpnSettings": MessageLookupByLibrary.simpleMessage("VPN 설정 열기"),
@@ -1623,6 +1620,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "usedTraffic": MessageLookupByLibrary.simpleMessage("사용한 트래픽"),
     "username": MessageLookupByLibrary.simpleMessage("사용자 이름"),
     "value": MessageLookupByLibrary.simpleMessage("값"),
+    "vibration": MessageLookupByLibrary.simpleMessage("진동"),
+    "vibrationDesc": MessageLookupByLibrary.simpleMessage(
+      "터치 피드백, 길게 눌러 전환할 때와 실행할 때의 진동.",
+    ),
     "view": MessageLookupByLibrary.simpleMessage("보기"),
     "virtualIpv4": MessageLookupByLibrary.simpleMessage("가상 IPv4"),
     "vividStyle": MessageLookupByLibrary.simpleMessage("선명"),

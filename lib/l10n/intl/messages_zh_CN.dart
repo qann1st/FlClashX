@@ -367,10 +367,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "changelogFixes": MessageLookupByLibrary.simpleMessage("问题修复"),
     "changelogPerformance": MessageLookupByLibrary.simpleMessage("性能优化"),
     "changelogReverts": MessageLookupByLibrary.simpleMessage("已回滚"),
-    "checkCertificate": MessageLookupByLibrary.simpleMessage("校验 TLS 证书"),
-    "checkCertificateDesc": MessageLookupByLibrary.simpleMessage(
-      "关闭证书校验后，订阅和备份可能遭中间人攻击。",
-    ),
     "checkUpdate": MessageLookupByLibrary.simpleMessage("检查更新"),
     "checkUpdateError": MessageLookupByLibrary.simpleMessage("当前应用已经是最新版了"),
     "cipher": MessageLookupByLibrary.simpleMessage("加密方式"),
@@ -829,7 +825,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "link": MessageLookupByLibrary.simpleMessage("链接"),
     "liquidGlass": MessageLookupByLibrary.simpleMessage("液态玻璃"),
     "liquidGlassReduced": MessageLookupByLibrary.simpleMessage(
-      "设备性能不足，液态玻璃已简化至重启。",
+      "设备性能不足，液态玻璃已永久简化。",
     ),
     "list": MessageLookupByLibrary.simpleMessage("列表"),
     "listen": MessageLookupByLibrary.simpleMessage("监听"),
@@ -976,6 +972,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "按需运行会在连上排除的 Wi-Fi 时暂停代理。",
     ),
+    "oneline": MessageLookupByLibrary.simpleMessage("单行"),
     "onlyStatisticsProxy": MessageLookupByLibrary.simpleMessage("仅统计代理流量"),
     "openLogsFolder": MessageLookupByLibrary.simpleMessage("打开日志文件夹"),
     "openVpnSettings": MessageLookupByLibrary.simpleMessage("打开 VPN 设置"),
@@ -1498,6 +1495,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "usedTraffic": MessageLookupByLibrary.simpleMessage("已用流量"),
     "username": MessageLookupByLibrary.simpleMessage("用户名"),
     "value": MessageLookupByLibrary.simpleMessage("值"),
+    "vibration": MessageLookupByLibrary.simpleMessage("振动"),
+    "vibrationDesc": MessageLookupByLibrary.simpleMessage("触摸反馈、长按切换和启动时的振动。"),
     "view": MessageLookupByLibrary.simpleMessage("查看"),
     "virtualIpv4": MessageLookupByLibrary.simpleMessage("虚拟 IPv4"),
     "vividStyle": MessageLookupByLibrary.simpleMessage("鲜明"),

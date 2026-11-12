@@ -491,12 +491,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "changelogFixes": MessageLookupByLibrary.simpleMessage("Correcciones"),
     "changelogPerformance": MessageLookupByLibrary.simpleMessage("Rendimiento"),
     "changelogReverts": MessageLookupByLibrary.simpleMessage("Reversiones"),
-    "checkCertificate": MessageLookupByLibrary.simpleMessage(
-      "Verificar certificados TLS",
-    ),
-    "checkCertificateDesc": MessageLookupByLibrary.simpleMessage(
-      "Con la verificación TLS desactivada, las suscripciones y las copias de seguridad quedan expuestas a ataques de intermediario.",
-    ),
     "checkUpdate": MessageLookupByLibrary.simpleMessage(
       "Buscar actualizaciones",
     ),
@@ -1140,7 +1134,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "link": MessageLookupByLibrary.simpleMessage("Enlace"),
     "liquidGlass": MessageLookupByLibrary.simpleMessage("Liquid Glass"),
     "liquidGlassReduced": MessageLookupByLibrary.simpleMessage(
-      "Liquid Glass simplificado hasta reiniciar: el dispositivo no da abasto.",
+      "Liquid Glass simplificado de forma permanente: el dispositivo no da abasto.",
     ),
     "list": MessageLookupByLibrary.simpleMessage("Lista"),
     "listen": MessageLookupByLibrary.simpleMessage("Escucha"),
@@ -1349,6 +1343,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "Bajo demanda pausa el proxy en las redes Wi-Fi excluidas.",
     ),
+    "oneline": MessageLookupByLibrary.simpleMessage("Una línea"),
     "onlyStatisticsProxy": MessageLookupByLibrary.simpleMessage(
       "Contar solo el tráfico del proxy",
     ),
@@ -2083,6 +2078,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "usedTraffic": MessageLookupByLibrary.simpleMessage("Tráfico usado"),
     "username": MessageLookupByLibrary.simpleMessage("Usuario"),
     "value": MessageLookupByLibrary.simpleMessage("Valor"),
+    "vibration": MessageLookupByLibrary.simpleMessage("Vibración"),
+    "vibrationDesc": MessageLookupByLibrary.simpleMessage(
+      "Respuesta táctil, vibración al mantener pulsado y al abrir la app.",
+    ),
     "view": MessageLookupByLibrary.simpleMessage("Ver"),
     "virtualIpv4": MessageLookupByLibrary.simpleMessage("IPv4 virtual"),
     "vividStyle": MessageLookupByLibrary.simpleMessage("Vivo"),

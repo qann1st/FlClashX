@@ -9,6 +9,8 @@ import (
 	"errors"
 	"io"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -842,6 +844,51 @@ func TestServeReleasesTheCoreWhenTheHostDisconnects(t *testing.T) {
 	connMu.Unlock()
 	if remaining != nil {
 		t.Error("serve returned with the closed connection still installed")
+	}
+}
+
+func TestTheExitFallbackRunsWellBeforeTheHelperKillsTheCore(t *testing.T) {
+	source, err := os.ReadFile("../services/helper/src/service/hub.rs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := regexp.MustCompile(`CORE_GRACEFUL_EXIT_TIMEOUT: Duration = Duration::from_millis\((\d+)\)`).FindSubmatch(source)
+	if match == nil {
+		t.Fatal("the Helper's graceful exit timeout is no longer where this test reads it")
+	}
+	millis, _ := strconv.Atoi(string(match[1]))
+	if kill := time.Duration(millis) * time.Millisecond; exitCleanupTimeout+time.Second > kill {
+		t.Errorf("the fallback starts %v after SIGTERM and the Helper kills at %v, leaving it under a second", exitCleanupTimeout, kill)
+	}
+}
+
+func TestReleaseOnExitTearsTheHostNetworkDownBehindAStuckApply(t *testing.T) {
+	withCurrentConfig(t, &config.Config{General: &config.General{}, Controller: &config.Controller{}})
+	previousTimeout, previousRelease := exitCleanupTimeout, releaseHostNetwork
+	t.Cleanup(func() { exitCleanupTimeout, releaseHostNetwork = previousTimeout, previousRelease })
+	exitCleanupTimeout = 50 * time.Millisecond
+	released := 0
+	releaseHostNetwork = func() { released++ }
+	isInit.Store(true)
+	isRunning.Store(true)
+
+	configMu.Lock()
+	releaseOnExit()
+	stillRunning := isRunning.Load()
+	configMu.Unlock()
+
+	if released != 1 {
+		t.Errorf("released the host network %d times behind a held configMu, want once", released)
+	}
+	if stillRunning {
+		t.Error("an apply finishing after exit would reopen the TUN")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for isInit.Load() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if isInit.Load() {
+		t.Fatal("the shutdown never ran once configMu was free")
 	}
 }
 

@@ -4,11 +4,14 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/ui/color.dart';
 
+import 'legacy_import.dart';
 import 'preferences.dart';
 import 'task.dart';
 
 typedef MigrationTransform =
     Future<MigrationData> Function(Map<String, Object?> configMap);
+
+typedef LegacyImport = Future<LegacyConfig?> Function();
 
 abstract interface class MigrationStore {
   /// False when the backing store could not be opened at all, as opposed to a
@@ -32,6 +35,12 @@ abstract interface class MigrationStore {
   Future<int> getUpgradeVersion();
 
   Future<void> setUpgradeVersion(int version);
+
+  Future<bool> hasProfiles();
+
+  Future<bool> getLegacyImported();
+
+  Future<void> setLegacyImported();
 }
 
 class _AppMigrationStore implements MigrationStore {
@@ -77,15 +86,30 @@ class _AppMigrationStore implements MigrationStore {
   @override
   Future<void> setUpgradeVersion(int version) =>
       preferences.setUpgradeVersion(version);
+
+  @override
+  Future<bool> hasProfiles() async =>
+      (await database.profilesDao.ids().get()).isNotEmpty;
+
+  @override
+  Future<bool> getLegacyImported() => preferences.getLegacyImported();
+
+  @override
+  Future<void> setLegacyImported() => preferences.setLegacyImported();
 }
 
 class Migration {
   final MigrationStore _store;
   final MigrationTransform _migrateV0;
+  final LegacyImport? _importLegacy;
 
-  Migration({required MigrationStore store, MigrationTransform? migrateV0})
-    : _store = store,
-      _migrateV0 = migrateV0 ?? oldToNowTask;
+  Migration({
+    required MigrationStore store,
+    MigrationTransform? migrateV0,
+    LegacyImport? importLegacy,
+  }) : _store = store,
+       _migrateV0 = migrateV0 ?? oldToNowTask,
+       _importLegacy = importLegacy;
 
   static const currentVersion = 1;
 
@@ -101,9 +125,57 @@ class Migration {
   };
 
   Future<Config> run() async {
-    final configMap = await _store.getConfigMap();
-    final config = await _migrate(configMap);
+    final stored = await _store.getConfigMap();
+    final isFresh = stored == null && await _store.getVersion() == 0;
+    final imported = isFresh ? await _importLegacy?.call() : null;
+    final configMap = stored ?? imported?.config;
+    var config = await _migrate(
+      configMap,
+      importedClashConfig: imported?.clashConfig,
+    );
+    if (_importLegacy != null) {
+      config = isFresh
+          ? await _markLegacyImported(config)
+          : await _recoverLegacyProfiles(config);
+    }
     return _upgrade(config, installed: configMap != null);
+  }
+
+  Future<Config> _markLegacyImported(Config config) async {
+    await _store.setLegacyImported();
+    return config;
+  }
+
+  /// Only profiles: the settings of a store a prerelease saved are the
+  /// user's own since, not an empty install's.
+  Future<Config> _recoverLegacyProfiles(Config config) async {
+    if (await _store.getLegacyImported()) {
+      return config;
+    }
+    if (await _store.hasProfiles()) {
+      await _store.setLegacyImported();
+      return config;
+    }
+    final legacy = await _importLegacy!();
+    if (legacy == null) {
+      await _store.setLegacyImported();
+      return config;
+    }
+    final data = await _migrateV0(Map.of(legacy.config));
+    final current = data.configMap?['currentProfileId'];
+    final recovered = config.copyWith(
+      currentProfileId: current is int
+          ? current
+          : data.profiles.firstOrNull?.id,
+    );
+    // Rows go in last: until they do, the store still has no profiles and the
+    // next launch redoes the whole step.
+    if (!await _store.saveConfig(recovered)) {
+      return config;
+    }
+    await _store.restore(data);
+    await _store.setLegacyImported();
+    return recovered;
   }
 
   Future<Config> _upgrade(Config config, {required bool installed}) async {
@@ -124,7 +196,10 @@ class Migration {
     return upgraded;
   }
 
-  Future<Config> _migrate(Map<String, Object?>? configMap) async {
+  Future<Config> _migrate(
+    Map<String, Object?>? configMap, {
+    Map<String, Object?>? importedClashConfig,
+  }) async {
     var oldVersion = await _store.getVersion();
     Config? config;
     if (oldVersion > currentVersion) {
@@ -157,7 +232,8 @@ class Migration {
     MigrationData data = MigrationData(configMap: configMap);
     var shouldClearClashConfig = false;
     if (oldVersion == 0) {
-      final clashConfigMap = await _store.getClashConfigMap();
+      final clashConfigMap =
+          importedClashConfig ?? await _store.getClashConfigMap();
       if (_isV0(configMap) && configMap != null) {
         final legacyConfigMap = Map<String, Object?>.from(configMap);
         if (clashConfigMap != null) {
@@ -258,4 +334,7 @@ String? _getStoredDavPassword(Map<String, Object?>? configMap) {
   return password is String && password.isNotEmpty ? password : null;
 }
 
-final migration = Migration(store: const _AppMigrationStore());
+final migration = Migration(
+  store: const _AppMigrationStore(),
+  importLegacy: importMacosLegacyConfig,
+);

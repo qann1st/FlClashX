@@ -55,6 +55,29 @@ class _ToolViewState extends ConsumerState<ToolsView> {
     return generateSection(
       title: appLocalizations.settings,
       items: [
+        if (system.isDesktop) ...[
+          ConfigToggleItem(
+            title: (l) => l.autoLaunch,
+            selector: appSettingProvider.select((state) => state.autoLaunch),
+            onChanged: (ref, value) => ref
+                .read(appSettingProvider.notifier)
+                .update((state) => state.copyWith(autoLaunch: value)),
+          ),
+          ConfigToggleItem(
+            title: (l) => l.silentLaunch,
+            selector: appSettingProvider.select((state) => state.silentLaunch),
+            onChanged: (ref, value) => ref
+                .read(appSettingProvider.notifier)
+                .update((state) => state.copyWith(silentLaunch: value)),
+          ),
+          ConfigToggleItem(
+            title: (l) => l.autoRun,
+            selector: appSettingProvider.select((state) => state.autoRun),
+            onChanged: (ref, value) => ref
+                .read(appSettingProvider.notifier)
+                .update((state) => state.copyWith(autoRun: value)),
+          ),
+        ],
         const _LocaleItem(),
         const _ThemeItem(),
         const _BackupItem(),

@@ -154,6 +154,10 @@ void main() {
         ViewRequest.parse('icon:plain;proxies.card:compact'),
         const ViewRequest(card: ProxyCardType.compact),
       );
+      expect(
+        ViewRequest.parse('proxies.card:oneline'),
+        const ViewRequest(card: ProxyCardType.oneline),
+      );
     });
 
     test('the older icon, card and style names mean nothing now', () {
@@ -349,6 +353,22 @@ void main() {
     });
   });
 
+  group('noVibration', () {
+    test('is asked for only by the novibrate special', () {
+      expect(const ProviderHeaders({}).noVibration, isFalse);
+      expect(
+        const ProviderHeaders({'flclashx-special': 'hideip'}).noVibration,
+        isFalse,
+      );
+      expect(
+        const ProviderHeaders({
+          'flclashx-special': 'hideip, NoVibrate',
+        }).noVibration,
+        isTrue,
+      );
+    });
+  });
+
   group('fallbackUrlsOf', () {
     final url = Uri.parse('https://u:p@old.example.com/sub/abc?x=1');
     List<String> moved(String header) => ProviderHeaders({
@@ -454,6 +474,20 @@ void main() {
         hasLength(1),
       );
       expect(nextOfferChange(ending(3), now), isNull);
+      final farThreshold = _profile(
+        headers: const {'flclashx-buyplan': 'https://p.example,101000000'},
+        info: SubscriptionInfo(expire: expireIn(10)),
+      );
+      expect(nextOfferChange(farThreshold, now), isNull);
+      expect(visibleOffersOf(farThreshold, now: now), hasLength(1));
+      for (final threshold in ['-101000000', '-1e300', '1e300']) {
+        final extreme = _profile(
+          headers: {'flclashx-buyplan': 'https://p.example,$threshold'},
+          info: SubscriptionInfo(expire: expireIn(10)),
+        );
+        expect(nextOfferChange(extreme, now), isNull);
+        visibleOffersOf(extreme, now: now);
+      }
       expect(
         nextOfferChange(
           _profile(headers: const {'flclashx-buyplan': 'https://p.example'}),

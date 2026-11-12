@@ -202,6 +202,66 @@ hooks:
       );
       // The driver locks WinDivert64.sys, so both paths stop it after the app.
       expect(script, matches(RegExp(r'ShutDownApp;\s+StopWinDivert;')));
+      expect(
+        script,
+        matches(
+          RegExp(
+            r'ShutDownApp;\s+ClearStaleProxyBeforeInstall;\s+StopWinDivert;\s+Result',
+          ),
+        ),
+        reason: 'an aborted install must not leave the proxy on a dead port',
+      );
+      expect(
+        script,
+        contains('Source: "{{CLEAR_PROXY_SCRIPT}}"; Flags: dontcopy'),
+      );
+      expect(
+        script,
+        contains("ExtractTemporaryFile('clear_stale_proxy.ps1');"),
+      );
+      expect(
+        File('windows/packaging/exe/clear_stale_proxy.ps1').readAsStringSync(),
+        contains(r"'^127\.0\.0\.1:(\d{1,5})$'"),
+      );
+    });
+
+    test('the installer takes over a 0.4 FlClashX registration in place', () {
+      final script = File(
+        'windows/packaging/exe/inno_setup.iss',
+      ).readAsStringSync();
+
+      expect(
+        script,
+        contains(r'Uninstall\728B3532-C74B-4870-9068-BE70FE12A3E6_is1'),
+      );
+      expect(script, contains("(Pos('FlClashX', Name) = 1)"));
+      expect(script, contains('WizardForm.DirEdit.Text := LegacyDir;'));
+      expect(
+        script,
+        matches(RegExp(r'ClearStaleProxy;\s+RetireLegacyInstall;')),
+      );
+      expect(script, isNot(contains('Exec(Uninstaller')));
+    });
+
+    test('bundles the AppIndicator libraries the tray links', () {
+      const ldd = '''
+\tlinux-vdso.so.1 (0x00007ffd)
+\tlibflutter_linux_gtk.so => /opt/bundle/lib/libflutter_linux_gtk.so (0x7f)
+\tlibayatana-appindicator3.so.1 => /lib/x86_64-linux-gnu/libayatana-appindicator3.so.1 (0x7f)
+\tlibgtk-3.so.0 => /lib/x86_64-linux-gnu/libgtk-3.so.0 (0x7f)
+\tlibayatana-indicator3.so.7 => /lib/x86_64-linux-gnu/libayatana-indicator3.so.7 (0x7f)
+\tlibayatana-ido3-0.4.so.0 => /lib/x86_64-linux-gnu/libayatana-ido3-0.4.so.0 (0x7f)
+\tlibdbusmenu-gtk3.so.4 => /lib/x86_64-linux-gnu/libdbusmenu-gtk3.so.4 (0x7f)
+\tlibdbusmenu-glib.so.4 => /lib/x86_64-linux-gnu/libdbusmenu-glib.so.4 (0x7f)
+''';
+
+      expect(setup.appIndicatorLibraries(ldd), [
+        '/lib/x86_64-linux-gnu/libayatana-appindicator3.so.1',
+        '/lib/x86_64-linux-gnu/libayatana-indicator3.so.7',
+        '/lib/x86_64-linux-gnu/libayatana-ido3-0.4.so.0',
+        '/lib/x86_64-linux-gnu/libdbusmenu-gtk3.so.4',
+        '/lib/x86_64-linux-gnu/libdbusmenu-glib.so.4',
+      ]);
     });
 
     test('downloads the appimagetool build matching the host', () {

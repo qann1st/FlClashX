@@ -458,12 +458,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "changelogFixes": MessageLookupByLibrary.simpleMessage("Bug fixes"),
     "changelogPerformance": MessageLookupByLibrary.simpleMessage("Performance"),
     "changelogReverts": MessageLookupByLibrary.simpleMessage("Reverts"),
-    "checkCertificate": MessageLookupByLibrary.simpleMessage(
-      "Verify TLS certificates",
-    ),
-    "checkCertificateDesc": MessageLookupByLibrary.simpleMessage(
-      "With TLS verification off, subscriptions and backups are open to man-in-the-middle attacks.",
-    ),
     "checkUpdate": MessageLookupByLibrary.simpleMessage("Check for updates"),
     "checkUpdateError": MessageLookupByLibrary.simpleMessage(
       "The app is already up to date",
@@ -1065,7 +1059,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "link": MessageLookupByLibrary.simpleMessage("Link"),
     "liquidGlass": MessageLookupByLibrary.simpleMessage("Liquid Glass"),
     "liquidGlassReduced": MessageLookupByLibrary.simpleMessage(
-      "Liquid Glass simplified until restart: this device can\'t keep up.",
+      "Liquid Glass simplified for good: this device can\'t keep up.",
     ),
     "list": MessageLookupByLibrary.simpleMessage("List"),
     "listen": MessageLookupByLibrary.simpleMessage("Listen"),
@@ -1252,6 +1246,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "On demand pauses the proxy on excluded Wi-Fi.",
     ),
+    "oneline": MessageLookupByLibrary.simpleMessage("Single line"),
     "onlyStatisticsProxy": MessageLookupByLibrary.simpleMessage(
       "Only count proxy traffic",
     ),
@@ -1926,6 +1921,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "usedTraffic": MessageLookupByLibrary.simpleMessage("Used traffic"),
     "username": MessageLookupByLibrary.simpleMessage("Username"),
     "value": MessageLookupByLibrary.simpleMessage("Value"),
+    "vibration": MessageLookupByLibrary.simpleMessage("Vibration"),
+    "vibrationDesc": MessageLookupByLibrary.simpleMessage(
+      "Touch feedback, the hold-to-toggle buzz and the pulse at launch.",
+    ),
     "view": MessageLookupByLibrary.simpleMessage("View"),
     "virtualIpv4": MessageLookupByLibrary.simpleMessage("Virtual IPv4"),
     "vividStyle": MessageLookupByLibrary.simpleMessage("Vivid"),

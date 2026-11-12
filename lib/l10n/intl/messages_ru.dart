@@ -477,12 +477,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Производительность",
     ),
     "changelogReverts": MessageLookupByLibrary.simpleMessage("Откаты"),
-    "checkCertificate": MessageLookupByLibrary.simpleMessage(
-      "Проверять TLS-сертификаты",
-    ),
-    "checkCertificateDesc": MessageLookupByLibrary.simpleMessage(
-      "Без проверки TLS-сертификатов подписки и резервные копии уязвимы для атаки «человек посередине».",
-    ),
     "checkUpdate": MessageLookupByLibrary.simpleMessage("Проверить обновления"),
     "checkUpdateError": MessageLookupByLibrary.simpleMessage(
       "Установлена последняя версия",
@@ -1104,7 +1098,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "link": MessageLookupByLibrary.simpleMessage("Ссылка"),
     "liquidGlass": MessageLookupByLibrary.simpleMessage("Жидкое стекло"),
     "liquidGlassReduced": MessageLookupByLibrary.simpleMessage(
-      "Стекло упрощено до перезапуска: устройство не успевает.",
+      "Стекло упрощено насовсем: устройство не успевает.",
     ),
     "list": MessageLookupByLibrary.simpleMessage("Список"),
     "listen": MessageLookupByLibrary.simpleMessage("Адрес прослушивания"),
@@ -1307,6 +1301,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "«По условию» приостанавливает прокси в исключённых сетях Wi-Fi.",
     ),
+    "oneline": MessageLookupByLibrary.simpleMessage("Однострочный"),
     "onlyStatisticsProxy": MessageLookupByLibrary.simpleMessage(
       "Учитывать только трафик прокси",
     ),
@@ -2027,6 +2022,10 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "username": MessageLookupByLibrary.simpleMessage("Имя пользователя"),
     "value": MessageLookupByLibrary.simpleMessage("Значение"),
+    "vibration": MessageLookupByLibrary.simpleMessage("Вибрация"),
+    "vibrationDesc": MessageLookupByLibrary.simpleMessage(
+      "Отклик на касания, вибрация при удержании кнопки и при запуске.",
+    ),
     "view": MessageLookupByLibrary.simpleMessage("Просмотр"),
     "virtualIpv4": MessageLookupByLibrary.simpleMessage("Виртуальный IPv4"),
     "vividStyle": MessageLookupByLibrary.simpleMessage("Яркий"),

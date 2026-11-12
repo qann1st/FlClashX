@@ -54,10 +54,15 @@ class ChangelogBuilder {
 
   ChangelogBuildResult build({PendingVersion? pending}) {
     final boundaryTag = VersionTag.tryParse(boundary);
-    final stable = git
-        .stableTags()
-        .where((tag) => boundaryTag == null || tag.compareTo(boundaryTag) > 0)
-        .toList();
+    // Fork releases can be numbered below upstream's, so compare by history.
+    final stable = boundaryTag != null && git.tagExists(boundaryTag.name)
+        ? git.stableTags(notMergedInto: boundaryTag.name)
+        : git
+              .stableTags()
+              .where(
+                (tag) => boundaryTag == null || tag.compareTo(boundaryTag) > 0,
+              )
+              .toList();
     final parser = ChangelogParser();
     final versions = <ChangelogVersion>[];
     final commitIdsByTag = <String, Set<String>>{};
@@ -112,6 +117,55 @@ class ChangelogBuilder {
 
   Set<String> _idsOf(List<RawCommit> commits) =>
       commits.map((commit) => commit.shortHash).toSet();
+}
+
+/// [built], keeping the entries [written] holds so a rebuild keeps wording.
+Changelog keepWrittenEntries(Changelog built, Changelog written) {
+  final writtenByTag = {
+    for (final version in written.versions) version.tag: version,
+  };
+  return Changelog(
+    versions: [
+      for (final version in built.versions)
+        switch (writtenByTag[version.tag]) {
+          final kept? => _withWrittenEntries(version, kept),
+          null => version,
+        },
+    ],
+  );
+}
+
+ChangelogVersion _withWrittenEntries(
+  ChangelogVersion built,
+  ChangelogVersion written,
+) {
+  final known = {
+    for (final group in written.groups)
+      for (final entry in group.entries) '${group.type.id}:${entry.id}',
+  };
+  List<ChangelogEntry> entriesOf(
+    ChangelogVersion version,
+    ChangelogType type,
+  ) => [
+    for (final group in version.groups)
+      if (group.type == type) ...group.entries,
+  ];
+  return ChangelogVersion(
+    version: built.version,
+    tag: built.tag,
+    date: built.date,
+    prerelease: built.prerelease,
+    groups: [
+      for (final type in ChangelogType.values)
+        if ([
+              ...entriesOf(written, type),
+              for (final entry in entriesOf(built, type))
+                if (!known.contains('${type.id}:${entry.id}')) entry,
+            ]
+            case final entries when entries.isNotEmpty)
+          ChangelogGroup(type: type, entries: entries),
+    ],
+  );
 }
 
 final _frozenComment = RegExp(r'\s*<!--.*?-->', dotAll: true);

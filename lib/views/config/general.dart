@@ -393,32 +393,18 @@ class GeneralView extends ConsumerWidget {
 
   List<Widget> _startupItems(AppLocalizations appLocalizations) {
     return [
-      if (system.isDesktop) ...[
-        _appSettingToggle(
-          title: (l) => l.autoLaunch,
-          managedKey: 'app.autoLaunch',
-          select: (state) => state.autoLaunch,
-          update: (state, value) => state.copyWith(autoLaunch: value),
-        ),
-        _appSettingToggle(
-          title: (l) => l.silentLaunch,
-          managedKey: 'app.silentLaunch',
-          select: (state) => state.silentLaunch,
-          update: (state, value) => state.copyWith(silentLaunch: value),
-        ),
-      ],
       if (system.isMacOS)
         _appSettingToggle(
           title: (l) => l.menuBarMode,
           select: (state) => state.menuBarMode,
           update: (state, value) => state.copyWith(menuBarMode: value),
         ),
-      _appSettingToggle(
-        title: (l) => l.autoRun,
-        managedKey: 'app.autoRun',
-        select: (state) => state.autoRun,
-        update: (state, value) => state.copyWith(autoRun: value),
-      ),
+      if (!system.isDesktop)
+        _appSettingToggle(
+          title: (l) => l.autoRun,
+          select: (state) => state.autoRun,
+          update: (state, value) => state.copyWith(autoRun: value),
+        ),
       ListItem.open(
         title: Text(appLocalizations.onDemand),
         widget: const OnDemandView(),
@@ -520,11 +506,6 @@ class GeneralView extends ConsumerWidget {
   List<Widget> _requestItems() {
     return [
       _appSettingToggle(
-        title: (l) => l.checkCertificate,
-        select: (state) => state.checkCertificate,
-        update: (state, value) => state.copyWith(checkCertificate: value),
-      ),
-      _appSettingToggle(
         title: (l) => l.autoCheckUpdate,
         managedKey: 'app.autoCheckUpdate',
         select: (state) => state.autoCheckUpdate,
@@ -604,16 +585,14 @@ class GeneralView extends ConsumerWidget {
             title: appLocalizations.startupAndBackground,
             items: _startupItems(appLocalizations),
             footer: [
-              if (system.isDesktop) appLocalizations.silentLaunchDesc,
               if (system.isMacOS) appLocalizations.menuBarModeDesc,
-              appLocalizations.autoRunDesc,
+              if (!system.isDesktop) appLocalizations.autoRunDesc,
               appLocalizations.onDemandDesc,
             ].join('\n'),
           ),
           generateSection(
             title: appLocalizations.requestsAndUpdates,
             items: _requestItems(),
-            footer: appLocalizations.checkCertificateDesc,
           ),
           generateSection(
             title: appLocalizations.inbound,

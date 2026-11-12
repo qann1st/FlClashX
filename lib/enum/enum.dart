@@ -248,7 +248,7 @@ enum ProxiesType { tab, list }
 
 enum ProxiesLayout { loose, standard, tight }
 
-enum ProxyCardType { loose, standard, compact }
+enum ProxyCardType { loose, standard, compact, oneline }
 
 /// What a proxy switch drops, as `flclashx-closeconnections` asks.
 enum CloseConnectionsScope { related, all }

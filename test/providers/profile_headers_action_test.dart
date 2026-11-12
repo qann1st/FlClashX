@@ -78,7 +78,7 @@ void main() {
   });
 
   test(
-    'the settings header turns the named switches on and the rest off',
+    'the settings header leaves startup switches local and turns the rest off',
     () async {
       container
           .read(appSettingProvider.notifier)
@@ -89,7 +89,7 @@ void main() {
       final setting = container.read(appSettingProvider);
       expect(setting.minimizeOnExit, isTrue);
       expect(setting.autoCheckUpdate, isTrue);
-      expect(setting.autoRun, isFalse);
+      expect(setting.autoRun, isTrue);
       expect(setting.openLogs, isFalse);
 
       await select(_profile(2));
@@ -168,6 +168,34 @@ void main() {
     expect(
       container.read(managedSettingsProvider),
       isNot(contains(hideIpSetting)),
+    );
+  });
+
+  test('the novibrate special turns vibration off and locks it', () async {
+    await select(_profile(1, special: 'novibrate'));
+
+    expect(container.read(appSettingProvider).vibration, isFalse);
+    expect(container.read(settingLockedProvider(vibrationSetting)), isTrue);
+  });
+
+  test('vibration the user took over is left to the user', () async {
+    container
+        .read(appSettingProvider.notifier)
+        .update((state) => state.copyWith(ownedSettings: {vibrationSetting}));
+
+    await select(_profile(1, special: 'novibrate'));
+
+    expect(container.read(appSettingProvider).vibration, isTrue);
+    expect(container.read(settingReleasableProvider(vibrationSetting)), isTrue);
+  });
+
+  test('without the novibrate special vibration stays the user\'s', () async {
+    await select(_profile(1, special: 'hideip'));
+
+    expect(container.read(appSettingProvider).vibration, isTrue);
+    expect(
+      container.read(managedSettingsProvider),
+      isNot(contains(vibrationSetting)),
     );
   });
 

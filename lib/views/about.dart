@@ -20,15 +20,14 @@ class Person {
 
 const _forkAuthors = [
   Person(
-    avatar: 'assets/images/avatar/pluralplay.jpg',
-    name: 'pluralplay',
-    link: 'https://github.com/pluralplay',
+    avatar: 'assets/images/icon.png',
+    name: 'qann1st',
+    link: 'https://github.com/qann1st',
   ),
 ];
 
-const _upstreamRepository = 'chen08209/FlClash';
+const _upstreamRepository = 'pluralplay/FlClashX';
 const _coreRepository = 'legiz-ru/Prizrak-Core';
-const _telegram = 'https://t.me/flclashx';
 
 /// The running core's version when it answers, else the one this build was
 /// made with, else nothing.
@@ -127,12 +126,6 @@ class AboutView extends ConsumerWidget {
                 title: appLocalizations.core,
                 url: 'https://github.com/$_coreRepository',
                 label: 'github.com/$_coreRepository',
-              ),
-              _buildLinkItem(
-                glyph: AppGlyphs.send,
-                title: 'Telegram',
-                url: _telegram,
-                label: 't.me/flclashx',
               ),
             ],
           ),

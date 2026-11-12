@@ -137,12 +137,13 @@ func TestHandleGetProfileBaseReadsTheOverrideOnlyFromGlobal(t *testing.T) {
 	}
 }
 
-func TestPresentKeysNamesTheTunKeysAndSkipsMergeKeys(t *testing.T) {
-	profile := "x: &x {allow-lan: true}\n<<: *x\nmixed-port: 1\ntun:\n  enable: true\n  stack: system\n"
+func TestPresentKeysNamesTheTunKeysAndWhatMergesBringIn(t *testing.T) {
+	profile := "x: &x {allow-lan: true, mixed-port: 2}\nt: &t {mtu: 1400}\n<<: *x\nmixed-port: 1\n" +
+		"tun:\n  <<: *t\n  enable: true\n  stack: system\n"
 
 	got := presentKeys([]byte(profile))
 
-	want := []string{"x", "mixed-port", "tun", "tun.enable", "tun.stack"}
+	want := []string{"x", "t", "mixed-port", "tun", "allow-lan", "tun.enable", "tun.stack", "tun.mtu"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("present = %v, want %v", got, want)
 	}
@@ -274,6 +275,31 @@ func TestLoadConfigWithBaseWritesAConfigThatLoadsAlone(t *testing.T) {
 		}
 		if got := proxy["reality-opts"].(map[string]any)["short-id"]; got != "0123" {
 			t.Errorf("short-id = %#v, want the literal 0123", got)
+		}
+	}
+}
+
+func TestMergeProfileBaseKeepsAShortIDAProxyReachesThroughAnAlias(t *testing.T) {
+	path := writeBaseProfile(t, `x-reality: &reality {public-key: k, short-id: 0123}
+x-sid: &sid 0456
+proxies:
+  - {name: a, type: vless, reality-opts: *reality}
+  - {name: b, type: vless, reality-opts: {public-key: k, short-id: *sid}}
+`)
+	document, err := mergeProfileBase(&SetupBase{Path: path, Overlay: `{"rules": ["MATCH,DIRECT"]}`})
+	if err != nil {
+		t.Fatalf("mergeProfileBase = %v", err)
+	}
+
+	raw := config.DefaultRawConfig()
+	if err := document.Decode(raw); err != nil {
+		t.Fatalf("decode = %v", err)
+	}
+	want := map[string]string{"a": "0123", "b": "0456"}
+	for _, proxy := range raw.Proxy {
+		name, _ := proxy["name"].(string)
+		if got := proxy["reality-opts"].(map[string]any)["short-id"]; got != want[name] {
+			t.Errorf("short-id of %s = %#v, want the literal %s", name, got, want[name])
 		}
 	}
 }
@@ -419,6 +445,40 @@ func TestHandleGetProxyDefinitionReadsAProviderProxyAsItsProviderBuildsIt(t *tes
 	}
 }
 
+func TestALargeRuleListAnAliasReusesIsWrittenInFullBothTimes(t *testing.T) {
+	var source strings.Builder
+	source.WriteString("rules: &shared\n")
+	count := encodeSliceLength + 1
+	for i := 0; i < count; i++ {
+		fmt.Fprintf(&source, "  - DOMAIN,%d.test,DIRECT\n", i)
+	}
+	source.WriteString("sub-rules:\n  common: *shared\n")
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(source.String()), &document); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	path, err := writeDocumentFile(t.TempDir(), "*.yaml", &document)
+	if err != nil {
+		t.Fatalf("writeDocumentFile = %v", err)
+	}
+
+	buf, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		Rules    []string            `yaml:"rules"`
+		SubRules map[string][]string `yaml:"sub-rules"`
+	}
+	if err := yaml.Unmarshal(buf, &decoded); err != nil {
+		t.Fatalf("decode = %v", err)
+	}
+	if len(decoded.Rules) != count || !reflect.DeepEqual(decoded.SubRules["common"], decoded.Rules) {
+		t.Errorf("wrote %d rules and %d sub-rules, want %d of each", len(decoded.Rules), len(decoded.SubRules["common"]), count)
+	}
+}
+
 func TestEncodeConfigMappingKeepsEveryKeyAfterAnOpenEndedScalar(t *testing.T) {
 	rules := make([]string, encodeSliceLength*2+1)
 	for i := range rules {
@@ -435,7 +495,7 @@ func TestEncodeConfigMappingKeepsEveryKeyAfterAnOpenEndedScalar(t *testing.T) {
 	mapping.Content = append(note, mapping.Content...)
 	var out bytes.Buffer
 
-	if err := encodeConfigMapping(&out, &mapping); err != nil {
+	if err := encodeConfigMapping(&out, &mapping, nil); err != nil {
 		t.Fatalf("encodeConfigMapping = %v", err)
 	}
 

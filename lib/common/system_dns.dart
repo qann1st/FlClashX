@@ -218,7 +218,22 @@ final class SystemDnsCoordinator {
     if (applied == null) {
       return;
     }
-    if (!await port.writeDnsServers(applied.service, applied.servers)) {
+    final current = await port.readDnsServers(applied.service);
+    if (current == null) {
+      commonPrint.log(
+        'Kept the system DNS record, unable to read ${applied.service}',
+        logLevel: LogLevel.warning,
+      );
+      return;
+    }
+    // A list that differs from the one this app installed was set by the user
+    // or a network manager since, and is theirs to keep.
+    final installed = applied.servers.contains(fallbackDns)
+        ? applied.servers
+        : [...applied.servers, fallbackDns];
+    if (stringListEquality.equals(current, installed) &&
+        !stringListEquality.equals(current, applied.servers) &&
+        !await port.writeDnsServers(applied.service, applied.servers)) {
       commonPrint.log(
         'Failed to restore the system DNS of ${applied.service}',
         logLevel: LogLevel.warning,

@@ -137,15 +137,45 @@ func presentKeys(buf []byte) []string {
 	return keys
 }
 
+// A key a merge brings in is set as surely as one written out, as the decoder sees it.
 func mappingKeys(mapping *yaml.Node) []string {
 	keys := []string{}
-	for i := 0; i+1 < len(mapping.Content); i += 2 {
-		name := mapping.Content[i]
-		if name.Kind != yaml.ScalarNode || name.ShortTag() == "!!merge" {
-			continue
+	named := map[string]struct{}{}
+	visited := map[*yaml.Node]struct{}{}
+	var collect func(mapping *yaml.Node)
+	collect = func(mapping *yaml.Node) {
+		if _, seen := visited[mapping]; seen {
+			return
 		}
-		keys = append(keys, name.Value)
+		visited[mapping] = struct{}{}
+		var sources []*yaml.Node
+		for i := 0; i+1 < len(mapping.Content); i += 2 {
+			name := mapping.Content[i]
+			if name.Kind != yaml.ScalarNode {
+				continue
+			}
+			if name.ShortTag() == "!!merge" {
+				sources = append(sources, resolveAlias(mapping.Content[i+1]))
+				continue
+			}
+			if _, seen := named[name.Value]; !seen {
+				named[name.Value] = struct{}{}
+				keys = append(keys, name.Value)
+			}
+		}
+		for _, source := range sources {
+			candidates := []*yaml.Node{source}
+			if source.Kind == yaml.SequenceNode {
+				candidates = source.Content
+			}
+			for _, candidate := range candidates {
+				if candidate = resolveAlias(candidate); candidate.Kind == yaml.MappingNode {
+					collect(candidate)
+				}
+			}
+		}
 	}
+	collect(mapping)
 	return keys
 }
 
@@ -191,6 +221,11 @@ func mergeProfileBase(base *SetupBase) (*yaml.Node, error) {
 	if err := yaml.Unmarshal([]byte(base.Overlay), &overlayDocument); err != nil {
 		return nil, err
 	}
+	// Before the merge drops the sections an alias may still point into.
+	if retag {
+		retagShortIDs(&profileDocument)
+		retagShortIDs(&overlayDocument)
+	}
 	profile, err := documentMapping(&profileDocument)
 	if err != nil {
 		return nil, err
@@ -210,9 +245,6 @@ func mergeProfileBase(base *SetupBase) (*yaml.Node, error) {
 	}
 	if rules != nil {
 		setMappingValue(root, "rules", rules)
-	}
-	if retag {
-		retagShortIDs(root)
 	}
 	return &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{root}}, nil
 }
@@ -323,14 +355,14 @@ func writeConfigDocument(path string, document *yaml.Node) error {
 }
 
 func writeDocumentFile(dir, pattern string, document *yaml.Node) (string, error) {
-	inlineAliases(document)
+	shared := inlineAliases(document)
 	file, err := os.CreateTemp(dir, pattern)
 	if err != nil {
 		return "", err
 	}
 	writer := bufio.NewWriterSize(file, 1<<20)
 	err = errors.Join(
-		encodeConfigMapping(writer, document.Content[0]),
+		encodeConfigMapping(writer, document.Content[0], shared),
 		writer.Flush(),
 		file.Close(),
 		os.Chmod(file.Name(), 0o644),
@@ -347,8 +379,8 @@ func writeDocumentFile(dir, pattern string, document *yaml.Node) (string, error)
 const encodeSliceLength = 4096
 
 // The mapping is drained as it is written, so the parse that follows does not
-// share the heap with the whole tree.
-func encodeConfigMapping(w io.Writer, mapping *yaml.Node) error {
+// share the heap with the whole tree; a list an alias reused is still to come.
+func encodeConfigMapping(w io.Writer, mapping *yaml.Node, shared map[*yaml.Node]struct{}) error {
 	for i := 0; i+1 < len(mapping.Content); i += 2 {
 		key, value := mapping.Content[i], mapping.Content[i+1]
 		mapping.Content[i+1] = nil
@@ -368,7 +400,9 @@ func encodeConfigMapping(w io.Writer, mapping *yaml.Node) error {
 			if err := encodeYamlPiece(w, slice, nil); err != nil {
 				return err
 			}
-			clear(items)
+			if _, reused := shared[value]; !reused {
+				clear(items)
+			}
 		}
 	}
 	return nil
@@ -393,7 +427,7 @@ func encodeYamlPiece(w io.Writer, node *yaml.Node, suffix []byte) error {
 
 // An anchor may sit in a section the overlay replaced, so every alias is
 // written out in full, as the host's own encoder always did.
-func inlineAliases(root *yaml.Node) {
+func inlineAliases(root *yaml.Node) map[*yaml.Node]struct{} {
 	visited := map[*yaml.Node]struct{}{}
 	var walk func(node *yaml.Node)
 	walk = func(node *yaml.Node) {
@@ -411,4 +445,5 @@ func inlineAliases(root *yaml.Node) {
 		}
 	}
 	walk(root)
+	return visited
 }

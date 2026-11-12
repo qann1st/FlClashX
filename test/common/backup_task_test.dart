@@ -397,6 +397,59 @@ void main() {
       expect(config.themeProps.style, ThemeStyle.original);
     });
 
+    test(
+      'turns the FlClashX 0.4 override switches into owned settings',
+      () async {
+        final data = await migrateLegacyConfig(
+          configMap: legacyConfig(
+            extra: {
+              'appSetting': {
+                'overrideNetworkSettings': true,
+                'overrideProviderSettings': true,
+              },
+            },
+          ),
+          sourcePath: source.path,
+          targetPath: target.path,
+        );
+
+        final owned = Config.realFromJson(
+          data.configMap,
+        ).appSettingProps.ownedSettings;
+        expect(
+          owned,
+          containsAll([
+            'clash.mixed-port',
+            'clash.allow-lan',
+            'clash.ipv6',
+            'clash.find-process-mode',
+            'clash.tun.stack',
+            ...appSwitchSettings.values,
+          ]),
+        );
+        expect(owned, hasLength(5 + appSwitchSettings.length));
+
+        final untouched = await migrateLegacyConfig(
+          configMap: legacyConfig(
+            extra: {
+              'appSetting': {
+                'overrideNetworkSettings': false,
+                'overrideProviderSettings': false,
+              },
+            },
+          ),
+          sourcePath: source.path,
+          targetPath: target.path,
+        );
+        expect(
+          Config.realFromJson(
+            untouched.configMap,
+          ).appSettingProps.ownedSettings,
+          isEmpty,
+        );
+      },
+    );
+
     test('links added rules to the profile that declared them', () async {
       writeFile(join(source.path, 'profiles', 'p1.yaml'), '');
 
@@ -511,6 +564,103 @@ void main() {
       expect(data.profiles.single.scriptId, data.scripts.single.id);
       expect(data.profiles.single.extendType, ExtendType.script);
     });
+
+    test('binds the script FlClashX 0.4 ran on every profile', () async {
+      writeFile(join(source.path, 'profiles', 'p1.yaml'), '');
+
+      final data = await migrateLegacyConfig(
+        configMap: legacyConfig(
+          profiles: [
+            {
+              'id': 'p1',
+              'autoUpdateDuration': 0,
+              'overrideData': {
+                'enable': true,
+                'rule': {
+                  'type': 'added',
+                  'addedRules': [
+                    {'id': 'a1', 'value': 'DOMAIN,example.com,DIRECT'},
+                  ],
+                },
+              },
+            },
+          ],
+          extra: {
+            'scriptProps': {
+              'currentId': 's1',
+              'scripts': [
+                {'id': 's1', 'label': 'S', 'content': 'body'},
+              ],
+            },
+          },
+        ),
+        sourcePath: source.path,
+        targetPath: target.path,
+      );
+
+      final profile = data.profiles.single;
+      expect(profile.extendType, ExtendType.script);
+      expect(profile.scriptId, data.scripts.single.id);
+      expect(data.rules.single.profileId, profile.id);
+    });
+
+    test(
+      'keeps a FlClashX 0.4 override list replacing the profile rules',
+      () async {
+        writeFile(join(source.path, 'profiles', 'p1.yaml'), '');
+        writeFile(join(source.path, 'profiles', 'p2.yaml'), '');
+
+        final data = await migrateLegacyConfig(
+          configMap: legacyConfig(
+            profiles: [
+              {
+                'id': 'p1',
+                'label': 'Work',
+                'autoUpdateDuration': 0,
+                'overrideData': {
+                  'enable': true,
+                  'rule': {
+                    'type': 'override',
+                    'overrideRules': [
+                      {'id': 'o1', 'value': 'DOMAIN,example.com,DIRECT'},
+                      {'id': 'o2', 'value': 'MATCH,Proxy'},
+                    ],
+                    'addedRules': [
+                      {'id': 'a1', 'value': 'DOMAIN,unused.com,DIRECT'},
+                    ],
+                  },
+                },
+              },
+              {
+                'id': 'p2',
+                'autoUpdateDuration': 0,
+                'overrideData': {
+                  'enable': true,
+                  'rule': {'type': 'override', 'overrideRules': []},
+                },
+              },
+            ],
+          ),
+          sourcePath: source.path,
+          targetPath: target.path,
+        );
+
+        expect(data.scripts, isEmpty);
+        List<String?> rulesOf(Profile profile) {
+          expect(profile.extendType, ExtendType.standard);
+          return [
+            for (final rule in data.rules)
+              if (rule.profileId == profile.id) rule.rawValue,
+          ];
+        }
+
+        expect(rulesOf(data.profiles.first), [
+          'DOMAIN,example.com,DIRECT',
+          'MATCH,Proxy',
+        ]);
+        expect(rulesOf(data.profiles.last), ['MATCH,DIRECT']);
+      },
+    );
 
     test('falls a custom overwrite back to a standard one', () async {
       writeFile(join(source.path, 'profiles', 'p1.yaml'), '');

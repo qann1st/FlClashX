@@ -56,13 +56,13 @@ _AppSettingProps _$AppSettingPropsFromJson(
       RestoreStrategy.compatible,
   showTrayTitle: json['showTrayTitle'] as bool? ?? true,
   monochromeTrayIcon: json['monochromeTrayIcon'] as bool? ?? true,
-  checkCertificate: json['checkCertificate'] as bool? ?? true,
   filters:
       (json['filters'] as List<dynamic>?)
           ?.map((e) => Filter.fromJson(e as Map<String, dynamic>))
           .toList() ??
       defaultFilters,
   hideIp: json['hideIp'] as bool? ?? false,
+  vibration: json['vibration'] as bool? ?? true,
   editorLineWrap: json['editorLineWrap'] as bool? ?? false,
   editorFontSize:
       $enumDecodeNullable(_$EditorFontSizeEnumMap, json['editorFontSize']) ??
@@ -128,9 +128,9 @@ Map<String, dynamic> _$AppSettingPropsToJson(_AppSettingProps instance) =>
       'restoreStrategy': _$RestoreStrategyEnumMap[instance.restoreStrategy]!,
       'showTrayTitle': instance.showTrayTitle,
       'monochromeTrayIcon': instance.monochromeTrayIcon,
-      'checkCertificate': instance.checkCertificate,
       'filters': instance.filters,
       'hideIp': instance.hideIp,
+      'vibration': instance.vibration,
       'editorLineWrap': instance.editorLineWrap,
       'editorFontSize': _$EditorFontSizeEnumMap[instance.editorFontSize]!,
       'serviceOrder': instance.serviceOrder,
@@ -358,6 +358,7 @@ const _$ProxyCardTypeEnumMap = {
   ProxyCardType.loose: 'loose',
   ProxyCardType.standard: 'standard',
   ProxyCardType.compact: 'compact',
+  ProxyCardType.oneline: 'oneline',
 };
 
 _TextScale _$TextScaleFromJson(Map<String, dynamic> json) => _TextScale(

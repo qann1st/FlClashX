@@ -494,12 +494,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Performances",
     ),
     "changelogReverts": MessageLookupByLibrary.simpleMessage("Annulations"),
-    "checkCertificate": MessageLookupByLibrary.simpleMessage(
-      "Vérifier les certificats TLS",
-    ),
-    "checkCertificateDesc": MessageLookupByLibrary.simpleMessage(
-      "Sans vérification TLS, les abonnements et les sauvegardes sont exposés aux attaques de l’homme du milieu.",
-    ),
     "checkUpdate": MessageLookupByLibrary.simpleMessage(
       "Rechercher des mises à jour",
     ),
@@ -1139,7 +1133,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "link": MessageLookupByLibrary.simpleMessage("Lien"),
     "liquidGlass": MessageLookupByLibrary.simpleMessage("Liquid Glass"),
     "liquidGlassReduced": MessageLookupByLibrary.simpleMessage(
-      "Liquid Glass simplifié jusqu\'au redémarrage : l\'appareil ne suit pas.",
+      "Liquid Glass simplifié durablement : l\'appareil ne suit pas.",
     ),
     "list": MessageLookupByLibrary.simpleMessage("Liste"),
     "listen": MessageLookupByLibrary.simpleMessage("Écoute"),
@@ -1344,6 +1338,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "À la demande met le proxy en pause sur les Wi-Fi exclus.",
     ),
+    "oneline": MessageLookupByLibrary.simpleMessage("Une ligne"),
     "onlyStatisticsProxy": MessageLookupByLibrary.simpleMessage(
       "Ne compter que le trafic proxy",
     ),
@@ -2084,6 +2079,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "usedTraffic": MessageLookupByLibrary.simpleMessage("Trafic utilisé"),
     "username": MessageLookupByLibrary.simpleMessage("Nom d’utilisateur"),
     "value": MessageLookupByLibrary.simpleMessage("Valeur"),
+    "vibration": MessageLookupByLibrary.simpleMessage("Vibrations"),
+    "vibrationDesc": MessageLookupByLibrary.simpleMessage(
+      "Retour tactile, vibration de l\'appui long et au lancement.",
+    ),
     "view": MessageLookupByLibrary.simpleMessage("Afficher"),
     "virtualIpv4": MessageLookupByLibrary.simpleMessage("IPv4 virtuelle"),
     "vividStyle": MessageLookupByLibrary.simpleMessage("Vif"),
