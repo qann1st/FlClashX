@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.11 (2026-11-12)
+
+**Features**
+
+- **core** Use the original Prizrak-Core everywhere but Windows (4714389)
+- **release** Ship an Arch package with the release (d5cdf0e)
+
 ## v0.5.10 (2026-11-08)
 
 **Features**
