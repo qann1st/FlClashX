@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.12 (2026-11-12)
+
+**Features**
+
+- **proxies** Drop only the changed group's connections (46e218e)
+- **upstream** Adopt 0.5.0-pre.8 (2875768)
+
 ## v0.5.11 (2026-11-12)
 
 **Features**
