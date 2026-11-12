@@ -234,7 +234,14 @@ class _Build {
     final config = loadYaml(
       File(p.join(rootDir, 'build_config.yaml')).readAsStringSync(),
     );
-    return ((config as Map?)?['core_version'] as String?) ?? '';
+    final map = config as Map?;
+    if (platform == 'windows') {
+      final windowsVersion = map?['windows_core_version'] as String? ?? '';
+      if (windowsVersion.isNotEmpty) {
+        return windowsVersion;
+      }
+    }
+    return (map?['core_version'] as String?) ?? '';
   }
 
   Map<dynamic, dynamic> packagingConfig(String format) {

@@ -83,16 +83,26 @@ class GoBuilder {
   // linker can set it for every reader.
   static const _versionSymbol = 'github.com/metacubex/mihomo/constant.Version';
 
-  String _ldflags() => [
-    config.goLdflags,
-    if (config.coreVersion.isNotEmpty)
-      '-X $_versionSymbol=${config.coreVersion}',
-  ].join(' ');
+  String _ldflags(Target target) {
+    final version =
+        target.goos == 'windows' && config.windowsCoreVersion.isNotEmpty
+        ? config.windowsCoreVersion
+        : config.coreVersion;
+    return [
+      config.goLdflags,
+      if (version.isNotEmpty) '-X $_versionSymbol=$version',
+    ].join(' ');
+  }
 
   List<String> _buildArguments(Target target, {String? outFile}) => [
     'build',
-    '-ldflags=${_ldflags()}',
+    '-ldflags=${_ldflags(target)}',
     '-tags=${config.tags}',
+    // Windows compiles the vendored Elysium-Core fork from its own module
+    // file; every other target keeps the original Prizrak-Core in go.mod.
+    if (target.goos == 'windows' &&
+        File(p.join(_corePath, 'go.windows.mod')).existsSync())
+      '-modfile=go.windows.mod',
     if (outFile != null) ...['-o', outFile],
     _mainPackage,
   ];

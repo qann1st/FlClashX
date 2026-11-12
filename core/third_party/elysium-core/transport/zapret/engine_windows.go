@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -20,6 +21,11 @@ type winBackend struct {
 }
 
 func newBackend() (backend, error) {
+	if runtime.GOARCH == "arm64" {
+		// WinDivert 2.2.x has no ARM64 driver. Keep the same fallback as
+		// non-Windows: the config loads and fragment/finalmask are used.
+		return nil, fmt.Errorf("%w: WinDivert has no ARM64 driver", ErrUnsupported)
+	}
 	wd, err := loadWinDivert()
 	if err != nil {
 		return nil, err

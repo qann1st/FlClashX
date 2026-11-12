@@ -34,7 +34,9 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: core/go.sum
+          cache-dependency-path: |
+            core/go.sum
+            core/go.windows.sum
 
       - name: Build core
         working-directory: core
@@ -45,7 +47,11 @@ jobs:
         run: |
           tags="$(sed -n 's/^tags: *//p' ../build_config.yaml)"
           ldflags="$(sed -n 's/^go_ldflags: *//p' ../build_config.yaml | tr -d '"')"
-          go build \
+          modfile=""
+          if [ "$GOOS" = "windows" ]; then
+            modfile="-modfile=go.windows.mod"
+          fi
+          go build $modfile \
             -ldflags="$ldflags -X github.com/metacubex/mihomo/constant.Version=${{ github.event.inputs.version }}" \
             -tags="$tags" \
             -o "../FlClashCore-${{ matrix.platform }}-${{ matrix.arch }}${{ matrix.ext }}" \

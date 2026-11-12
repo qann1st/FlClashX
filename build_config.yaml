@@ -1,7 +1,10 @@
 tags: with_gvisor
 android_tags: with_gvisor,cmfa
 go_ldflags: "-w -s"
-core_version: v1.19.33-r11
+core_version: v1.19.34-r1
+# Windows builds the Elysium-Core fork from core/go.windows.mod; it carries the
+# WinDivert zapret outbound the original core does not have.
+windows_core_version: v1.19.34-r1-elysium.1
 core_dir: core
 core_name: FlClashCore
 output_dir: libclash

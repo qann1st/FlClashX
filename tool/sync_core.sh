@@ -29,4 +29,5 @@ rsync -a --delete --exclude='.git' --exclude='bin' "$src"/ "$dest"/
 echo "synced $src -> $dest"
 echo
 echo "Core version in build_config.yaml: $(sed -n 's/^core_version: *//p' "$root/build_config.yaml")"
-echo "Bump it if the fork's version changed, then commit and push."
+echo "Windows core version: $(sed -n 's/^windows_core_version: *//p' "$root/build_config.yaml")"
+echo "Bump them if the fork's version changed, then commit and push."

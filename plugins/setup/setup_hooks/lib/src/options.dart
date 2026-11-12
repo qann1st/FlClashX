@@ -11,6 +11,7 @@ class BuildConfig {
     required this.tags,
     required this.goLdflags,
     required this.coreVersion,
+    required this.windowsCoreVersion,
     required this.coreDir,
     required this.coreName,
     required this.outputDir,
@@ -21,6 +22,10 @@ class BuildConfig {
   final String tags;
   final String goLdflags;
   final String coreVersion;
+
+  /// The version stamped into the Windows build, whose core is the vendored
+  /// Elysium-Core fork rather than the original named by [coreVersion].
+  final String windowsCoreVersion;
   final String coreDir;
   final String coreName;
   final String outputDir;
@@ -31,6 +36,7 @@ class BuildConfig {
     tags: 'with_gvisor',
     goLdflags: '-w -s',
     coreVersion: '',
+    windowsCoreVersion: '',
     coreDir: 'core',
     coreName: 'FlClashCore',
     outputDir: 'libclash',
@@ -50,6 +56,9 @@ class BuildConfig {
       tags: yaml['tags'] as String? ?? _defaults.tags,
       goLdflags: yaml['go_ldflags'] as String? ?? _defaults.goLdflags,
       coreVersion: yaml['core_version'] as String? ?? _defaults.coreVersion,
+      windowsCoreVersion:
+          yaml['windows_core_version'] as String? ??
+          _defaults.windowsCoreVersion,
       coreDir: yaml['core_dir'] as String? ?? _defaults.coreDir,
       coreName: yaml['core_name'] as String? ?? _defaults.coreName,
       outputDir: yaml['output_dir'] as String? ?? _defaults.outputDir,
@@ -62,6 +71,7 @@ class BuildConfig {
     'tags': tags,
     'go_ldflags': goLdflags,
     'core_version': coreVersion,
+    'windows_core_version': windowsCoreVersion,
     'core_dir': coreDir,
     'core_name': coreName,
     'output_dir': outputDir,

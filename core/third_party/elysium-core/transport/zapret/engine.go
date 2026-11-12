@@ -11,7 +11,7 @@ import (
 
 // ErrUnsupported is returned on platforms without the packet backend. A config
 // with zapret still loads there; the original fragment/finalmask path is used.
-var ErrUnsupported = errors.New("zapret packet desync is supported on Windows only")
+var ErrUnsupported = errors.New("zapret packet desync is not available on this platform")
 
 // Engine owns the parsed strategies and the platform backend.
 type Engine struct {

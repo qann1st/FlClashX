@@ -127,6 +127,10 @@ func handleVShareLink(names map[string]int, url *url.URL, scheme string, proxy m
 		headers["Host"] = query.Get("host")
 		wsOpts["path"] = query.Get("path")
 		wsOpts["headers"] = headers
+		if network == "httpupgrade" {
+			proxy["network"] = "ws"
+			wsOpts["v2ray-http-upgrade"] = true
+		}
 
 		if earlyData := query.Get("ed"); earlyData != "" {
 			med, err := strconv.Atoi(earlyData)
@@ -182,6 +186,15 @@ func handleVShareLink(names map[string]int, url *url.URL, scheme string, proxy m
 		}
 
 		proxy["xhttp-opts"] = xhttpOpts
+
+	case "xdrive":
+		opts, err := xdriveLinkOpts(query, scheme)
+		if err != nil {
+			return err
+		}
+		proxy["network"] = "xdrive"
+		proxy["xdrive-opts"] = opts
+		proxy["mux.cool"] = map[string]any{"enabled": true}
 
 	case "kcp", "mkcp":
 		kcp := map[string]any{}
