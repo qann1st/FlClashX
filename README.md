@@ -65,7 +65,7 @@
 <details>
 <summary><strong>Что приложение отправляет</strong></summary>
 
-Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/<ядро>/v<версия ядра> Platform/<ос>`, где `<ядро>` — `Elysium-Core` на Windows и `Prizrak-Core` на остальных платформах, например `FlClashX/v0.5.0 core/Elysium-Core/v1.19.33-r11 Platform/windows`.
+Каждая загрузка подписки идёт с `User-Agent: FlClashX/v<версия> core/<ядро>/v<версия ядра> Platform/<ос>`, где `<ядро>` — `Elysium-Core` на Windows и `Prizrak-Core` на остальных платформах, например `FlClashX/v0.5.0 core/Elysium-Core/v1.19.34-r1-elysium.1 Platform/windows` или `FlClashX/v0.5.0 core/Prizrak-Core/v1.19.34-r1 Platform/android`.
 
 Если у профиля включено «Отправлять HWID» (по умолчанию включено), добавляются:
 
