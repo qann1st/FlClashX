@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.6.0 (2026-11-13)
+
+**Bug Fixes**
+
+- **profiles** Windows devices send the same HWID as in FlClashX 0.4 again, so a device limit no longer counts them twice (cherry picked from commit 8f4ad5c59b28172b56a110c2ebe33a7e85f90120) (67ece9b)
+- **ci** Skip desktop jobs during upload-only runs (bb9f840)
+- **ci** Support publishing existing artifacts (d4e234b)
+
 ## v0.5.13 (2026-11-13)
 
 **Features**

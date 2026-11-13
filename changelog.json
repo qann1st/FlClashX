@@ -2,6 +2,34 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.0",
+      "tag": "v0.6.0",
+      "date": "2026-11-13",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "67ece9b",
+              "scope": "profiles",
+              "text": "Windows devices send the same HWID as in FlClashX 0.4 again, so a device limit no longer counts them twice (cherry picked from commit 8f4ad5c59b28172b56a110c2ebe33a7e85f90120)"
+            },
+            {
+              "id": "bb9f840",
+              "scope": "ci",
+              "text": "Skip desktop jobs during upload-only runs"
+            },
+            {
+              "id": "d4e234b",
+              "scope": "ci",
+              "text": "Support publishing existing artifacts"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.13",
       "tag": "v0.5.13",
       "date": "2026-11-13",
