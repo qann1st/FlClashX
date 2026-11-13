@@ -55,6 +55,9 @@ class SetupAction extends _$SetupAction {
   /// Moves as each config push starts and again once the Core answers it.
   int get pushes => _pushes;
 
+  /// A start, stop or restart of the listeners has not finished yet.
+  bool get isChangingRun => _listenerScheduler.isBusy;
+
   bool get _isRunning => _startTime != null && _startTime!.isBeforeNow;
 
   @override
@@ -672,7 +675,10 @@ class SetupAction extends _$SetupAction {
         ? await setupState.script?.content
         : null;
     final hasScript = scriptContent?.isNotEmpty == true;
-    final profileBase = !isCustom && !hasScript
+    // Chains build on the profile's own proxies and groups, which a base
+    // leaves out for the Core to merge back in.
+    final profileBase =
+        !isCustom && !hasScript && setupState.proxyChains.isEmpty
         ? await _core.getProfileBase(profileId)
         : null;
     Map<String, dynamic> rawConfig = isCustom
@@ -718,6 +724,7 @@ class SetupAction extends _$SetupAction {
             ? setupState.matchTarget
             : lastMatchTarget(profileBase.base.matchRules),
         safeMode: ref.read(safeModeProvider),
+        proxyChains: setupState.proxyChains,
       ),
     );
     if (profileBase == null) {

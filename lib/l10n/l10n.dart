@@ -6314,6 +6314,16 @@ class AppLocalizations {
     return Intl.message('Hide IP', name: 'hideIp', desc: '', args: []);
   }
 
+  /// `Leaves the outbound IP off the dashboard and the service checks.`
+  String get hideIpDesc {
+    return Intl.message(
+      'Leaves the outbound IP off the dashboard and the service checks.',
+      name: 'hideIpDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Editor unavailable`
   String get editorUnavailable {
     return Intl.message(
@@ -8281,6 +8291,481 @@ class AppLocalizations {
     return Intl.message(
       'The file is too large to download',
       name: 'downloadTooLarge',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `FlClashX Pre`
+  String get preChannelTipTitle {
+    return Intl.message(
+      'FlClashX Pre',
+      name: 'preChannelTipTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This pre-release is a separate app and can't see FlClashX's profiles. To bring them over, make a backup in FlClashX under Backup and restore and restore it here, or add your subscriptions again by link.`
+  String get preChannelTip {
+    return Intl.message(
+      'This pre-release is a separate app and can\'t see FlClashX\'s profiles. To bring them over, make a backup in FlClashX under Backup and restore and restore it here, or add your subscriptions again by link.',
+      name: 'preChannelTip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Proxy chains`
+  String get proxyChainsTitle {
+    return Intl.message(
+      'Proxy chains',
+      name: 'proxyChainsTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Beta`
+  String get beta {
+    return Intl.message('Beta', name: 'beta', desc: '', args: []);
+  }
+
+  /// `Add a chain`
+  String get addProxyChain {
+    return Intl.message(
+      'Add a chain',
+      name: 'addProxyChain',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `New chain`
+  String get newProxyChain {
+    return Intl.message('New chain', name: 'newProxyChain', desc: '', args: []);
+  }
+
+  /// `Chain`
+  String get proxyChain {
+    return Intl.message('Chain', name: 'proxyChain', desc: '', args: []);
+  }
+
+  /// `Traffic passes the hops in order, and sites see only the exit. Chains are kept on this device and are not in backups yet.`
+  String get proxyChainsDesc {
+    return Intl.message(
+      'Traffic passes the hops in order, and sites see only the exit. Chains are kept on this device and are not in backups yet.',
+      name: 'proxyChainsDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Entry`
+  String get proxyChainEntry {
+    return Intl.message('Entry', name: 'proxyChainEntry', desc: '', args: []);
+  }
+
+  /// `Middle`
+  String get proxyChainMiddle {
+    return Intl.message('Middle', name: 'proxyChainMiddle', desc: '', args: []);
+  }
+
+  /// `Exit`
+  String get proxyChainExit {
+    return Intl.message('Exit', name: 'proxyChainExit', desc: '', args: []);
+  }
+
+  /// `Device`
+  String get proxyChainDevice {
+    return Intl.message('Device', name: 'proxyChainDevice', desc: '', args: []);
+  }
+
+  /// `Internet`
+  String get proxyChainInternet {
+    return Intl.message(
+      'Internet',
+      name: 'proxyChainInternet',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Add a hop`
+  String get addProxyChainHop {
+    return Intl.message(
+      'Add a hop',
+      name: 'addProxyChainHop',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The device connects to the entry, and traffic leaves for the internet from the exit.`
+  String get proxyChainHopsDesc {
+    return Intl.message(
+      'The device connects to the entry, and traffic leaves for the internet from the exit.',
+      name: 'proxyChainHopsDesc',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{name} is not in this profile`
+  String proxyChainMissingHop(Object name) {
+    return Intl.message(
+      '$name is not in this profile',
+      name: 'proxyChainMissingHop',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `{name} takes its nodes from a provider, which chains do not support yet`
+  String proxyChainProviderHop(Object name) {
+    return Intl.message(
+      '$name takes its nodes from a provider, which chains do not support yet',
+      name: 'proxyChainProviderHop',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `The same hop is picked twice`
+  String get proxyChainRepeatedHop {
+    return Intl.message(
+      'The same hop is picked twice',
+      name: 'proxyChainRepeatedHop',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{name} is already a name in this profile`
+  String proxyChainNameTaken(Object name) {
+    return Intl.message(
+      '$name is already a name in this profile',
+      name: 'proxyChainNameTaken',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Give the chain a name and pick every hop`
+  String get proxyChainIncomplete {
+    return Intl.message(
+      'Give the chain a name and pick every hop',
+      name: 'proxyChainIncomplete',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `{name} has proxies that cannot dial through another hop, such as direct`
+  String proxyChainUnchainableHop(Object name) {
+    return Intl.message(
+      '$name has proxies that cannot dial through another hop, such as direct',
+      name: 'proxyChainUnchainableHop',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `The filter of {name} uses syntax this app cannot read yet`
+  String proxyChainUnreadableFilter(Object name) {
+    return Intl.message(
+      'The filter of $name uses syntax this app cannot read yet',
+      name: 'proxyChainUnreadableFilter',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `{name} is the MATCH target. Pick another target before turning it off or deleting it`
+  String proxyChainIsMatchTarget(Object name) {
+    return Intl.message(
+      '$name is the MATCH target. Pick another target before turning it off or deleting it',
+      name: 'proxyChainIsMatchTarget',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `{name} is the target of added rules. Point them elsewhere before turning it off or deleting it`
+  String proxyChainIsRuleTarget(Object name) {
+    return Intl.message(
+      '$name is the target of added rules. Point them elsewhere before turning it off or deleting it',
+      name: 'proxyChainIsRuleTarget',
+      desc: '',
+      args: [name],
+    );
+  }
+
+  /// `Bring over your FlClashX profiles`
+  String get stableImportTitle {
+    return Intl.message(
+      'Bring over your FlClashX profiles',
+      name: 'stableImportTitle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `FlClashX Pre couldn't take FlClashX's profiles and settings yet. If FlClashX is running, quit it and retry.`
+  String get stableImportTip {
+    return Intl.message(
+      'FlClashX Pre couldn\'t take FlClashX\'s profiles and settings yet. If FlClashX is running, quit it and retry.',
+      name: 'stableImportTip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Retry`
+  String get stableImportRetry {
+    return Intl.message('Retry', name: 'stableImportRetry', desc: '', args: []);
+  }
+
+  /// `Continue without them`
+  String get stableImportSkip {
+    return Intl.message(
+      'Continue without them',
+      name: 'stableImportSkip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `View on GitHub`
+  String get updateViewOnGitHub {
+    return Intl.message(
+      'View on GitHub',
+      name: 'updateViewOnGitHub',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Install`
+  String get updateInstall {
+    return Intl.message('Install', name: 'updateInstall', desc: '', args: []);
+  }
+
+  /// `{received} of {total} · {percent}%`
+  String updateDownloadProgress(Object received, Object total, Object percent) {
+    return Intl.message(
+      '$received of $total · $percent%',
+      name: 'updateDownloadProgress',
+      desc: '',
+      args: [received, total, percent],
+    );
+  }
+
+  /// `Checking the download…`
+  String get updateVerifying {
+    return Intl.message(
+      'Checking the download…',
+      name: 'updateVerifying',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Downloaded and verified.`
+  String get updateReady {
+    return Intl.message(
+      'Downloaded and verified.',
+      name: 'updateReady',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Starting the installer…`
+  String get updateInstalling {
+    return Intl.message(
+      'Starting the installer…',
+      name: 'updateInstalling',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Finish the update in the installer that opened.`
+  String get updateHandedOff {
+    return Intl.message(
+      'Finish the update in the installer that opened.',
+      name: 'updateHandedOff',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This copy can't be replaced in place. Drag the app from the opened disk image to Applications.`
+  String get updateOpenedImage {
+    return Intl.message(
+      'This copy can\'t be replaced in place. Drag the app from the opened disk image to Applications.',
+      name: 'updateOpenedImage',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Closing to finish the update…`
+  String get updateExiting {
+    return Intl.message(
+      'Closing to finish the update…',
+      name: 'updateExiting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This copy is managed by your package manager. Update it there.`
+  String get updatePackageManager {
+    return Intl.message(
+      'This copy is managed by your package manager. Update it there.',
+      name: 'updatePackageManager',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This copy can't update itself. Get the new version on GitHub.`
+  String get updateUnsupported {
+    return Intl.message(
+      'This copy can\'t update itself. Get the new version on GitHub.',
+      name: 'updateUnsupported',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This release has no build for this device.`
+  String get updateErrorNoAsset {
+    return Intl.message(
+      'This release has no build for this device.',
+      name: 'updateErrorNoAsset',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `This release publishes no checksum, so the download can't be verified.`
+  String get updateErrorNoChecksum {
+    return Intl.message(
+      'This release publishes no checksum, so the download can\'t be verified.',
+      name: 'updateErrorNoChecksum',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The download was redirected to an address that isn't GitHub.`
+  String get updateErrorUntrustedHost {
+    return Intl.message(
+      'The download was redirected to an address that isn\'t GitHub.',
+      name: 'updateErrorUntrustedHost',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The download is larger than the release says it is.`
+  String get updateErrorTooLarge {
+    return Intl.message(
+      'The download is larger than the release says it is.',
+      name: 'updateErrorTooLarge',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The download ended early.`
+  String get updateErrorIncomplete {
+    return Intl.message(
+      'The download ended early.',
+      name: 'updateErrorIncomplete',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The download failed. Check the connection and try again.`
+  String get updateErrorNetwork {
+    return Intl.message(
+      'The download failed. Check the connection and try again.',
+      name: 'updateErrorNetwork',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The download doesn't match the release checksum and was deleted.`
+  String get updateErrorChecksum {
+    return Intl.message(
+      'The download doesn\'t match the release checksum and was deleted.',
+      name: 'updateErrorChecksum',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The download isn't signed like this app and was deleted.`
+  String get updateErrorIdentity {
+    return Intl.message(
+      'The download isn\'t signed like this app and was deleted.',
+      name: 'updateErrorIdentity',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The download isn't newer than this app.`
+  String get updateErrorNotNewer {
+    return Intl.message(
+      'The download isn\'t newer than this app.',
+      name: 'updateErrorNotNewer',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Wait until the connection finishes starting or stopping.`
+  String get updateErrorBusy {
+    return Intl.message(
+      'Wait until the connection finishes starting or stopping.',
+      name: 'updateErrorBusy',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Safe mode doesn't install updates.`
+  String get updateErrorSafeMode {
+    return Intl.message(
+      'Safe mode doesn\'t install updates.',
+      name: 'updateErrorSafeMode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Allow installing apps from this source, then tap Install again.`
+  String get updateErrorPermission {
+    return Intl.message(
+      'Allow installing apps from this source, then tap Install again.',
+      name: 'updateErrorPermission',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The update couldn't be installed.`
+  String get updateErrorInstall {
+    return Intl.message(
+      'The update couldn\'t be installed.',
+      name: 'updateErrorInstall',
       desc: '',
       args: [],
     );

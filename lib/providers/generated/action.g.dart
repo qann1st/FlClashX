@@ -40,7 +40,7 @@ final class CommonActionProvider extends $NotifierProvider<CommonAction, void> {
   }
 }
 
-String _$commonActionHash() => r'ceb00707e3be0a64f5ee2a5e8d101d315d21fb0a';
+String _$commonActionHash() => r'05610d27e5705e5c3adc38bff20863126d3fc53a';
 
 abstract class _$CommonAction extends $Notifier<void> {
   void build();
@@ -150,7 +150,7 @@ final class ProfileHeadersActionProvider
 }
 
 String _$profileHeadersActionHash() =>
-    r'4437e9d24e7d0ffd7108ab643d6b5a5d607005bd';
+    r'499a345c6ab4d13da55bb295364991793b845ec6';
 
 /// Lands once per update of, or switch to, a profile; edits in between stay.
 
@@ -270,7 +270,7 @@ final class SetupActionProvider extends $NotifierProvider<SetupAction, void> {
   }
 }
 
-String _$setupActionHash() => r'6b1d693f2e4f47ce7a5460c85735a82f6b94e9b6';
+String _$setupActionHash() => r'79b1a2be3ffd74e82ceca002cfabff0678c4501b';
 
 abstract class _$SetupAction extends $Notifier<void> {
   void build();
@@ -321,7 +321,7 @@ final class BackupActionProvider extends $NotifierProvider<BackupAction, void> {
   }
 }
 
-String _$backupActionHash() => r'54fd2237cdf91158849fbb967ad1ac5f22880709';
+String _$backupActionHash() => r'f2ea15d55bb2f46d36bc79a54854f8a91572b3c8';
 
 abstract class _$BackupAction extends $Notifier<void> {
   void build();
@@ -629,7 +629,7 @@ final class ProfilesActionProvider
   }
 }
 
-String _$profilesActionHash() => r'3ba2c82763ac5f144d74e9070f845d269903e8ed';
+String _$profilesActionHash() => r'90e45332426f3c683928efec4b06dac184fab64f';
 
 abstract class _$ProfilesAction extends $Notifier<void> {
   void build();

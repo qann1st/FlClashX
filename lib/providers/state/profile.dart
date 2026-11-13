@@ -204,6 +204,9 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
           ),
         );
   final allProfileProviders = ref.watch(profileProvidersProvider);
+  final proxyChains = profileId == null || profileType == ProfileType.custom
+      ? null
+      : watchEnabledProxyChains(ref, profileId);
   List<ProxyGroup> proxyGroups = [];
   List<Rule> rules = [];
   List<Rule> addedRules = [];
@@ -250,6 +253,7 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
         profileType != ProfileType.custom && extendType == ExtendType.standard
         ? profile?.matchTarget
         : null,
+    proxyChains: await proxyChains ?? const [],
   );
 }
 
