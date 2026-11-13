@@ -18,6 +18,10 @@ on:
         description: 'Release build targets for a dispatch, comma-separated: android, windows-amd64, windows-arm64, linux-amd64, linux-arm64, macos-amd64, macos-arm64. Empty builds nothing.'
         type: string
         required: false
+      macos_runner:
+        description: 'Runner image for the macOS arm64 build; defaults to macos-26. Another image dodges a pool GitHub cannot allocate.'
+        type: string
+        required: false
       source_run_id:
         description: 'GitHub Actions run ID that owns the build artifacts'
         type: string
@@ -394,7 +398,7 @@ jobs:
             os: macos-26-intel
             arch: amd64
           - platform: macos
-            os: macos-26
+            os: ${{ inputs.macos_runner || 'macos-26' }}
             arch: arm64
           - platform: windows
             os: windows-11-arm
