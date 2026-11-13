@@ -14,6 +14,10 @@ on:
         description: 'Run the check jobs only, skipping the desktop and release builds'
         type: boolean
         default: false
+      build_platforms:
+        description: 'Release build targets for a dispatch, comma-separated: android, windows-amd64, windows-arm64, linux-amd64, linux-arm64, macos-amd64, macos-arm64. Empty builds nothing.'
+        type: string
+        required: false
       source_run_id:
         description: 'GitHub Actions run ID that owns the build artifacts'
         type: string
@@ -353,7 +357,15 @@ jobs:
 
   build:
     # Releases publish where the release links point: the public repository.
-    if: github.repository == 'qann1st/FlClashX' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    # A dispatch may name the targets it needs, so one stale artifact can be
+    # rebuilt without repeating the whole matrix.
+    if: >-
+      github.repository == 'qann1st/FlClashX' && (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.build_platforms != '' &&
+         contains(format(',{0},', inputs.build_platforms),
+                  format(',{0}{1},', matrix.platform, matrix.arch && format('-{0}', matrix.arch) || '')))
+      )
     runs-on: ${{ matrix.os }}
     # Optional Apple secrets: without them the macOS DMG ships ad-hoc signed, as
     # this fork has always released it. Steps check the value, since `secrets`
@@ -578,9 +590,10 @@ jobs:
     # The checks are skipped where the repository is private, so a skipped one
     # passes; one that failed or was cancelled holds the release back.
     if: >-
-      always() && (
-        (inputs.upload_only == true && inputs.source_run_id != '' && inputs.release_tag != '') ||
-        (needs.build.result == 'success' &&
+      always() &&
+      needs.build.result != 'failure' && needs.build.result != 'cancelled' && (
+        (inputs.source_run_id != '' && inputs.release_tag != '') ||
+        (inputs.build_platforms == '' && needs.build.result == 'success' &&
          !contains(needs.*.result, 'failure') &&
          !contains(needs.*.result, 'cancelled'))
       )
@@ -592,15 +605,27 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: ${{ inputs.upload_only == true && inputs.release_tag || github.ref }}
+          ref: ${{ inputs.release_tag || github.ref }}
 
-      - name: Download
+      # Artifacts of this run, when it built any.
+      - name: Download this run's artifacts
+        if: inputs.build_platforms != '' || inputs.source_run_id == ''
         uses: actions/download-artifact@v7
         with:
           path: ./dist/
           pattern: artifact-*
           merge-multiple: true
-          run-id: ${{ inputs.upload_only == true && inputs.source_run_id || '' }}
+
+      # Artifacts of the run that built the rest, for a dispatch that rebuilt
+      # only one target.
+      - name: Download the source run's artifacts
+        if: inputs.source_run_id != ''
+        uses: actions/download-artifact@v7
+        with:
+          path: ./dist/
+          pattern: artifact-*
+          merge-multiple: true
+          run-id: ${{ inputs.source_run_id }}
           github-token: ${{ github.token }}
 
       - name: Setup Flutter
