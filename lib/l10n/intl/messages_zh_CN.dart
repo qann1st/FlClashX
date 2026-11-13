@@ -901,7 +901,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "messageTest": MessageLookupByLibrary.simpleMessage("消息测试"),
     "messageTestTip": MessageLookupByLibrary.simpleMessage("这是一条消息。"),
     "minimize": MessageLookupByLibrary.simpleMessage("最小化"),
-    "minimizeOnExit": MessageLookupByLibrary.simpleMessage("退出时最小化"),
     "minutes": MessageLookupByLibrary.simpleMessage("分钟"),
     "minutesAgo": m48,
     "minutesAgoShort": m49,

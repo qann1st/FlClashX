@@ -52,7 +52,6 @@
   "allowLan": "Разрешить LAN",
   "tun": "TUN",
   "tunDesc": "TUN требует прав администратора.",
-  "minimizeOnExit": "Сворачивать при выходе",
   "autoLaunch": "Автозапуск",
   "silentLaunch": "Тихий запуск",
   "silentLaunchDesc": "При тихом запуске окно не показывается.",

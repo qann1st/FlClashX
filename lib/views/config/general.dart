@@ -409,12 +409,6 @@ class GeneralView extends ConsumerWidget {
         title: Text(appLocalizations.onDemand),
         widget: const OnDemandView(),
       ),
-      _appSettingToggle(
-        title: (l) => l.minimizeOnExit,
-        managedKey: 'app.minimizeOnExit',
-        select: (state) => state.minimizeOnExit,
-        update: (state, value) => state.copyWith(minimizeOnExit: value),
-      ),
       if (system.isAndroid) ...[
         _appSettingToggle(
           title: (l) => l.exclude,

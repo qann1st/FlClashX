@@ -132,7 +132,6 @@ void main() {
       expect(restored.tabAnimation, TabAnimation.fade);
       expect(restored.autoCheckUpdate, false);
       expect(restored.sidebarExpanded, true);
-      expect(restored.minimizeOnExit, false);
       expect(restored.restoreStrategy, RestoreStrategy.compatible);
       expect(restored.filters, defaultFilters);
       expect(restored.testUrl, defaultTestUrl);

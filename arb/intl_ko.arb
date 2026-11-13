@@ -52,7 +52,6 @@
   "allowLan": "LAN 허용",
   "tun": "TUN",
   "tunDesc": "TUN은 관리자 모드에서만 작동합니다.",
-  "minimizeOnExit": "종료 시 최소화",
   "autoLaunch": "자동 실행",
   "silentLaunch": "백그라운드 실행",
   "silentLaunchDesc": "백그라운드 실행은 창을 표시하지 않고 시작합니다.",

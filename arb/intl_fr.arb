@@ -52,7 +52,6 @@
   "allowLan": "Autoriser le LAN",
   "tun": "TUN",
   "tunDesc": "TUN ne fonctionne qu’en mode administrateur.",
-  "minimizeOnExit": "Réduire à la fermeture",
   "autoLaunch": "Lancement automatique",
   "silentLaunch": "Lancement silencieux",
   "silentLaunchDesc": "Le lancement silencieux démarre l’app sans afficher la fenêtre.",

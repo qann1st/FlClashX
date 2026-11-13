@@ -116,7 +116,7 @@ class SystemAction extends _$SystemAction {
   }
 
   Future<void> handleClose([bool exit = true]) async {
-    if (ref.read(appSettingProvider).minimizeOnExit || !exit) {
+    if (system.isDesktop || !exit) {
       if (system.isDesktop) {
         await _savePreferencesSafely();
       }

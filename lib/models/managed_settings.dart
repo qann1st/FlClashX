@@ -3,7 +3,6 @@ import 'provider_headers.dart';
 
 /// Flags of `flclashx-settings` and the app switch each one drives.
 const appSwitchSettings = {
-  'minimize': 'app.minimizeOnExit',
   'autoupdate': 'app.autoCheckUpdate',
   'openlogs': 'app.openLogs',
   'closeconnections': 'app.closeConnections',
@@ -55,7 +54,6 @@ String clashSettingKey(String yamlKey) => 'clash.$yamlKey';
 
 /// The lockable keys of each settings page, for its hint.
 const generalPageKeys = {
-  'app.minimizeOnExit',
   'app.autoCheckUpdate',
   'app.openLogs',
   'app.closeConnections',

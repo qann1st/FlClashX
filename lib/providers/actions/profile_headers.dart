@@ -139,7 +139,6 @@ class ProfileHeadersAction extends _$ProfileHeadersAction {
           .read(appSettingProvider.notifier)
           .update(
             (state) => state.copyWith(
-              minimizeOnExit: said('minimize') ?? state.minimizeOnExit,
               autoLaunch: said('autorun') ?? state.autoLaunch,
               silentLaunch: said('shadowstart') ?? state.silentLaunch,
               autoRun: said('autostart') ?? state.autoRun,

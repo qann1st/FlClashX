@@ -968,7 +968,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "messageTest": MessageLookupByLibrary.simpleMessage("메시지 테스트"),
     "messageTestTip": MessageLookupByLibrary.simpleMessage("이것은 메시지입니다."),
     "minimize": MessageLookupByLibrary.simpleMessage("최소화"),
-    "minimizeOnExit": MessageLookupByLibrary.simpleMessage("종료 시 최소화"),
     "minutes": MessageLookupByLibrary.simpleMessage("분"),
     "minutesAgo": m48,
     "minutesAgoShort": m49,

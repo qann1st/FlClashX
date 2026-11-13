@@ -160,7 +160,10 @@ class CommonAction extends _$CommonAction {
           update,
         );
         if (installed && !Platform.isAndroid) {
-          await ref.read(systemActionProvider.notifier).handleExit(false);
+          // Settings are written on a normal exit.  The installer terminates
+          // this process immediately after this, so opting out here loses any
+          // changes still waiting in the preferences debounce.
+          await ref.read(systemActionProvider.notifier).handleExit();
         }
         if (installed) return;
       }

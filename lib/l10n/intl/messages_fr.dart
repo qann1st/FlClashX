@@ -996,9 +996,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Saisissez le contenu de la règle",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "L’autorisation de la liste des apps a été refusée ; les apps installées ne peuvent donc pas être listées. Veuillez l’accorder manuellement dans les réglages du système.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "L’autorisation de la liste des apps a été refusée ; les apps installées ne peuvent donc pas être listées. Veuillez l’accorder manuellement dans les réglages du système.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Ce système masque la liste des apps installées tant que l’autorisation n’est pas accordée. Accordez-la pour configurer le proxy par app.",
     ),
@@ -1241,9 +1242,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Ceci est un message.",
     ),
     "minimize": MessageLookupByLibrary.simpleMessage("Réduire"),
-    "minimizeOnExit": MessageLookupByLibrary.simpleMessage(
-      "Réduire à la fermeture",
-    ),
     "minutes": MessageLookupByLibrary.simpleMessage("minutes"),
     "minutesAgo": m48,
     "minutesAgoShort": m49,

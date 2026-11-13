@@ -84,16 +84,15 @@ void main() {
           .read(appSettingProvider.notifier)
           .update((state) => state.copyWith(autoRun: true, openLogs: true));
 
-      await select(_profile(1, settings: 'minimize,autoupdate'));
+      await select(_profile(1, settings: 'autoupdate'));
 
       final setting = container.read(appSettingProvider);
-      expect(setting.minimizeOnExit, isTrue);
       expect(setting.autoCheckUpdate, isTrue);
       expect(setting.autoRun, isTrue);
       expect(setting.openLogs, isFalse);
 
       await select(_profile(2));
-      expect(container.read(appSettingProvider).minimizeOnExit, isTrue);
+      expect(container.read(appSettingProvider).autoCheckUpdate, isTrue);
     },
   );
 
@@ -129,14 +128,13 @@ void main() {
     container
         .read(appSettingProvider.notifier)
         .update(
-          (state) => state.copyWith(ownedSettings: {'app.minimizeOnExit'}),
+          (state) => state.copyWith(ownedSettings: {'app.autoCheckUpdate'}),
         );
 
-    await select(_profile(1, settings: 'minimize,autoupdate'));
+    await select(_profile(1, settings: 'autoupdate'));
 
     final setting = container.read(appSettingProvider);
-    expect(setting.minimizeOnExit, isFalse);
-    expect(setting.autoCheckUpdate, isTrue);
+    expect(setting.autoCheckUpdate, isFalse);
   });
 
   test('the hideip special hides the IP and locks its switch', () async {

@@ -41,7 +41,7 @@ void main() {
     label: 'Plan',
     type: ProfileType.url,
     autoUpdateDuration: Duration.zero,
-    providerHeaders: {'flclashx-settings': 'minimize'},
+    providerHeaders: {'flclashx-settings': 'autoupdate'},
   );
 
   Future<void> pumpGeneral(WidgetTester tester) async {
@@ -74,13 +74,13 @@ void main() {
 
   AppSettingProps setting() => container.read(appSettingProvider);
 
-  Finder row() => find.widgetWithText(ListTile, 'Minimize on exit');
+  Finder row() => find.widgetWithText(ListTile, 'Auto check for updates');
 
   testWidgets('a managed row is dimmed and asks before it is taken over', (
     tester,
   ) async {
     await pumpGeneral(tester);
-    expect(setting().minimizeOnExit, isTrue);
+    expect(setting().autoCheckUpdate, isTrue);
     expect(
       find.ancestor(of: row(), matching: find.byType(Opacity)),
       findsOneWidget,
@@ -91,7 +91,7 @@ void main() {
     expect(find.text('Managed by your provider'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(setting().minimizeOnExit, isTrue);
+    expect(setting().autoCheckUpdate, isTrue);
     expect(setting().ownedSettings, isEmpty);
 
     await tester.tap(row());
@@ -99,8 +99,8 @@ void main() {
     await tester.tap(find.text('Change'));
     await tester.pumpAndSettle();
 
-    expect(setting().ownedSettings, {'app.minimizeOnExit'});
-    expect(setting().minimizeOnExit, isFalse);
+    expect(setting().ownedSettings, {'app.autoCheckUpdate'});
+    expect(setting().autoCheckUpdate, isFalse);
     expect(
       find.ancestor(of: row(), matching: find.byType(Opacity)),
       findsNothing,
@@ -122,7 +122,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Managed by your provider'), findsOneWidget);
-    expect(setting().minimizeOnExit, isTrue);
+    expect(setting().autoCheckUpdate, isTrue);
     expect(setting().ownedSettings, isEmpty);
   });
 
@@ -159,8 +159,8 @@ void main() {
         .read(appSettingProvider.notifier)
         .update(
           (state) => state.copyWith(
-            ownedSettings: {'app.minimizeOnExit'},
-            minimizeOnExit: false,
+            ownedSettings: {'app.autoCheckUpdate'},
+            autoCheckUpdate: false,
           ),
         );
     await tester.pumpAndSettle();
@@ -171,7 +171,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(setting().ownedSettings, isEmpty);
-    expect(setting().minimizeOnExit, isTrue);
+    expect(setting().autoCheckUpdate, isTrue);
   });
 
   testWidgets('one row in diagnostics hands every setting back', (
@@ -182,8 +182,8 @@ void main() {
         .read(appSettingProvider.notifier)
         .update(
           (state) => state.copyWith(
-            ownedSettings: {'app.minimizeOnExit', 'clash.allow-lan'},
-            minimizeOnExit: false,
+            ownedSettings: {'app.autoCheckUpdate', 'clash.allow-lan'},
+            autoCheckUpdate: false,
           ),
         );
     await tester.pumpAndSettle();
@@ -199,7 +199,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(setting().ownedSettings, isEmpty);
-    expect(setting().minimizeOnExit, isTrue);
+    expect(setting().autoCheckUpdate, isTrue);
   });
 
   Future<void> pumpTheme(WidgetTester tester, String view) async {
@@ -315,7 +315,7 @@ void main() {
           .read(appSettingProvider.notifier)
           .update(
             (state) => state.copyWith(
-              ownedSettings: {'app.minimizeOnExit', 'clash.allow-lan'},
+              ownedSettings: {'app.autoCheckUpdate', 'clash.allow-lan'},
             ),
           );
       await tester.pumpAndSettle();
@@ -385,14 +385,14 @@ void main() {
     container
         .read(appSettingProvider.notifier)
         .update(
-          (state) => state.copyWith(ownedSettings: {'app.minimizeOnExit'}),
+          (state) => state.copyWith(ownedSettings: {'app.autoCheckUpdate'}),
         );
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
         child: const TestApp(
           child: ManagedSetting(
-            settingKey: 'app.minimizeOnExit',
+            settingKey: 'app.autoCheckUpdate',
             showsLock: false,
             child: Text('Card'),
           ),

@@ -52,7 +52,6 @@
   "allowLan": "LANプロキシ",
   "tun": "TUN",
   "tunDesc": "TUN は管理者モードでのみ有効です。",
-  "minimizeOnExit": "終了時に最小化",
   "autoLaunch": "自動起動",
   "silentLaunch": "サイレント起動",
   "silentLaunchDesc": "サイレント起動ではウィンドウを表示しません。",

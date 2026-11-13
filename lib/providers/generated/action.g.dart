@@ -150,7 +150,7 @@ final class ProfileHeadersActionProvider
 }
 
 String _$profileHeadersActionHash() =>
-    r'1db71a57ec61a6991119ce7417e0ecdaaa366533';
+    r'4437e9d24e7d0ffd7108ab643d6b5a5d607005bd';
 
 /// Lands once per update of, or switch to, a profile; edits in between stay.
 
@@ -423,7 +423,7 @@ final class SystemActionProvider extends $NotifierProvider<SystemAction, void> {
   }
 }
 
-String _$systemActionHash() => r'25505bd4e32cbe790df1b70a6a64bbee68e5a002';
+String _$systemActionHash() => r'7716bf9d568eb08e4f812aff8c5dcfe0d9accd98';
 
 abstract class _$SystemAction extends $Notifier<void> {
   void build();

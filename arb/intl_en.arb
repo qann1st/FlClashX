@@ -52,7 +52,6 @@
   "allowLan": "Allow LAN",
   "tun": "TUN",
   "tunDesc": "TUN works only in administrator mode.",
-  "minimizeOnExit": "Minimize on exit",
   "autoLaunch": "Auto launch",
   "silentLaunch": "Silent launch",
   "silentLaunchDesc": "Silent launch starts without showing the window.",
