@@ -66,11 +66,11 @@ void main() {
     await pump(tester);
 
     expect(find.text('Original repository'), findsOneWidget);
-    expect(find.text('github.com/chen08209/FlClash'), findsOneWidget);
+    expect(find.text('github.com/pluralplay/FlClashX'), findsOneWidget);
     expect(find.text('github.com/legiz-ru/Prizrak-Core'), findsOneWidget);
-    expect(find.text('t.me/flclashx'), findsOneWidget);
+    expect(find.text('t.me/flclashx'), findsNothing);
     expect(find.text('Fork author'), findsOneWidget);
-    expect(find.text('pluralplay'), findsOneWidget);
+    expect(find.text('qann1st'), findsOneWidget);
     expect(find.byType(CircleAvatar), findsOneWidget);
     expect(find.text('x_kit_'), findsNothing);
     expect(tester.takeException(), isNull);
