@@ -280,6 +280,22 @@ enum UpdateInstallResult {
   installFailed,
 }
 
+/// The manifest a check reads. A panel may name its own with the
+/// `flclashx-update` header, and a prerelease build follows the
+/// `flclashx-update-pre` channel when its panel publishes one; without a
+/// header the built-in bucket answers.
+@visibleForTesting
+String manifestFor({
+  required String version,
+  String? manifestUrl,
+  String? preManifestUrl,
+}) {
+  final named = version.contains('-')
+      ? preManifestUrl ?? manifestUrl
+      : manifestUrl;
+  return named == null || named.isEmpty ? updateManifestUrl : named;
+}
+
 /// Checks the manifest and downloads and starts the platform installer.
 class AppUpdateService {
   AppUpdateService._();
@@ -318,17 +334,30 @@ class AppUpdateService {
 
   /// Null when the manifest is unreachable, the build is current, or this
   /// platform has nothing to install.
-  static Future<AppUpdate?> check({String? currentVersion}) async {
-    if (!canSelfInstall || updateManifestUrl.isEmpty) return null;
+  ///
+  /// [manifestUrl] and [preManifestUrl] are the subscription's own channels,
+  /// when its panel publishes one; see [manifestFor].
+  static Future<AppUpdate?> check({
+    String? currentVersion,
+    String? manifestUrl,
+    String? preManifestUrl,
+  }) async {
+    if (!canSelfInstall) return null;
     final version =
         currentVersion ??
         currentVersionOverride ??
         (await PackageInfo.fromPlatform()).version;
+    final source = manifestFor(
+      version: version,
+      manifestUrl: manifestUrl,
+      preManifestUrl: preManifestUrl,
+    );
+    if (source.isEmpty) return null;
     final dio = httpClient ?? Dio();
     final ownsClient = httpClient == null;
     try {
       final response = await dio.get<String>(
-        updateManifestUrl,
+        source,
         options: Options(
           responseType: ResponseType.plain,
           receiveTimeout: const Duration(seconds: 20),

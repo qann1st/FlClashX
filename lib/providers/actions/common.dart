@@ -87,11 +87,21 @@ class CommonAction extends _$CommonAction {
     }
   }
 
+  /// The update manifest of the active subscription, when its panel names one
+  /// with `flclashx-update` (`flclashx-update-pre` for prerelease builds).
+  Future<AppUpdate?> checkUpdate() {
+    final headers = ref.read(currentProfileProvider)?.headers;
+    return AppUpdateService.check(
+      manifestUrl: headers?.updateManifestUrl,
+      preManifestUrl: headers?.preUpdateManifestUrl,
+    );
+  }
+
   Future<bool> autoCheckUpdate() async {
     if (!ref.read(appSettingProvider).autoCheckUpdate) return false;
     final AppUpdate? update;
     try {
-      update = await AppUpdateService.check();
+      update = await checkUpdate();
     } catch (error) {
       commonPrint.log(
         'checkForUpdate failed: ${compactError(error)}',

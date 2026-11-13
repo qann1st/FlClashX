@@ -51,6 +51,7 @@ FlClashX читает HTTP-заголовки ответа, которым па�
 | `flclashx-serverinfo` | имя группы прокси, текст или base64 | Группа, чей выбранный сервер показывается на расширенном дашборде |
 | `flclashx-buyplan` | `URL` или `URL,<дней>` | Кнопка «Продлить подписку». С числом появляется, когда до конца подписки осталось не больше указанных дней |
 | `flclashx-buytraffic` | `URL` или `URL,<процентов>` | Кнопка докупки трафика. С числом появляется, когда осталось не больше указанного процента трафика |
+| `flclashx-update` | `https://…/update.json` | Манифест обновлений этой подписки вместо встроенного адреса; `flclashx-update-pre` — канал для пре-релизных сборок. Только `https` |
 | `flclashx-widgets` | имена карточек через запятую | Набор и порядок карточек обычного дашборда. На расширенный дашборд и десктопную раскладку не влияет |
 | `flclashx-background` | `URL` или `URL,<видимость 1–100>` | Картинка под всеми полноэкранными страницами, приглушённая цветом страницы. Без числа видно 8 %. Качается один раз в дисковый кэш |
 | `flclashx-view` | `ключ:значение;...` | Внешний вид, см. ниже |
@@ -116,6 +117,7 @@ flclashx-servicelogo: https://cdn.myvpn.example/logo.svg
 flclashx-serverinfo: Auto
 flclashx-buyplan: https://my.myvpn.example/renew,7
 flclashx-buytraffic: https://my.myvpn.example/traffic,10
+flclashx-update: https://my.myvpn.example/update.json
 flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
 flclashx-background: https://cdn.myvpn.example/bg.jpg,25
 flclashx-view: app.board:extended;app.color:#FF5733;app.style:soft;app.black:false;app.navbar:docked;app.tabs:fade;app.glass:standard;proxies.type:tab;proxies.sort:delay;proxies.card:compact
@@ -180,6 +182,10 @@ support-url: https://t.me/myvpn_support
   {
     "key": "flclashx-buytraffic",
     "value": "https://shop.example.com/#/buy-extra-traffic,10"
+  },
+  {
+    "key": "flclashx-update",
+    "value": "https://panel.example/update.json"
   },
   {
     "key": "flclashx-buyplan",

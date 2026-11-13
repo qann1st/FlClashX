@@ -30,6 +30,39 @@ void main() {
     });
   });
 
+  group('manifestFor', () {
+    test('prefers the channels the subscription names', () {
+      expect(
+        manifestFor(
+          version: '0.6.0',
+          manifestUrl: 'https://panel.example/update.json',
+          preManifestUrl: 'https://panel.example/pre.json',
+        ),
+        'https://panel.example/update.json',
+      );
+      expect(
+        manifestFor(
+          version: '0.6.1-pre.2',
+          manifestUrl: 'https://panel.example/update.json',
+          preManifestUrl: 'https://panel.example/pre.json',
+        ),
+        'https://panel.example/pre.json',
+      );
+    });
+
+    test('falls back to the built-in manifest', () {
+      expect(
+        manifestFor(
+          version: '0.6.1-pre.2',
+          manifestUrl: 'https://panel.example/update.json',
+        ),
+        'https://panel.example/update.json',
+      );
+      expect(manifestFor(version: '0.6.0'), updateManifestUrl);
+      expect(manifestFor(version: '0.6.0', manifestUrl: ''), updateManifestUrl);
+    });
+  });
+
   group('parseUpdateManifest', () {
     AppUpdate? parse(
       Map<String, dynamic> json, {

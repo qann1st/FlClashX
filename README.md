@@ -136,6 +136,24 @@ flclashx-buytraffic: https://my.myvpn.example/traffic,10
 </details>
 
 <details>
+<summary><strong>flclashx-update, flclashx-update-pre</strong></summary>
+
+Манифест обновлений этой подписки.
+
+| Заголовок | Формат | Что делает |
+|---|---|---|
+| `flclashx-update` | `https://…/update.json` | Версия, заметки, ссылки и контрольные суммы обновления берутся отсюда, а не из встроенного адреса |
+| `flclashx-update-pre` | `https://…/pre.json` | Канал пре-релизов: сборка с `-pre` в версии сначала пробует его, потом обычный манифест |
+
+Только `https`: по манифесту приложение скачивает и запускает установщик.
+
+```http
+flclashx-update: https://my.myvpn.example/update.json
+flclashx-update-pre: https://my.myvpn.example/update-pre.json
+```
+</details>
+
+<details>
 <summary><strong>flclashx-widgets</strong></summary>
 
 `flclashx-widgets` задаёт набор и порядок карточек обычного дашборда. На расширенный дашборд и десктопную раскладку не влияет. Регистр имён не важен.
@@ -263,6 +281,7 @@ flclashx-servicelogo: https://cdn.myvpn.example/logo.svg
 flclashx-serverinfo: Auto
 flclashx-buyplan: https://my.myvpn.example/renew,7
 flclashx-buytraffic: https://my.myvpn.example/traffic,10
+flclashx-update: https://my.myvpn.example/update.json
 flclashx-widgets: currentOutbound,announcement,profiles,proxyGroups,networkSpeed
 flclashx-background: https://cdn.myvpn.example/bg.jpg,25
 flclashx-view: app.board:extended;app.color:#FF5733;app.style:soft;app.black:false;app.navbar:docked;app.tabs:fade;app.glass:standard;proxies.type:tab;proxies.sort:delay;proxies.card:compact
@@ -332,6 +351,10 @@ support-url: https://t.me/myvpn_support
   {
     "key": "flclashx-buyplan",
     "value": "https://shop.example.com/#/buy-plan,7"
+  },
+  {
+    "key": "flclashx-update",
+    "value": "https://panel.example/update.json"
   }
 ]
 ```
@@ -424,7 +447,8 @@ proxies:
 Приложение не обращается к GitHub за обновлениями: версия, файлы и контрольные суммы берутся из
 вашего S3-хранилища. Адрес манифеста по умолчанию — `https://elysium.s3.cloud.ru/update.json`;
 переопределяется на сборке через `--dart-define=FLCLASHX_UPDATE_MANIFEST_URL=…` (в CI — переменная
-окружения с тем же именем, `setup.dart` кладёт её в `env.json`).
+окружения с тем же именем, `setup.dart` кладёт её в `env.json`), а подписка может назвать свой
+манифест заголовком `flclashx-update` — тогда используется он, пока профиль активен.
 
 Формат `update.json`:
 

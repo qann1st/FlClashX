@@ -136,6 +136,24 @@ flclashx-buytraffic: https://my.myvpn.example/traffic,10
 </details>
 
 <details>
+<summary><strong>flclashx-update, flclashx-update-pre</strong></summary>
+
+The update manifest of this subscription.
+
+| Header | Format | Effect |
+|---|---|---|
+| `flclashx-update` | `https://…/update.json` | Version, notes, links and checksums come from here instead of the built-in address |
+| `flclashx-update-pre` | `https://…/pre.json` | Prerelease channel: a build with `-pre` in its version tries it first, then the regular manifest |
+
+HTTPS only: the app downloads and runs the installer the manifest points at.
+
+```http
+flclashx-update: https://my.myvpn.example/update.json
+flclashx-update-pre: https://my.myvpn.example/update-pre.json
+```
+</details>
+
+<details>
 <summary><strong>flclashx-widgets</strong></summary>
 
 `flclashx-widgets` sets the cards of the standard dashboard and their order. It does not affect the extended dashboard or the desktop layout. Names are case-insensitive.
@@ -299,6 +317,10 @@ The same set in the form panel settings accept (Remnawave and alike): a `headers
   {
     "key": "flclashx-buyplan",
     "value": "https://shop.example.com/#/buy-plan,7"
+  },
+  {
+    "key": "flclashx-update",
+    "value": "https://panel.example/update.json"
   }
 ]
 ```

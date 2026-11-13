@@ -10,6 +10,7 @@
 | `flclashx-serverinfo` | имя группы прокси, текст или base64 | Группа, чей выбранный сервер показывается на панели сервера расширенного дашборда с флагом и IP |
 | `flclashx-buyplan` | `URL` или `URL,<дней>` | Кнопка «Продлить подписку». С числом появляется, когда до конца подписки осталось не больше указанных дней. Тап по уведомлению об окончании ведёт сюда |
 | `flclashx-buytraffic` | `URL` или `URL,<процентов>` | Кнопка докупки трафика. С числом появляется, когда осталось не больше указанного процента трафика |
+| `flclashx-update` | `https://…/update.json` | Манифест обновлений этой подписки вместо встроенного адреса. `flclashx-update-pre` — канал для пре-релизных сборок |
 | `flclashx-widgets` | имена карточек через запятую | Набор и порядок карточек обычного дашборда. На расширенный дашборд и десктопную раскладку не влияет |
 | `flclashx-background` | `URL` или `URL,<видимость 1–100>` | Картинка под всеми полноэкранными страницами, приглушённая цветом страницы. Без числа видно 8 %. Качается один раз в дисковый кэш |
 | `flclashx-view` | `ключ:значение;...` | Внешний вид приложения и вкладки прокси |
@@ -76,6 +77,22 @@
 
 ```json
 { "key": "flclashx-buytraffic", "value": "https://shop.example.com/#/buy-extra-traffic,10" }
+```
+
+## `flclashx-update`
+
+Манифест обновлений этой подписки: версия, заметки, ссылки на файлы и их
+контрольные суммы берутся из него, а не из встроенного адреса. Встроенный
+остаётся запасным и используется, когда заголовка нет.
+
+`flclashx-update-pre` — канал для пре-релизных сборок: если в версии приложения
+есть `-pre`, оно сначала пробует его и только потом обычный манифест.
+
+Только `https`: по манифесту приложение скачивает и запускает установщик,
+поэтому `http`-адрес игнорируется.
+
+```json
+{ "key": "flclashx-update", "value": "https://panel.example/update.json" }
 ```
 
 ## `flclashx-widgets`
@@ -227,6 +244,7 @@
   { "key": "flclashx-serverinfo", "value": "SERVERS" },
   { "key": "flclashx-special", "value": "noglobal,androidsecure,denywidgets" },
   { "key": "flclashx-buytraffic", "value": "https://shop.example.com/#/buy-extra-traffic,10" },
+  { "key": "flclashx-update", "value": "https://panel.example/update.json" },
   { "key": "flclashx-buyplan", "value": "https://shop.example.com/#/buy-plan,7" }
 ]
 ```
@@ -244,5 +262,6 @@ flclashx-closeconnections: related
 flclashx-serverinfo: SERVERS
 flclashx-special: noglobal,androidsecure,denywidgets
 flclashx-buytraffic: https://shop.example.com/#/buy-extra-traffic,10
+flclashx-update: https://panel.example/update.json
 flclashx-buyplan: https://shop.example.com/#/buy-plan,7
 ```
