@@ -145,6 +145,10 @@ const defaultExternalUi = 'ui';
 const defaultExternalUiUrl =
     'https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip';
 
+/// The bundled dashboard unpacks below [defaultExternalUi], so an older
+/// MetaCubeXD install that used the directory itself is never served.
+const defaultExternalUiName = 'zashboard';
+
 const shareLinkSchemes = {
   'hysteria',
   'hysteria2',

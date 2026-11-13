@@ -198,7 +198,7 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
     // Keep the bundled Zashboard below its own directory.  An earlier
     // MetaCubeXD install used `ui` itself, which mihomo would otherwise see
     // as an already downloaded dashboard and leave in place.
-    rawConfig['external-ui-name'] = 'zashboard';
+    rawConfig['external-ui-name'] = defaultExternalUiName;
   }
   rawConfig['external-ui'] = externalUi;
   rawConfig['external-ui-name'] = _localPath(rawConfig['external-ui-name']);

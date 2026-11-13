@@ -388,7 +388,7 @@ void main() {
       );
       expect(dropped['external-ui'], defaultExternalUi, reason: path);
       expect(dropped['external-ui-url'], defaultExternalUiUrl, reason: path);
-      expect(dropped['external-ui-name'], '', reason: path);
+      expect(dropped['external-ui-name'], defaultExternalUiName, reason: path);
     }
   });
 
@@ -449,6 +449,7 @@ void main() {
     );
     expect(open['external-ui'], defaultExternalUi);
     expect(open['external-ui-url'], defaultExternalUiUrl);
+    expect(open['external-ui-name'], defaultExternalUiName);
 
     final closed = loadYaml(
       (await makeRealProfileTask(state(const PatchClashConfig()))).yaml,
