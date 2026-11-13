@@ -357,14 +357,10 @@ jobs:
 
   build:
     # Releases publish where the release links point: the public repository.
-    # A dispatch may name the targets it needs, so one stale artifact can be
-    # rebuilt without repeating the whole matrix.
     if: >-
       github.repository == 'qann1st/FlClashX' && (
         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-        (github.event_name == 'workflow_dispatch' && inputs.build_platforms != '' &&
-         contains(format(',{0},', inputs.build_platforms),
-                  format(',{0}{1},', matrix.platform, matrix.arch && format('-{0}', matrix.arch) || '')))
+        (github.event_name == 'workflow_dispatch' && inputs.build_platforms != '')
       )
     runs-on: ${{ matrix.os }}
     # Optional Apple secrets: without them the macOS DMG ships ad-hoc signed, as
@@ -549,6 +545,13 @@ jobs:
           security find-identity -v -p codesigning "$keychain"
 
       - name: Setup
+        # A dispatch may name the targets it needs, so one stale artifact can
+        # be rebuilt without repeating the whole matrix. `matrix` is not a
+        # named value a job-level `if` understands, only a step one.
+        if: >-
+          !inputs.build_platforms ||
+          contains(format(',{0},', inputs.build_platforms),
+                   format(',{0}{1},', matrix.platform, matrix.arch && format('-{0}', matrix.arch) || ''))
         env:
           ANDROID_NDK_HOME: ${{ steps.build-ndk.outputs.ndk-path }}
           # Signing needs the certificate the step above imported.
@@ -556,7 +559,12 @@ jobs:
         run: dart setup.dart ${{ matrix.platform }} ${{ env.IS_STABLE == 'true' && '--env stable' || '' }} -v
 
       - name: Notarize macOS
-        if: startsWith(matrix.platform,'macos') && env.IS_STABLE == 'true' && env.APPLE_API_KEY_BASE64 != '' && env.APPLE_DEVELOPER_ID != ''
+        if: >-
+          startsWith(matrix.platform,'macos') && env.IS_STABLE == 'true' &&
+          env.APPLE_API_KEY_BASE64 != '' && env.APPLE_DEVELOPER_ID != '' &&
+          (!inputs.build_platforms ||
+           contains(format(',{0},', inputs.build_platforms),
+                    format(',{0}{1},', matrix.platform, matrix.arch && format('-{0}', matrix.arch) || '')))
         run: |
           key="$RUNNER_TEMP/AuthKey_$APPLE_API_KEY_ID.p8"
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$key"
@@ -577,6 +585,10 @@ jobs:
           rm "$key"
 
       - name: Upload
+        if: >-
+          !inputs.build_platforms ||
+          contains(format(',{0},', inputs.build_platforms),
+                   format(',{0}{1},', matrix.platform, matrix.arch && format('-{0}', matrix.arch) || ''))
         uses: actions/upload-artifact@v6
         with:
           name: artifact-${{ matrix.platform }}${{ matrix.arch && format('-{0}', matrix.arch) }}
