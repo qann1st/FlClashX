@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.5.13 (2026-11-13)
+
+**Features**
+
+- **upstream** Adopt 0.5.1 without updater (1ed2f54)
+- **upstream** Adopt 0.5.0 (14ee768)
+
+**Bug Fixes**
+
+- **settings** Preserve preferences during update (43a7a0c)
+
 ## v0.5.12 (2026-11-12)
 
 **Features**

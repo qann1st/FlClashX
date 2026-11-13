@@ -2,6 +2,39 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.5.13",
+      "tag": "v0.5.13",
+      "date": "2026-11-13",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "1ed2f54",
+              "scope": "upstream",
+              "text": "Adopt 0.5.1 without updater"
+            },
+            {
+              "id": "14ee768",
+              "scope": "upstream",
+              "text": "Adopt 0.5.0"
+            }
+          ]
+        },
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "43a7a0c",
+              "scope": "settings",
+              "text": "Preserve preferences during update"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.5.12",
       "tag": "v0.5.12",
       "date": "2026-11-12",
