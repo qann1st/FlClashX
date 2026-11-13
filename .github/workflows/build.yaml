@@ -640,6 +640,28 @@ jobs:
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ github.token }}
 
+      # A platform job GitHub cancelled for want of a runner leaves no
+      # artifact, and the release would otherwise ship without it.
+      - name: Check every platform the release carries
+        shell: bash
+        run: |
+          missing=()
+          for file in \
+            FlClashX-android-arm64-v8a.apk FlClashX-android-armeabi-v7a.apk \
+            FlClashX-android-universal.apk FlClashX-android-x86_64.apk \
+            FlClashX-linux-amd64.AppImage FlClashX-linux-amd64.deb FlClashX-linux-amd64.rpm \
+            FlClashX-linux-arm64.AppImage FlClashX-linux-arm64.deb FlClashX-linux-arm64.rpm \
+            FlClashX-macos-amd64.dmg FlClashX-macos-arm64.dmg \
+            FlClashX-windows-amd64-setup.exe FlClashX-windows-amd64.zip \
+            FlClashX-windows-arm64-setup.exe FlClashX-windows-arm64.zip; do
+            [ -f "dist/$file" ] || missing+=("$file")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo 'The release is missing:' >&2
+            printf '  %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
