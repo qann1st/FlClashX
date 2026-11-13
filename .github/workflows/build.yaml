@@ -10,6 +10,10 @@ on:
         description: 'Publish artifacts from an existing build run without rebuilding them'
         type: boolean
         default: false
+      checks_only:
+        description: 'Run the check jobs only, skipping the desktop and release builds'
+        type: boolean
+        default: false
       source_run_id:
         description: 'GitHub Actions run ID that owns the build artifacts'
         type: string
@@ -93,7 +97,11 @@ jobs:
 
       - name: Verify changelog
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-        run: dart run tool/changelog.dart verify
+        run: |
+          # A force-moved tag leaves an older run with the tag it was created
+          # with, and the check is about the repository, not that snapshot.
+          git fetch --force --tags origin '+refs/tags/*:refs/tags/*' || true
+          dart run tool/changelog.dart verify
 
       - name: Run tests
         run: dart run tool/test.dart -- --reporter expanded --coverage
@@ -128,7 +136,7 @@ jobs:
 
   desktop:
     name: Desktop ${{ matrix.platform }}
-    if: inputs.upload_only != true && (github.event_name == 'workflow_dispatch' || !github.event.repository.private) && !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: inputs.upload_only != true && inputs.checks_only != true && (github.event_name == 'workflow_dispatch' || !github.event.repository.private) && !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -139,7 +147,7 @@ jobs:
           - platform: windows
             os: windows-2022
           - platform: macos
-            os: macos-15
+            os: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -375,10 +383,10 @@ jobs:
           # right-click Open, while the in-app updater replaces the bundle with
           # no prompt (the DMG it downloads never gets the quarantine flag).
           - platform: macos
-            os: macos-15-intel
+            os: macos-26-intel
             arch: amd64
           - platform: macos
-            os: macos-15
+            os: macos-26
             arch: arm64
           - platform: windows
             os: windows-11-arm
