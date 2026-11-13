@@ -5,6 +5,19 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      upload_only:
+        description: 'Publish artifacts from an existing build run without rebuilding them'
+        type: boolean
+        default: false
+      source_run_id:
+        description: 'GitHub Actions run ID that owns the build artifacts'
+        type: string
+        required: false
+      release_tag:
+        description: 'Release tag to publish, for example v0.5.13'
+        type: string
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -26,7 +39,9 @@ jobs:
     name: Dart
     # A private copy pays for its Actions minutes, so it runs the checks only when
     # started by hand.
-    if: &checks github.event_name == 'workflow_dispatch' || !github.event.repository.private
+    if: &checks >-
+      inputs.upload_only != true &&
+      (github.event_name == 'workflow_dispatch' || !github.event.repository.private)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -555,15 +570,21 @@ jobs:
     # The checks are skipped where the repository is private, so a skipped one
     # passes; one that failed or was cancelled holds the release back.
     if: >-
-      always() && needs.build.result == 'success' &&
-      !contains(needs.*.result, 'failure') &&
-      !contains(needs.*.result, 'cancelled')
+      always() && (
+        (inputs.upload_only == true && inputs.source_run_id != '' && inputs.release_tag != '') ||
+        (needs.build.result == 'success' &&
+         !contains(needs.*.result, 'failure') &&
+         !contains(needs.*.result, 'cancelled'))
+      )
     runs-on: ubuntu-24.04
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ inputs.upload_only == true && inputs.release_tag || github.ref }}
 
       - name: Download
         uses: actions/download-artifact@v7
@@ -571,6 +592,8 @@ jobs:
           path: ./dist/
           pattern: artifact-*
           merge-multiple: true
+          run-id: ${{ inputs.upload_only == true && inputs.source_run_id || '' }}
+          github-token: ${{ github.token }}
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -590,7 +613,7 @@ jobs:
         shell: bash
         env:
           IS_STABLE: ${{ env.IS_STABLE }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
         run: |
           target=()
           if [[ "$IS_STABLE" == 'true' ]]; then
@@ -602,7 +625,7 @@ jobs:
 
       - name: Patch release.md
         run: |
-          version=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          version=$(echo "${{ env.RELEASE_TAG }}" | sed 's/^v//')
           if [ "${{ env.IS_STABLE }}" == "true" ]; then
             sed "s|VERSION|$version|g" ./.github/release_template.md >> release.md
           else
@@ -614,7 +637,7 @@ jobs:
       - name: Build the Arch package
         if: ${{ env.IS_STABLE == 'true' }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           work="$RUNNER_TEMP/archpkg"
           rm -rf "$work"
           mkdir -p "$work"
@@ -647,7 +670,7 @@ jobs:
       - name: Generate the update manifest
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${RELEASE_TAG#v}"
           grep -E '^- ' release.md | head -n 9 > notes.txt || true
           dart run tool/update_manifest.dart \
             --dist ./dist \
@@ -661,6 +684,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: ./dist/*
           body_path: './release.md'
           prerelease: ${{ env.IS_STABLE != 'true' }}
