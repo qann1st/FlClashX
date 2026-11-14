@@ -36,8 +36,16 @@ class Bootstrap {
   }
 
   BootDecision _bootDecision = const BootDecision();
+  bool _forceWindowVisibleAfterUpdate = false;
 
-  Future<ProviderContainer> init(int version) async {
+  Future<ProviderContainer> init(
+    int version, {
+    bool forceWindowVisibleAfterUpdate = false,
+  }) async {
+    // The installer starts a newly installed build with this flag.  It must
+    // take precedence over the user's normal silent-start preference once,
+    // without changing that preference for later launches.
+    _forceWindowVisibleAfterUpdate = forceWindowVisibleAfterUpdate;
     globalState.appEnv = const String.fromEnvironment(
       'APP_ENV',
       defaultValue: 'pre',
@@ -182,7 +190,8 @@ class Bootstrap {
       autoLaunch?.updateStatus(_container.read(appSettingProvider).autoLaunch),
     );
     // A menu bar app waits in the status item for a click.
-    if (!_container.read(appSettingProvider).silentLaunch &&
+    if ((_forceWindowVisibleAfterUpdate ||
+            !_container.read(appSettingProvider).silentLaunch) &&
         !(window?.isMenuBarMode ?? false)) {
       unawaited(window?.show());
     } else {

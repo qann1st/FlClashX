@@ -43,7 +43,12 @@ void main(List<String> args) {
       try {
         await RustLib.init();
         final version = await system.init();
-        final container = await bootstrap.init(version);
+        final container = await bootstrap.init(
+          version,
+          forceWindowVisibleAfterUpdate: args.contains(
+            forceWindowVisibleAfterUpdateArgument,
+          ),
+        );
         await FlClashHttpOverrides.trustCoreRoots();
         HttpOverrides.global = FlClashHttpOverrides(container);
         request.attach(container.read);

@@ -23,6 +23,10 @@ const updateManifestUrl = String.fromEnvironment(
   defaultValue: 'https://elysium.s3.cloud.ru/update.json',
 );
 
+/// Passed by the desktop installer for its first launch after an installation
+/// or update. It overrides only that launch's silent-start setting.
+const forceWindowVisibleAfterUpdateArgument = '--show-after-update';
+
 /// The manifest is a JSON object published next to the assets:
 ///
 /// ```json

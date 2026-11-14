@@ -23,6 +23,10 @@ ChangesAssociations=yes
 UsePreviousAppDir=yes
 UsePreviousGroup=yes
 UsePreviousTasks=yes
+; Select the closest bundled language from Windows without displaying a
+; language picker on every in-app update.
+LanguageDetectionMethod=uilanguage
+ShowLanguageDialog=no
 
 [Code]
 const
@@ -351,4 +355,4 @@ Name: "{autoprograms}\{{DISPLAY_NAME}}"; Filename: "{app}\{{EXECUTABLE_NAME}}"
 Name: "{autodesktop}\{{DISPLAY_NAME}}"; Filename: "{app}\{{EXECUTABLE_NAME}}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{{EXECUTABLE_NAME}}"; Description: "{cm:LaunchProgram,{{DISPLAY_NAME}}}"; Flags: {{RUN_FLAGS}} nowait postinstall skipifsilent
+Filename: "{app}\{{EXECUTABLE_NAME}}"; Parameters: "--show-after-update"; Description: "{cm:LaunchProgram,{{DISPLAY_NAME}}}"; Flags: {{RUN_FLAGS}} nowait postinstall skipifsilent

@@ -193,6 +193,16 @@ hooks:
       expect(script, isNot(contains('{{')));
     });
 
+    test('the installer detects Windows language without a picker', () {
+      final script = File(
+        'windows/packaging/exe/inno_setup.iss',
+      ).readAsStringSync();
+
+      expect(script, contains('LanguageDetectionMethod=uilanguage'));
+      expect(script, contains('ShowLanguageDialog=no'));
+      expect(script, contains('Parameters: "--show-after-update"'));
+    });
+
     test('the Windows installer offers Chinese after Russian', () {
       final langs = RegExp(r'- lang: (\w+)')
           .allMatches(
