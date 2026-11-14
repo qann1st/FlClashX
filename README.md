@@ -519,6 +519,8 @@ dart run tool/update_manifest.dart \
 
 Релизный workflow собирает `update.json` сам (включая `macos-arm64` и `macos-amd64`, если DMG
 собраны) и прикладывает его к GitHub-релизу — остаётся только загрузить файлы и манифест в бакет.
+Также он создаёт `manifest.json`: полный список ассетов, их S3-ссылок и SHA-256, например
+`https://elysium.s3.cloud.ru/releases/<version>/<file>`.
 
 Адрес манифеста зашит в сборку (`FLCLASHX_UPDATE_MANIFEST_URL`), поэтому меняйте содержимое по тому же
 пути, а версии раскладывайте подпапками (как в примере выше).

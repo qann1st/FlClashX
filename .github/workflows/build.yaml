@@ -770,6 +770,19 @@ jobs:
             --out ./dist/update.json
           cat ./dist/update.json
 
+      # A complete S3 inventory for manual downloads.  It intentionally does
+      # not replace update.json, which is the smaller manifest the app reads.
+      - name: Generate the release asset manifest
+        shell: bash
+        run: |
+          version="${RELEASE_TAG#v}"
+          dart run tool/release_manifest.dart \
+            --dist ./dist \
+            --version "$version" \
+            --base-url "https://elysium.s3.cloud.ru/releases/$version" \
+            --out ./dist/manifest.json
+          cat ./dist/manifest.json
+
       - name: Release
         uses: softprops/action-gh-release@v3
         with:
