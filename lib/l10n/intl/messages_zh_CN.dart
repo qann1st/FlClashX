@@ -220,16 +220,13 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m93(transport) => "${transport} 请求头";
 
-  static String m94(received, total, percent) =>
-      "${received} / ${total} · ${percent}%";
+  static String m94(label) => "${label}必须为URL";
 
-  static String m95(label) => "${label}必须为URL";
+  static String m95(appName) => "你没有允许 ${appName} 建立 VPN 连接";
 
-  static String m96(appName) => "你没有允许 ${appName} 建立 VPN 连接";
+  static String m96(count) => "${count} 年前";
 
   static String m97(count) => "${count} 年前";
-
-  static String m98(count) => "${count} 年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -264,10 +261,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "add": MessageLookupByLibrary.simpleMessage("添加"),
     "addCustomProxy": MessageLookupByLibrary.simpleMessage("添加代理"),
     "addFilters": MessageLookupByLibrary.simpleMessage("添加筛选"),
+    "addFromClipboard": MessageLookupByLibrary.simpleMessage("从剪贴板添加"),
     "addNodes": MessageLookupByLibrary.simpleMessage("添加节点"),
     "addOverrideEntry": MessageLookupByLibrary.simpleMessage("添加覆写项"),
     "addProfile": MessageLookupByLibrary.simpleMessage("添加配置"),
-    "addProfileFromClipboard": MessageLookupByLibrary.simpleMessage("从剪贴板添加配置"),
     "addProxyChain": MessageLookupByLibrary.simpleMessage("添加代理链"),
     "addProxyChainHop": MessageLookupByLibrary.simpleMessage("添加中转"),
     "addProxyGroup": MessageLookupByLibrary.simpleMessage("添加策略组"),
@@ -332,7 +329,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "autoUpdate": MessageLookupByLibrary.simpleMessage("自动更新"),
     "autoUpdateInterval": MessageLookupByLibrary.simpleMessage("自动更新间隔"),
     "back": MessageLookupByLibrary.simpleMessage("返回"),
-    "backgroundBlur": MessageLookupByLibrary.simpleMessage("背景模糊"),
     "backup": MessageLookupByLibrary.simpleMessage("备份"),
     "backupAndRestore": MessageLookupByLibrary.simpleMessage("备份与恢复"),
     "backupFromNewerVersion": MessageLookupByLibrary.simpleMessage(
@@ -343,7 +339,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "basicStrategy": MessageLookupByLibrary.simpleMessage("基础策略"),
     "batchAdd": MessageLookupByLibrary.simpleMessage("批量添加"),
     "batchImport": MessageLookupByLibrary.simpleMessage("批量导入"),
-    "batchLinkInputTip": MessageLookupByLibrary.simpleMessage("每行一个链接"),
     "batchListInputTip": MessageLookupByLibrary.simpleMessage("每行一项，也可用逗号分隔"),
     "batchMapInputTip": MessageLookupByLibrary.simpleMessage("每行一条，键和值之间用空格分隔"),
     "batchPreviewTip": m3,
@@ -442,6 +437,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "coreBlockedBySmartAppControlTip": MessageLookupByLibrary.simpleMessage(
       "Windows 智能应用控制拦截了未签名的 FlClashCore.exe。请打开 Windows 安全中心 → 应用和浏览器控制 → 智能应用控制设置，选择「关闭」后重新启动 FlClashX。智能应用控制关闭后无法再开启，除非重装 Windows。",
     ),
+    "coreRestartByCommandFailed": MessageLookupByLibrary.simpleMessage(
+      "命令未能重启核心",
+    ),
+    "coreRestartedByCommand": MessageLookupByLibrary.simpleMessage("已通过命令重启核心"),
     "coreStatus": MessageLookupByLibrary.simpleMessage("核心状态"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("检测到崩溃"),
     "crashDetectedTip": m6,
@@ -723,7 +722,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "导入会替换此配置现有的策略组、规则和设置",
     ),
     "importFile": MessageLookupByLibrary.simpleMessage("通过文件导入"),
-    "importFromLink": MessageLookupByLibrary.simpleMessage("从链接导入"),
     "importUrl": MessageLookupByLibrary.simpleMessage("通过URL导入"),
     "inbound": MessageLookupByLibrary.simpleMessage("入站"),
     "includeInterface": MessageLookupByLibrary.simpleMessage("包含网卡"),
@@ -1057,6 +1055,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "profileAutoUpdateIntervalNullValidationDesc":
         MessageLookupByLibrary.simpleMessage("请输入自动更新间隔时间"),
     "profileDaysFigure": m63,
+    "profileDetails": MessageLookupByLibrary.simpleMessage("详情"),
     "profileExpired": MessageLookupByLibrary.simpleMessage("已到期"),
     "profileHasUpdate": MessageLookupByLibrary.simpleMessage(
       "配置文件已经修改，是否关闭自动更新？",
@@ -1395,9 +1394,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "通知栏显示停止按钮",
     ),
     "showPassword": MessageLookupByLibrary.simpleMessage("显示密码"),
-    "sidebarBlurDesc": MessageLookupByLibrary.simpleMessage(
-      "背景模糊会让侧边栏透出窗口后方的桌面。",
-    ),
     "silentLaunch": MessageLookupByLibrary.simpleMessage("静默启动"),
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage("静默启动时不显示窗口。"),
     "singleAdd": MessageLookupByLibrary.simpleMessage("单条添加"),
@@ -1542,7 +1538,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "unpinWindow": MessageLookupByLibrary.simpleMessage("取消置顶"),
     "update": MessageLookupByLibrary.simpleMessage("更新"),
     "updateDownloadFailed": MessageLookupByLibrary.simpleMessage("无法下载更新"),
-    "updateDownloadProgress": m94,
     "updateErrorBusy": MessageLookupByLibrary.simpleMessage("请等待连接完成启动或停止。"),
     "updateErrorChecksum": MessageLookupByLibrary.simpleMessage(
       "下载与版本校验和不符，已删除。",
@@ -1574,6 +1569,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "updateExiting": MessageLookupByLibrary.simpleMessage("正在退出以完成更新…"),
     "updateHandedOff": MessageLookupByLibrary.simpleMessage("请在打开的安装程序中完成更新。"),
+    "updateHide": MessageLookupByLibrary.simpleMessage("隐藏"),
     "updateInstall": MessageLookupByLibrary.simpleMessage("安装"),
     "updateInstallFailed": MessageLookupByLibrary.simpleMessage("无法自动安装更新"),
     "updateInstalling": MessageLookupByLibrary.simpleMessage("正在启动安装程序…"),
@@ -1592,7 +1588,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("上传"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage("上行带宽"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
-    "urlTip": m95,
+    "urlTip": m94,
     "useHosts": MessageLookupByLibrary.simpleMessage("使用Hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("使用系统Hosts"),
     "usedTraffic": MessageLookupByLibrary.simpleMessage("已用流量"),
@@ -1615,7 +1611,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "vpnEnableDesc": MessageLookupByLibrary.simpleMessage(
       "VPN 通过 VpnService 自动路由系统所有流量。",
     ),
-    "vpnPermissionNotGranted": m96,
+    "vpnPermissionNotGranted": m95,
     "vpnRestrictedByAdministrator": MessageLookupByLibrary.simpleMessage(
       "此设备的管理员限制了 VPN",
     ),
@@ -1626,8 +1622,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "写入系统会同时设置系统时钟，Android 上不生效。",
     ),
-    "yearsAgo": m97,
-    "yearsAgoShort": m98,
+    "yearsAgo": m96,
+    "yearsAgoShort": m97,
     "yes": MessageLookupByLibrary.simpleMessage("是"),
     "zhCN": MessageLookupByLibrary.simpleMessage("中文简体"),
   };

@@ -6,6 +6,8 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
+import 'package:fl_clash/views/dashboard/widgets/profile_detail.dart'
+    show showProfileDetailSheet;
 import 'package:fl_clash/views/profiles/custom/custom.dart';
 import 'package:fl_clash/views/profiles/extend/extend.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -105,7 +107,7 @@ class _ProfilesViewState extends ConsumerState<ProfilesView> {
           isLoading: isLoading,
           title: appLocalizations.profiles,
           iconActions: picker ? const [] : _buildActions(state.profiles),
-          actions: state.profiles.isEmpty || picker
+          actions: picker
               ? null
               : [
                   AddProfileMenu(
@@ -122,13 +124,11 @@ class _ProfilesViewState extends ConsumerState<ProfilesView> {
               label: appLocalizations.nullTip(appLocalizations.profiles),
               description: appLocalizations.nullProfileDesc,
               illustration: NullStatusIllustration.profile,
-              action: AddProfileMenu(
-                builder: (open) => TonalButton(
-                  size: TonalButtonSize.bar,
-                  glyph: AppGlyphs.addCircle,
-                  label: appLocalizations.addProfile,
-                  onPressed: open,
-                ),
+              action: TonalButton(
+                size: TonalButtonSize.bar,
+                glyph: AppGlyphs.addCircle,
+                label: appLocalizations.addProfile,
+                onPressed: () => addProfileByLink(context, ref),
               ),
             ),
             child: _ProfilesGrid(
@@ -329,7 +329,7 @@ class ProfileItem extends ConsumerWidget {
     final info = _subscriptionInfo;
     if (info != null && info.usage != null) {
       final used = info.upload + info.download;
-      return '${used.traffic.show} / ${info.total.traffic.show}';
+      return '${used.quota.show} / ${info.total.quota.show}';
     }
     final appLocalizations = context.appLocalizations;
     return switch (profile.type) {
@@ -442,6 +442,12 @@ class ProfileItem extends ConsumerWidget {
           onPressed: () {
             updateProfile(ref);
           },
+        ),
+      if (profile.id == groupValue)
+        CommonPopupMenuItem(
+          glyph: AppGlyphs.info,
+          label: appLocalizations.profileDetails,
+          onPressed: () => showProfileDetailSheet(context),
         ),
       if (!isCustom)
         CommonPopupMenuItem(

@@ -860,16 +860,6 @@ class AppLocalizations {
     return Intl.message('Dark', name: 'dark', desc: '', args: []);
   }
 
-  /// `Import from link`
-  String get importFromLink {
-    return Intl.message(
-      'Import from link',
-      name: 'importFromLink',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Send from phone`
   String get sendFromPhone {
     return Intl.message(
@@ -1656,6 +1646,11 @@ class AppLocalizations {
     return Intl.message('Sync', name: 'sync', desc: '', args: []);
   }
 
+  /// `Details`
+  String get profileDetails {
+    return Intl.message('Details', name: 'profileDetails', desc: '', args: []);
+  }
+
   /// `Hide from recent tasks`
   String get exclude {
     return Intl.message(
@@ -1791,26 +1786,6 @@ class AppLocalizations {
     );
   }
 
-  /// `Background blur`
-  String get backgroundBlur {
-    return Intl.message(
-      'Background blur',
-      name: 'backgroundBlur',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Background blur lets the desktop behind the window show through the sidebar.`
-  String get sidebarBlurDesc {
-    return Intl.message(
-      'Background blur lets the desktop behind the window show through the sidebar.',
-      name: 'sidebarBlurDesc',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Liquid Glass`
   String get liquidGlass {
     return Intl.message(
@@ -1906,11 +1881,11 @@ class AppLocalizations {
     );
   }
 
-  /// `Add profile from clipboard`
-  String get addProfileFromClipboard {
+  /// `Add from clipboard`
+  String get addFromClipboard {
     return Intl.message(
-      'Add profile from clipboard',
-      name: 'addProfileFromClipboard',
+      'Add from clipboard',
+      name: 'addFromClipboard',
       desc: '',
       args: [],
     );
@@ -3771,16 +3746,6 @@ class AppLocalizations {
     return Intl.message(
       'One URL per line',
       name: 'batchUrlInputTip',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `One link per line`
-  String get batchLinkInputTip {
-    return Intl.message(
-      'One link per line',
-      name: 'batchLinkInputTip',
       desc: '',
       args: [],
     );
@@ -8112,8 +8077,7 @@ class AppLocalizations {
   String customImportDroppedSubRules(num count, Object label) {
     return Intl.plural(
       count,
-      one:
-          '1 SUB-RULE rule was dropped, since custom profiles do not support sub-rules',
+      one: '1 SUB-RULE rule was dropped, since custom profiles do not support sub-rules',
       other:
           '$label SUB-RULE rules were dropped, since custom profiles do not support sub-rules',
       name: 'customImportDroppedSubRules',
@@ -8552,14 +8516,9 @@ class AppLocalizations {
     return Intl.message('Install', name: 'updateInstall', desc: '', args: []);
   }
 
-  /// `{received} of {total} · {percent}%`
-  String updateDownloadProgress(Object received, Object total, Object percent) {
-    return Intl.message(
-      '$received of $total · $percent%',
-      name: 'updateDownloadProgress',
-      desc: '',
-      args: [received, total, percent],
-    );
+  /// `Hide`
+  String get updateHide {
+    return Intl.message('Hide', name: 'updateHide', desc: '', args: []);
   }
 
   /// `Checking the download…`
@@ -8767,6 +8726,26 @@ class AppLocalizations {
     return Intl.message(
       'The update couldn\'t be installed.',
       name: 'updateErrorInstall',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Core restarted by a command`
+  String get coreRestartedByCommand {
+    return Intl.message(
+      'Core restarted by a command',
+      name: 'coreRestartedByCommand',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The command could not restart the core`
+  String get coreRestartByCommandFailed {
+    return Intl.message(
+      'The command could not restart the core',
+      name: 'coreRestartByCommandFailed',
       desc: '',
       args: [],
     );

@@ -256,18 +256,15 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m93(transport) => "Заголовки ${transport}";
 
-  static String m94(received, total, percent) =>
-      "${received} из ${total} · ${percent}%";
+  static String m94(label) => "Значение «${label}» должно быть URL";
 
-  static String m95(label) => "Значение «${label}» должно быть URL";
-
-  static String m96(appName) =>
+  static String m95(appName) =>
       "Вы не дали ${appName} разрешение на подключение VPN";
 
-  static String m97(count) =>
+  static String m96(count) =>
       "${Intl.plural(count, one: '${count} год назад', few: '${count} года назад', many: '${count} лет назад', other: '${count} года назад')}";
 
-  static String m98(count) =>
+  static String m97(count) =>
       "${Intl.plural(count, one: '${count} г. назад', few: '${count} г. назад', many: '${count} лет назад', other: '${count} г. назад')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -311,14 +308,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "add": MessageLookupByLibrary.simpleMessage("Добавить"),
     "addCustomProxy": MessageLookupByLibrary.simpleMessage("Добавить прокси"),
     "addFilters": MessageLookupByLibrary.simpleMessage("Добавить фильтры"),
+    "addFromClipboard": MessageLookupByLibrary.simpleMessage(
+      "Добавить из буфера",
+    ),
     "addNodes": MessageLookupByLibrary.simpleMessage("Добавить узлы"),
     "addOverrideEntry": MessageLookupByLibrary.simpleMessage(
       "Добавить параметр",
     ),
     "addProfile": MessageLookupByLibrary.simpleMessage("Добавить профиль"),
-    "addProfileFromClipboard": MessageLookupByLibrary.simpleMessage(
-      "Добавить профиль из буфера",
-    ),
     "addProxyChain": MessageLookupByLibrary.simpleMessage("Добавить цепочку"),
     "addProxyChainHop": MessageLookupByLibrary.simpleMessage("Добавить звено"),
     "addProxyGroup": MessageLookupByLibrary.simpleMessage(
@@ -419,7 +416,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Интервал автообновления",
     ),
     "back": MessageLookupByLibrary.simpleMessage("Назад"),
-    "backgroundBlur": MessageLookupByLibrary.simpleMessage("Размытие фона"),
     "backup": MessageLookupByLibrary.simpleMessage("Резервное копирование"),
     "backupAndRestore": MessageLookupByLibrary.simpleMessage(
       "Резервное копирование и восстановление",
@@ -434,9 +430,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "basicStrategy": MessageLookupByLibrary.simpleMessage("Базовые политики"),
     "batchAdd": MessageLookupByLibrary.simpleMessage("Массовое добавление"),
     "batchImport": MessageLookupByLibrary.simpleMessage("Массовый импорт"),
-    "batchLinkInputTip": MessageLookupByLibrary.simpleMessage(
-      "По одной ссылке на строку",
-    ),
     "batchListInputTip": MessageLookupByLibrary.simpleMessage(
       "По одному значению на строку или через запятую",
     ),
@@ -586,6 +579,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "coreBlockedByPolicyTip": m5,
     "coreBlockedBySmartAppControlTip": MessageLookupByLibrary.simpleMessage(
       "Smart App Control в Windows заблокировал неподписанный FlClashCore.exe. Откройте Безопасность Windows → Управление приложениями и браузером → Параметры Smart App Control, выберите «Выкл.» и снова запустите FlClashX. Повторно включить Smart App Control без переустановки Windows нельзя.",
+    ),
+    "coreRestartByCommandFailed": MessageLookupByLibrary.simpleMessage(
+      "Команде не удалось перезапустить ядро",
+    ),
+    "coreRestartedByCommand": MessageLookupByLibrary.simpleMessage(
+      "Ядро перезапущено командой",
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("Статус ядра"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("Обнаружен сбой"),
@@ -966,7 +965,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Импорт заменит текущие группы прокси, правила и настройки этого профиля",
     ),
     "importFile": MessageLookupByLibrary.simpleMessage("Импорт из файла"),
-    "importFromLink": MessageLookupByLibrary.simpleMessage("Импорт по ссылке"),
     "importUrl": MessageLookupByLibrary.simpleMessage("Импорт по URL"),
     "inbound": MessageLookupByLibrary.simpleMessage("Входящие"),
     "includeInterface": MessageLookupByLibrary.simpleMessage(
@@ -995,9 +993,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Введите содержимое правила",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "Разрешение на список приложений отклонено, поэтому установленные приложения недоступны. Предоставьте его вручную в системных настройках.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "Разрешение на список приложений отклонено, поэтому установленные приложения недоступны. Предоставьте его вручную в системных настройках.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Эта система не выдаёт список установленных приложений без разрешения. Предоставьте его, чтобы настроить прокси для отдельных приложений.",
     ),
@@ -1425,6 +1424,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "profileAutoUpdateIntervalNullValidationDesc":
         MessageLookupByLibrary.simpleMessage("Введите интервал автообновления"),
     "profileDaysFigure": m63,
+    "profileDetails": MessageLookupByLibrary.simpleMessage("Подробнее"),
     "profileExpired": MessageLookupByLibrary.simpleMessage("Истекла"),
     "profileHasUpdate": MessageLookupByLibrary.simpleMessage(
       "Профиль изменён. Отключить автообновление?",
@@ -1869,9 +1869,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Кнопка остановки в уведомлении",
     ),
     "showPassword": MessageLookupByLibrary.simpleMessage("Показать пароль"),
-    "sidebarBlurDesc": MessageLookupByLibrary.simpleMessage(
-      "Размытие фона показывает рабочий стол за окном сквозь боковую панель.",
-    ),
     "silentLaunch": MessageLookupByLibrary.simpleMessage("Тихий запуск"),
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage(
       "При тихом запуске окно не показывается.",
@@ -2072,7 +2069,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "updateDownloadFailed": MessageLookupByLibrary.simpleMessage(
       "Не удалось скачать обновление",
     ),
-    "updateDownloadProgress": m94,
     "updateErrorBusy": MessageLookupByLibrary.simpleMessage(
       "Дождитесь, пока подключение запустится или остановится.",
     ),
@@ -2118,6 +2114,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "updateHandedOff": MessageLookupByLibrary.simpleMessage(
       "Завершите обновление в открывшемся установщике.",
     ),
+    "updateHide": MessageLookupByLibrary.simpleMessage("Скрыть"),
     "updateInstall": MessageLookupByLibrary.simpleMessage("Установить"),
     "updateInstallFailed": MessageLookupByLibrary.simpleMessage(
       "Не удалось установить обновление автоматически",
@@ -2146,7 +2143,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("Отдача"),
     "uploadBandwidth": MessageLookupByLibrary.simpleMessage("Скорость отдачи"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
-    "urlTip": m95,
+    "urlTip": m94,
     "useHosts": MessageLookupByLibrary.simpleMessage("Использовать hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
       "Использовать системный hosts",
@@ -2175,7 +2172,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "vpnEnableDesc": MessageLookupByLibrary.simpleMessage(
       "VPN автоматически направляет весь системный трафик через VpnService.",
     ),
-    "vpnPermissionNotGranted": m96,
+    "vpnPermissionNotGranted": m95,
     "vpnRestrictedByAdministrator": MessageLookupByLibrary.simpleMessage(
       "VPN на этом устройстве ограничен администратором",
     ),
@@ -2192,8 +2189,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "«Записывать в систему» также устанавливает системные часы; Android это игнорирует.",
     ),
-    "yearsAgo": m97,
-    "yearsAgoShort": m98,
+    "yearsAgo": m96,
+    "yearsAgoShort": m97,
     "yes": MessageLookupByLibrary.simpleMessage("Да"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Упрощённый китайский"),
   };

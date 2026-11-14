@@ -50,6 +50,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -264,9 +265,28 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 )
             }
 
+            "extractAsset" -> reply(result) {
+                extractAsset(
+                    requireNotNull(call.argument<String>("asset")),
+                    requireNotNull(call.argument<String>("path")),
+                )
+                true
+            }
+
             else -> {
                 result.notImplemented()
             }
+        }
+    }
+
+    private fun extractAsset(asset: String, path: String) {
+        val partial = File("$path.part")
+        val key = flutterAssets.getAssetFilePathByName(asset)
+        GlobalState.application.assets.open(key).use { input ->
+            partial.outputStream().use { output -> input.copyTo(output, 1 shl 16) }
+        }
+        if (!partial.renameTo(File(path))) {
+            throw IOException("Unable to move $asset to $path")
         }
     }
 

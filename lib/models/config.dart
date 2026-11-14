@@ -265,6 +265,9 @@ abstract class AppSettingProps with _$AppSettingProps {
     TabAnimation tabAnimation,
     @Default(true) bool floatingNavigationBar,
     @Default(false) bool autoCheckUpdate,
+
+    /// The release tag the user hid; automatic checks skip only that one.
+    String? hiddenUpdate,
     @Default(true)
     @JsonKey(readValue: _readSidebarExpanded)
     bool sidebarExpanded,
@@ -532,7 +535,6 @@ abstract class ThemeProps with _$ThemeProps {
     @JsonKey(readValue: _readColorStyle)
     ColorStyle colorStyle,
     @Default(false) bool pureBlack,
-    @Default(false) bool sidebarBlur,
     @Default(LiquidGlassMode.none)
     @JsonKey(readValue: _readLiquidGlass)
     LiquidGlassMode liquidGlass,

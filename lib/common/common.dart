@@ -6,6 +6,7 @@ export 'changelog.dart';
 export 'cidr.dart';
 export 'compute.dart';
 export 'constant.dart';
+export 'core_cli.dart';
 export 'dashboard_url.dart';
 export 'file_logger.dart';
 export 'context.dart';

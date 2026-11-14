@@ -261,18 +261,15 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m93(transport) => "Encabezados ${transport}";
 
-  static String m94(received, total, percent) =>
-      "${received} de ${total} · ${percent}%";
+  static String m94(label) => "${label} debe ser una URL";
 
-  static String m95(label) => "${label} debe ser una URL";
-
-  static String m96(appName) =>
+  static String m95(appName) =>
       "No permitiste que ${appName} se conectara como VPN";
 
-  static String m97(count) =>
+  static String m96(count) =>
       "${Intl.plural(count, one: 'hace 1 año', other: 'hace ${count} años')}";
 
-  static String m98(count) => "${Intl.plural(count, other: 'hace ${count} a')}";
+  static String m97(count) => "${Intl.plural(count, other: 'hace ${count} a')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -313,14 +310,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "add": MessageLookupByLibrary.simpleMessage("Añadir"),
     "addCustomProxy": MessageLookupByLibrary.simpleMessage("Añadir proxy"),
     "addFilters": MessageLookupByLibrary.simpleMessage("Añadir filtros"),
+    "addFromClipboard": MessageLookupByLibrary.simpleMessage(
+      "Añadir desde el portapapeles",
+    ),
     "addNodes": MessageLookupByLibrary.simpleMessage("Añadir nodos"),
     "addOverrideEntry": MessageLookupByLibrary.simpleMessage(
       "Añadir entrada de sobrescritura",
     ),
     "addProfile": MessageLookupByLibrary.simpleMessage("Añadir perfil"),
-    "addProfileFromClipboard": MessageLookupByLibrary.simpleMessage(
-      "Añadir perfil desde el portapapeles",
-    ),
     "addProxyChain": MessageLookupByLibrary.simpleMessage("Añadir cadena"),
     "addProxyChainHop": MessageLookupByLibrary.simpleMessage("Añadir salto"),
     "addProxyGroup": MessageLookupByLibrary.simpleMessage(
@@ -429,9 +426,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Intervalo de actualización automática",
     ),
     "back": MessageLookupByLibrary.simpleMessage("Atrás"),
-    "backgroundBlur": MessageLookupByLibrary.simpleMessage(
-      "Desenfoque de fondo",
-    ),
     "backup": MessageLookupByLibrary.simpleMessage("Copia de seguridad"),
     "backupAndRestore": MessageLookupByLibrary.simpleMessage(
       "Copia de seguridad y restauración",
@@ -448,9 +442,6 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "batchAdd": MessageLookupByLibrary.simpleMessage("Añadir en lote"),
     "batchImport": MessageLookupByLibrary.simpleMessage("Importar en lote"),
-    "batchLinkInputTip": MessageLookupByLibrary.simpleMessage(
-      "Un enlace por línea",
-    ),
     "batchListInputTip": MessageLookupByLibrary.simpleMessage(
       "Un elemento por línea, o separados por comas",
     ),
@@ -606,6 +597,12 @@ class MessageLookup extends MessageLookupByLibrary {
     "coreBlockedByPolicyTip": m5,
     "coreBlockedBySmartAppControlTip": MessageLookupByLibrary.simpleMessage(
       "Smart App Control de Windows bloqueó FlClashCore.exe porque no está firmado. Abre Seguridad de Windows → Control de aplicaciones y navegador → Configuración de Smart App Control, elige Desactivado y vuelve a iniciar FlClashX. Smart App Control no se puede volver a activar sin reinstalar Windows.",
+    ),
+    "coreRestartByCommandFailed": MessageLookupByLibrary.simpleMessage(
+      "El comando no pudo reiniciar el núcleo",
+    ),
+    "coreRestartedByCommand": MessageLookupByLibrary.simpleMessage(
+      "Núcleo reiniciado por un comando",
     ),
     "coreStatus": MessageLookupByLibrary.simpleMessage("Estado del núcleo"),
     "crashDetected": MessageLookupByLibrary.simpleMessage("Fallo detectado"),
@@ -994,9 +991,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "importFile": MessageLookupByLibrary.simpleMessage(
       "Importar desde archivo",
     ),
-    "importFromLink": MessageLookupByLibrary.simpleMessage(
-      "Importar desde enlace",
-    ),
     "importUrl": MessageLookupByLibrary.simpleMessage("Importar desde URL"),
     "inbound": MessageLookupByLibrary.simpleMessage("Entrada"),
     "includeInterface": MessageLookupByLibrary.simpleMessage(
@@ -1025,9 +1019,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "inputRuleContent": MessageLookupByLibrary.simpleMessage(
       "Introduce el contenido de la regla",
     ),
-    "installedAppsPermissionDeniedMessage": MessageLookupByLibrary.simpleMessage(
-      "Se denegó el permiso de lista de apps, por lo que no se pueden mostrar las apps instaladas. Concédelo manualmente en los ajustes del sistema.",
-    ),
+    "installedAppsPermissionDeniedMessage":
+        MessageLookupByLibrary.simpleMessage(
+          "Se denegó el permiso de lista de apps, por lo que no se pueden mostrar las apps instaladas. Concédelo manualmente en los ajustes del sistema.",
+        ),
     "installedAppsPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "Este sistema oculta la lista de apps instaladas hasta que se concede el permiso. Autorízalo para configurar el proxy por app.",
     ),
@@ -1463,6 +1458,7 @@ class MessageLookup extends MessageLookupByLibrary {
           "Introduce el intervalo de actualización automática",
         ),
     "profileDaysFigure": m63,
+    "profileDetails": MessageLookupByLibrary.simpleMessage("Detalles"),
     "profileExpired": MessageLookupByLibrary.simpleMessage("Vencida"),
     "profileHasUpdate": MessageLookupByLibrary.simpleMessage(
       "El perfil se ha modificado. ¿Desactivar la actualización automática?",
@@ -1931,9 +1927,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Botón de detener en la notificación",
     ),
     "showPassword": MessageLookupByLibrary.simpleMessage("Mostrar contraseña"),
-    "sidebarBlurDesc": MessageLookupByLibrary.simpleMessage(
-      "El desenfoque de fondo deja ver el escritorio detrás de la ventana a través de la barra lateral.",
-    ),
     "silentLaunch": MessageLookupByLibrary.simpleMessage("Inicio silencioso"),
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage(
       "El inicio silencioso arranca sin mostrar la ventana.",
@@ -2130,7 +2123,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "updateDownloadFailed": MessageLookupByLibrary.simpleMessage(
       "No se pudo descargar la actualización",
     ),
-    "updateDownloadProgress": m94,
     "updateErrorBusy": MessageLookupByLibrary.simpleMessage(
       "Espera a que la conexión termine de iniciarse o detenerse.",
     ),
@@ -2176,6 +2168,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "updateHandedOff": MessageLookupByLibrary.simpleMessage(
       "Termina la actualización en el instalador que se abrió.",
     ),
+    "updateHide": MessageLookupByLibrary.simpleMessage("Ocultar"),
     "updateInstall": MessageLookupByLibrary.simpleMessage("Instalar"),
     "updateInstallFailed": MessageLookupByLibrary.simpleMessage(
       "No se pudo instalar la actualización automáticamente",
@@ -2204,7 +2197,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Ancho de banda de subida",
     ),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
-    "urlTip": m95,
+    "urlTip": m94,
     "useHosts": MessageLookupByLibrary.simpleMessage("Usar hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
       "Usar hosts del sistema",
@@ -2231,7 +2224,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "vpnEnableDesc": MessageLookupByLibrary.simpleMessage(
       "La VPN enruta automáticamente todo el tráfico del sistema a través de VpnService.",
     ),
-    "vpnPermissionNotGranted": m96,
+    "vpnPermissionNotGranted": m95,
     "vpnRestrictedByAdministrator": MessageLookupByLibrary.simpleMessage(
       "El administrador de este dispositivo restringe la VPN",
     ),
@@ -2246,8 +2239,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "writeToSystemDesc": MessageLookupByLibrary.simpleMessage(
       "Escribir en el sistema también ajusta el reloj del sistema; Android lo ignora.",
     ),
-    "yearsAgo": m97,
-    "yearsAgoShort": m98,
+    "yearsAgo": m96,
+    "yearsAgoShort": m97,
     "yes": MessageLookupByLibrary.simpleMessage("Sí"),
     "zhCN": MessageLookupByLibrary.simpleMessage("Chino simplificado"),
   };

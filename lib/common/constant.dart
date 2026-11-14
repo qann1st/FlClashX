@@ -28,6 +28,7 @@ const helperPortKey =
     'SYSTEM\\CurrentControlSet\\Services\\$appHelperService\\Runtime';
 const helperPortValue = 'Port';
 const helperSocketPath = '/run/flclashx/helper.sock';
+const helperUnitPath = '/etc/systemd/system/flclashx-helper.service';
 const helperProtocolVersionHeader = 'x-flclashx-helper-protocol';
 final helperProtocolVersion = Platform.isWindows ? '8' : '6';
 const maxTextScale = 1.4;
