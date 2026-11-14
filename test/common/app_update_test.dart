@@ -271,6 +271,10 @@ void main() {
       );
       expect(expectedAssetName('macos', 'arm64'), 'FlClashX-macos-arm64.dmg');
       expect(
+        expectedAssetName('linux', 'amd64'),
+        'FlClashX-linux-amd64.AppImage',
+      );
+      expect(
         expectedAssetName('android', 'arm64'),
         'FlClashX-android-universal.apk',
       );

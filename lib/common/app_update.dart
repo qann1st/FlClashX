@@ -35,6 +35,8 @@ const updateManifestUrl = String.fromEnvironment(
 ///     "windows-arm64": "https://bucket/FlClashX-windows-arm64-setup.exe",
 ///     "macos-arm64": "https://bucket/FlClashX-macos-arm64.dmg",
 ///     "macos-amd64": "https://bucket/FlClashX-macos-amd64.dmg",
+///     "linux-amd64": "https://bucket/FlClashX-linux-amd64.AppImage",
+///     "linux-arm64": "https://bucket/FlClashX-linux-arm64.AppImage",
 ///     "android": "https://bucket/FlClashX-android-universal.apk"
 ///   },
 ///   "sha256s": {"windows-amd64": "…", "macos-arm64": "…"},
@@ -75,6 +77,7 @@ String expectedAssetName(String platform, String arch) => switch (platform) {
   'windows' => 'FlClashX-windows-$arch-setup.exe',
   'android' => 'FlClashX-android-universal.apk',
   'macos' => 'FlClashX-macos-$arch.dmg',
+  'linux' => 'FlClashX-linux-$arch.AppImage',
   _ => 'FlClashX-$platform-$arch',
 };
 
@@ -303,7 +306,14 @@ class AppUpdateService {
   /// Platforms that can install an update without help.
   static bool get canSelfInstall =>
       selfInstallOverride ??
-      (Platform.isAndroid || Platform.isWindows || Platform.isMacOS);
+      (Platform.isAndroid ||
+          Platform.isWindows ||
+          Platform.isMacOS ||
+          _isRunningAppImage);
+
+  static bool get _isRunningAppImage =>
+      Platform.isLinux &&
+      (Platform.environment['APPIMAGE']?.isNotEmpty ?? false);
 
   /// Lets a test run the desktop flow on the host it runs on.
   @visibleForTesting
@@ -395,6 +405,7 @@ class AppUpdateService {
     if (Platform.isAndroid) return _installAndroid(update, onProgress);
     if (Platform.isWindows) return _installWindows(update, onProgress);
     if (Platform.isMacOS) return _installMacOS(update, onProgress);
+    if (_isRunningAppImage) return _installLinuxAppImage(update, onProgress);
     return UpdateInstallResult.installFailed;
   }
 
@@ -547,6 +558,65 @@ class AppUpdateService {
   static String _psQuote(String value) => "'${value.replaceAll("'", "''")}'";
 
   // ----------------------------------------------------------------- macOS
+
+  // ---------------------------------------------------------- Linux AppImage
+
+  /// Replaces an AppImage in place, then relaunches it after this process has
+  /// exited. System packages stay owned by their package manager.
+  static Future<UpdateInstallResult> _installLinuxAppImage(
+    AppUpdate update,
+    void Function(int, int)? onProgress,
+  ) async {
+    final appImage = Platform.environment['APPIMAGE'];
+    if (appImage == null || appImage.isEmpty) {
+      return UpdateInstallResult.installFailed;
+    }
+    final directory = await getTemporaryDirectory();
+    final downloaded = await _download(
+      update,
+      p.join(directory.path, 'FlClashX-update.AppImage'),
+      onProgress: onProgress,
+    );
+    if (downloaded == null) return UpdateInstallResult.downloadFailed;
+
+    final staged = p.join(
+      p.dirname(appImage),
+      '.${p.basename(appImage)}.update',
+    );
+    try {
+      await downloaded.copy(staged);
+      final chmod = await Process.run('chmod', ['755', staged]);
+      if (chmod.exitCode != 0) return UpdateInstallResult.installFailed;
+      await File(staged).rename(appImage);
+
+      final launcher = File(
+        p.join(directory.path, 'flclashx-appimage-update.sh'),
+      );
+      await launcher.writeAsString(
+        '#!/bin/sh\n'
+        'PID=$pid\n'
+        'while kill -0 "\$PID" 2>/dev/null; do sleep 0.2; done\n'
+        'exec ${_shQuote(appImage)}\n',
+        flush: true,
+      );
+      await Process.run('chmod', ['755', launcher.path]);
+      await Process.start('/bin/sh', [
+        launcher.path,
+      ], mode: ProcessStartMode.detached);
+      return UpdateInstallResult.started;
+    } catch (error) {
+      commonPrint.log(
+        'Linux AppImage update failed: ${compactError(error)}',
+        logLevel: LogLevel.warning,
+      );
+      try {
+        await File(staged).delete();
+      } on FileSystemException {
+        // A failed cleanup must not hide the actual update error.
+      }
+      return UpdateInstallResult.installFailed;
+    }
+  }
 
   static Future<UpdateInstallResult> _installMacOS(
     AppUpdate update,

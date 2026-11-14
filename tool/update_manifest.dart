@@ -112,5 +112,7 @@ const artifactNames = <String, String>{
   'windows-arm64': 'FlClashX-windows-arm64-setup.exe',
   'macos-amd64': 'FlClashX-macos-amd64.dmg',
   'macos-arm64': 'FlClashX-macos-arm64.dmg',
+  'linux-amd64': 'FlClashX-linux-amd64.AppImage',
+  'linux-arm64': 'FlClashX-linux-arm64.AppImage',
   'android': 'FlClashX-android-universal.apk',
 };
