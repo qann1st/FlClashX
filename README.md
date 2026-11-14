@@ -462,6 +462,8 @@ proxies:
     "windows-arm64": "https://.../FlClashX-windows-arm64-setup.exe",
     "macos-arm64": "https://.../FlClashX-macos-arm64.dmg",
     "macos-amd64": "https://.../FlClashX-macos-amd64.dmg",
+    "linux-amd64": "https://.../FlClashX-linux-amd64.AppImage",
+    "linux-arm64": "https://.../FlClashX-linux-arm64.AppImage",
     "android": "https://.../FlClashX-android-universal.apk"
   },
   "sha256s": {
@@ -469,6 +471,8 @@ proxies:
     "windows-arm64": "...",
     "macos-arm64": "...",
     "macos-amd64": "...",
+    "linux-amd64": "...",
+    "linux-arm64": "...",
     "android": "..."
   }
 }
@@ -478,6 +482,9 @@ proxies:
 
 - `version` сравнивается с версией установленной сборки: равная или меньшая игнорируется, суффикс
   `-pre.N` считается младше релиза.
+- На Linux самообновление работает для AppImage: скачивается соответствующий `linux-<arch>` файл,
+  сверяется SHA-256, затем AppImage заменяется и перезапускается. `.deb` и `.rpm` обновляются
+  пакетным менеджером.
 - `urls`/`sha256s` можно задавать ключом `платформа-арх` или только `платформа`; поддерживаются и
   старые плоские ключи (`windows_url`, `apk_url`, `url`, …), и список
   `files: [{name, url, sha256}]` с именами ассетов из релиза.
