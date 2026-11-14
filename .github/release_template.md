@@ -46,7 +46,8 @@
                 <a href="https://github.com/qann1st/FlClashX/releases/download/vVERSION/FlClashX-linux-amd64.AppImage"><img src="https://img.shields.io/badge/AppImage-x64-f84e29.svg?logo=linux"></a><br>
                 <a href="https://github.com/qann1st/FlClashX/releases/download/vVERSION/FlClashX-linux-amd64.deb"><img src="https://img.shields.io/badge/DebPackage-x64-FF9966.svg?logo=debian"></a><br>
                 <a href="https://github.com/qann1st/FlClashX/releases/download/vVERSION/FlClashX-linux-amd64.rpm"><img src="https://img.shields.io/badge/RpmPackage-x64-F1B42F.svg?logo=redhat"></a><br>
-                <a href="https://github.com/qann1st/FlClashX/releases/download/vVERSION/flclashx-elysium-git-VERSION-1-x86_64.pkg.tar.zst"><img src="https://img.shields.io/badge/ArchPackage-x64-1793D1.svg?logo=archlinux"></a><br>
+                <a href="https://github.com/qann1st/FlClashX/releases/download/vVERSION/FlClashX-linux-amd64.pkg"><img src="https://img.shields.io/badge/ArchPackage-x64-1793D1.svg?logo=archlinux"></a><br>
+                <a href="https://github.com/qann1st/FlClashX/releases/download/vVERSION/FlClashX-linux-arm64.pkg"><img src="https://img.shields.io/badge/ArchPackage-arm64-1793D1.svg?logo=archlinux"></a><br>
                 <a href="https://aur.archlinux.org/packages/flclashx-bin"><img src="https://img.shields.io/aur/version/flclashx-bin"></a>
             </td>
         </tr>

@@ -703,29 +703,47 @@ jobs:
             sed "s|VERSION|$version|g" ./.github/pre_release_template.md >> release.md
           fi
 
-      # The Arch package is a repack of the .deb, built here so it can ship
-      # beside it; a pre-release tag carries a hyphen its pkgver cannot hold.
-      - name: Build the Arch package
+      # Arch packages are repacks of the matching .deb files.  Publish them
+      # under the same FlClashX-platform-architecture convention as every
+      # other release asset; a pre-release tag carries a hyphen its pkgver
+      # cannot hold.
+      - name: Build the Arch packages
         if: ${{ env.IS_STABLE == 'true' }}
         run: |
           version="${RELEASE_TAG#v}"
-          work="$RUNNER_TEMP/archpkg"
-          rm -rf "$work"
-          mkdir -p "$work"
-          cp dist/FlClashX-linux-amd64.deb "$work/"
-          cp aur/flclashx-elysium-git/PKGBUILD "$work/"
-          sha=$(sha256sum "$work/FlClashX-linux-amd64.deb" | cut -d' ' -f1)
-          sed -i "s/^pkgver=.*/pkgver=$version/" "$work/PKGBUILD"
-          sed -i "s/^pkgrel=.*/pkgrel=1/" "$work/PKGBUILD"
-          sed -i "s|^arch=.*|arch=('x86_64')|" "$work/PKGBUILD"
-          sed -i "s|^source_x86_64=.*|source_x86_64=(\"FlClashX-linux-amd64.deb\")|" "$work/PKGBUILD"
-          sed -i "s|^sha256sums_x86_64=.*|sha256sums_x86_64=('$sha')|" "$work/PKGBUILD"
-          sed -i "/^source_aarch64=/d" "$work/PKGBUILD"
-          sed -i "/^sha256sums_aarch64=/d" "$work/PKGBUILD"
-          docker run --rm -v "$work:/pkg" archlinux:base-devel bash -c \
-            "useradd -m -u $(id -u) builder && chown -R builder:builder /pkg && su builder -c 'cd /pkg && makepkg --nodeps --noconfirm'"
-          cp "$work"/*.pkg.tar.zst dist/
-          ls -l dist/*.pkg.tar.zst
+          for target in amd64 arm64; do
+            case "$target" in
+              amd64) pkg_arch=x86_64 ;;
+              arm64) pkg_arch=aarch64 ;;
+            esac
+            work="$RUNNER_TEMP/archpkg-$target"
+            rm -rf "$work"
+            mkdir -p "$work"
+            deb="FlClashX-linux-$target.deb"
+            cp "dist/$deb" "$work/"
+            cp aur/flclashx-elysium-git/PKGBUILD "$work/"
+            sha=$(sha256sum "$work/$deb" | cut -d' ' -f1)
+            sed -i "s/^pkgver=.*/pkgver=$version/" "$work/PKGBUILD"
+            sed -i "s/^pkgrel=.*/pkgrel=1/" "$work/PKGBUILD"
+            sed -i "s|^arch=.*|arch=('$pkg_arch')|" "$work/PKGBUILD"
+            if [ "$pkg_arch" = x86_64 ]; then
+              sed -i "s|^source_x86_64=.*|source_x86_64=(\"$deb\")|" "$work/PKGBUILD"
+              sed -i "s|^sha256sums_x86_64=.*|sha256sums_x86_64=('$sha')|" "$work/PKGBUILD"
+              sed -i "/^source_aarch64=/d" "$work/PKGBUILD"
+              sed -i "/^sha256sums_aarch64=/d" "$work/PKGBUILD"
+            else
+              sed -i "s|^source_aarch64=.*|source_aarch64=(\"$deb\")|" "$work/PKGBUILD"
+              sed -i "s|^sha256sums_aarch64=.*|sha256sums_aarch64=('$sha')|" "$work/PKGBUILD"
+              sed -i "/^source_x86_64=/d" "$work/PKGBUILD"
+              sed -i "/^sha256sums_x86_64=/d" "$work/PKGBUILD"
+            fi
+            docker run --rm -v "$work:/pkg" archlinux:base-devel bash -c \
+              "sed 's/^CARCH=.*/CARCH=$pkg_arch/' /etc/makepkg.conf > /tmp/makepkg.conf && useradd -m -u $(id -u) builder && chown -R builder:builder /pkg && su builder -c 'cd /pkg && makepkg --config /tmp/makepkg.conf --nodeps --noconfirm --ignorearch'"
+            package=$(find "$work" -maxdepth 1 -name '*.pkg.tar.zst' -print -quit)
+            test -n "$package"
+            mv "$package" "dist/FlClashX-linux-$target.pkg"
+          done
+          ls -l dist/FlClashX-linux-*.pkg
 
       - name: Generate sha256
         if: ${{ env.IS_STABLE == 'true' }}
