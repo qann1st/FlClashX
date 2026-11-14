@@ -445,7 +445,7 @@ void main() {
         ),
       );
 
-      expect(await client.readiness(), HelperReadiness.notReady);
+      expect(await client.readiness(), HelperReadiness.coreMismatch);
     },
   );
 

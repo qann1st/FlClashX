@@ -11,5 +11,6 @@ output_base_file_name: FlClashX.exe
 setup_icon_file: windows\runner\resources\app_icon.ico
 locales:
   - lang: ru
+  - lang: zh
   - lang: en
 privileges_required: admin

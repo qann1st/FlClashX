@@ -74,6 +74,8 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
 
     private lateinit var channel: MethodChannel
 
+    private lateinit var flutterAssets: FlutterPlugin.FlutterAssets
+
     private lateinit var scope: CoroutineScope
 
     private val vpnPrepareCallback = PendingCallback<Boolean>()
@@ -610,6 +612,7 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
         channel =
             MethodChannel(flutterPluginBinding.binaryMessenger, "${Components.PACKAGE_NAME}/app")
         channel.setMethodCallHandler(this)
+        flutterAssets = flutterPluginBinding.flutterAssets
         watchPackageChanges(flutterPluginBinding.applicationContext)
     }
 
