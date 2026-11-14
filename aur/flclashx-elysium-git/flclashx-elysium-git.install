@@ -1,0 +1,21 @@
+# TUN needs the bundled helper registered with systemd. The app asks for that
+# on the first TUN start, but the approval (pkexec or sudo) can fail without a
+# polkit agent or a dismissed password prompt, so point at the manual command.
+
+post_install() {
+    cat <<'EOF'
+TUN mode needs a privileged helper service. The app registers it on the first
+TUN start; if that prompt fails or never appears, run it once from your own
+session, so the helper knows which account to grant its socket to:
+
+    sudo /usr/lib/flclashx-elysium/FlClashXHelperService install
+    systemctl status flclashx-helper.service
+EOF
+}
+
+post_upgrade() {
+    # A Helper left running from the old tree still serves the old Core and
+    # rejects the new one by hash, so TUN reports "could not get rights".
+    systemctl try-restart flclashx-helper.service >/dev/null 2>&1 || true
+    post_install
+}

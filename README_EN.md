@@ -396,6 +396,31 @@ A settings row set by the subscription (switches from `flclashx-settings`, `flcl
  sudo apt-get install libkeybinder-3.0-dev
 ```
 
+#### TUN and the privileged helper
+
+TUN is opened by `FlClashXHelperService`, a helper that sits beside the app. On the first
+TUN start the app asks to register it with systemd (pkexec, then sudo) and writes the
+`flclashx-helper.service` unit: it runs as root and hands the socket
+`/run/flclashx/helper.sock` to the account that installed it.
+
+If the approval never appears (no polkit agent, dismissed password prompt) and the app says
+it could not get TUN rights, register the helper once by hand — **from your own session**, so
+it knows which account to grant the socket to:
+
+```bash
+ # Arch package (flclashx-elysium-git)
+ sudo /usr/lib/flclashx-elysium/FlClashXHelperService install
+ # .deb
+ sudo /opt/FlClashX/FlClashXHelperService install
+
+ systemctl status flclashx-helper.service
+```
+
+The helper refuses to run when it or its directory is not owned by root or is writable by
+group or others — that is, out of a manually unpacked archive. The pacman and `.deb`
+packages install the tree as root, which is what it expects. TUN is unavailable in the
+AppImage: its bundle lives on a `nosuid` mount that changes path on every run.
+
 ### Android
 
 The following actions are supported:

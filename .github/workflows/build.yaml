@@ -722,6 +722,7 @@ jobs:
             deb="FlClashX-linux-$target.deb"
             cp "dist/$deb" "$work/"
             cp aur/flclashx-elysium-git/PKGBUILD "$work/"
+            cp aur/flclashx-elysium-git/flclashx-elysium-git.install "$work/"
             sha=$(sha256sum "$work/$deb" | cut -d' ' -f1)
             sed -i "s/^pkgver=.*/pkgver=$version/" "$work/PKGBUILD"
             sed -i "s/^pkgrel=.*/pkgrel=1/" "$work/PKGBUILD"

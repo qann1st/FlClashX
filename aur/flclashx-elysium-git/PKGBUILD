@@ -15,6 +15,7 @@ conflicts=("${pkgname%-git}" "flclashx-bin" "flclashx-git" "flclash-bin" "flclas
 provides=("${pkgname%-git}=${pkgver}")
 depends=('gtk3' 'libayatana-appindicator' 'libsecret')
 options=('!strip' '!emptydirs')
+install=flclashx-elysium-git.install
 source_x86_64=("${pkgname%-git}-${pkgver}-x86_64.deb::${url}/releases/download/${_tag}/${_pkgname}-linux-amd64.deb")
 source_aarch64=("${pkgname%-git}-${pkgver}-aarch64.deb::${url}/releases/download/${_tag}/${_pkgname}-linux-arm64.deb")
 sha256sums_x86_64=('SKIP')
