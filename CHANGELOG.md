@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.1 (2026-11-14)
+
+**Features**
+
+- **upstream** Adopt v0.5.5 (fdecbc9)
+- **update** Follow the subscription's own update manifest (ea7f096)
+
 ## v0.6.0 (2026-11-13)
 
 **Bug Fixes**

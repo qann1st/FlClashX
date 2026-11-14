@@ -2,6 +2,29 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.1",
+      "tag": "v0.6.1",
+      "date": "2026-11-14",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "fdecbc9",
+              "scope": "upstream",
+              "text": "Adopt v0.5.5"
+            },
+            {
+              "id": "ea7f096",
+              "scope": "update",
+              "text": "Follow the subscription's own update manifest"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.0",
       "tag": "v0.6.0",
       "date": "2026-11-13",
