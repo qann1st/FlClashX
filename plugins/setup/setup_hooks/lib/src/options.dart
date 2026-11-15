@@ -24,7 +24,8 @@ class BuildConfig {
   final String coreVersion;
 
   /// The version stamped into the Windows build, whose core is the vendored
-  /// Elysium-Core fork rather than the original named by [coreVersion].
+  /// qann1st/Prizrak-Core release branch rather than the original named by
+  /// [coreVersion]. Used only for Windows amd64.
   final String windowsCoreVersion;
   final String coreDir;
   final String coreName;

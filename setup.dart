@@ -235,7 +235,7 @@ class _Build {
       File(p.join(rootDir, 'build_config.yaml')).readAsStringSync(),
     );
     final map = config as Map?;
-    if (platform == 'windows') {
+    if (platform == 'windows' && arch == 'amd64') {
       final windowsVersion = map?['windows_core_version'] as String? ?? '';
       if (windowsVersion.isNotEmpty) {
         return windowsVersion;

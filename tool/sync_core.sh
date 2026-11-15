@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Copies the working Elysium-Core checkout into core/third_party/elysium-core,
-# which is the copy every build (desktop hooks and Android's gomobile module)
-# compiles. Run it after changing the fork, then commit the result.
+# Copies the qann1st/Prizrak-Core release checkout into
+# core/third_party/elysium-core, which is the copy every Windows amd64 build
+# compiles. Without an explicit source checkout it fetches the canonical
+# release branch, so an update cannot accidentally come from another branch.
 #
-# Usage: tool/sync_core.sh [path-to-fork]   (default: ../Prizrak-Core)
+# Usage: tool/sync_core.sh [path-to-release-checkout]
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$script_dir/.." && pwd)"
-src="${1:-"$root/../Prizrak-Core"}"
+fork_repo='https://github.com/qann1st/Prizrak-Core.git'
+fork_branch='release'
+src="${1:-}"
 dest="$root/core/third_party/elysium-core"
+
+if [[ -z "$src" ]]; then
+  temp_dir="$(mktemp -d)"
+  trap 'rm -rf "$temp_dir"' EXIT
+  src="$temp_dir/Prizrak-Core"
+  git clone --depth=1 --branch "$fork_branch" "$fork_repo" "$src"
+fi
 
 [[ -f "$src/go.mod" ]] || {
   echo "error: $src has no go.mod; pass the fork's path" >&2

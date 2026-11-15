@@ -15,8 +15,8 @@ Everything below has been broken at least once by a careless merge.
 
 | Platform | Core | Selected by |
 | --- | --- | --- |
-| Windows | Elysium-Core fork, vendored in `core/third_party/elysium-core` | `core/go.windows.mod` |
-| Android, Linux, macOS | original `legiz-ru/Prizrak-Core` release | `core/go.mod` |
+| Windows amd64 | `qann1st/Prizrak-Core` branch `release`, vendored in `core/third_party/elysium-core` | `core/go.windows.mod` |
+| Windows arm64, Android, Linux, macOS | original `legiz-ru/Prizrak-Core` release | `core/go.mod` |
 
 How it works:
 
@@ -25,8 +25,8 @@ How it works:
 - `core/go.windows.mod` (and its own `core/go.windows.sum`) replaces the same
   module with `./third_party/elysium-core`.
 - `plugins/setup/setup_hooks/lib/src/go_builder.dart` passes
-  `-modfile=go.windows.mod` when the target is `GOOS=windows`; every other
-  target builds `core/go.mod`.
+  `-modfile=go.windows.mod` only for `GOOS=windows GOARCH=amd64`; every other
+  target, including Windows arm64, builds `core/go.mod`.
 - Android's `android/core` Gradle module runs `gomobile bind` against `core`,
   so it builds `core/go.mod` (the original core) with `with_gvisor,cmfa`.
 - Versions live in `build_config.yaml`:
@@ -38,12 +38,14 @@ How it works:
 Keeping them in sync:
 
 ```bash
-tool/sync_core.sh                 # copies ../Prizrak-Core into core/third_party/elysium-core
-tool/sync_core.sh /path/to/fork   # or an explicit checkout
+tool/sync_core.sh                 # fetches qann1st/Prizrak-Core@release and vendors it
+tool/sync_core.sh /path/to/fork   # or an explicit checkout of that branch
 ```
 
 The script refuses a checkout that does not keep the mihomo module path and
-excludes `.git` and `bin`. After syncing, commit the vendored tree.
+excludes `.git` and `bin`. After syncing, commit the vendored tree. The
+remaining platforms continue using the pinned `legiz-ru/Prizrak-Core` module
+release declared in `core/go.mod` (`v1.19.34-r1`); they must not use this tree.
 
 **Do not** point `core/go.mod` at the vendored fork (that makes Windows-only
 zapret code part of every build) and **do not** delete `core/go.windows.mod`.

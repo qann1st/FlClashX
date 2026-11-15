@@ -85,7 +85,9 @@ class GoBuilder {
 
   String _ldflags(Target target) {
     final version =
-        target.goos == 'windows' && config.windowsCoreVersion.isNotEmpty
+        target.goos == 'windows' &&
+            target.goarch == 'amd64' &&
+            config.windowsCoreVersion.isNotEmpty
         ? config.windowsCoreVersion
         : config.coreVersion;
     return [
@@ -98,9 +100,10 @@ class GoBuilder {
     'build',
     '-ldflags=${_ldflags(target)}',
     '-tags=${config.tags}',
-    // Windows compiles the vendored Elysium-Core fork from its own module
-    // file; every other target keeps the original Prizrak-Core in go.mod.
-    if (target.goos == 'windows' &&
+    // Only Windows amd64 compiles the vendored release branch. Every other
+    // target, including Windows arm64, keeps the original Prizrak-Core in
+    // go.mod.
+    if (target.goos == 'windows' && target.goarch == 'amd64' &&
         File(p.join(_corePath, 'go.windows.mod')).existsSync())
       '-modfile=go.windows.mod',
     if (outFile != null) ...['-o', outFile],
