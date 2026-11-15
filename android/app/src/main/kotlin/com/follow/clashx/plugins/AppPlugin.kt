@@ -446,7 +446,16 @@ class AppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware 
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(intent)
+            // An Activity token lets Android show the package installer even
+            // when this task is merely hidden in Recents. The application
+            // context fallback still works if an activity was detached while
+            // the download completed.
+            val activity = activity
+            if (activity != null) {
+                activity.startActivity(intent)
+            } else {
+                context.startActivity(intent)
+            }
             true
         } catch (_: Exception) {
             false

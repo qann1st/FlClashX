@@ -176,6 +176,10 @@ class CommonAction extends _$CommonAction {
           await ref.read(systemActionProvider.notifier).handleExit();
         }
         if (installed) return;
+        // The in-app flow owns its own error and retry UI. In particular,
+        // Android Back must never turn a running APK download into a browser
+        // launch.
+        return;
       }
     }
     final page = update.pageUrl;

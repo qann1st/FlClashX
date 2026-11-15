@@ -16,7 +16,12 @@ Future<bool> showAppUpdateDownloadDialog(
   final result = await dialogs.showCommonDialog<bool>(
     context: context,
     dismissible: false,
-    child: _UpdateDownloadDialog(update: update),
+    // `dismissible` blocks outside taps only. Android's Back gesture must not
+    // pop a running update and make its caller treat it as declined.
+    child: PopScope(
+      canPop: false,
+      child: _UpdateDownloadDialog(update: update),
+    ),
   );
   return result ?? false;
 }
