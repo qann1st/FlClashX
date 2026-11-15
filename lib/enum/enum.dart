@@ -855,6 +855,17 @@ enum LoadingTag {
 
 enum CoreStatus { connecting, connected, disconnected }
 
+/// Values understood by Prizrak-Core's component/powersave package.
+enum CorePowersave {
+  active(0),
+  background(1),
+  idle(2);
+
+  const CorePowersave(this.value);
+
+  final int value;
+}
+
 enum RequestFeed { recent, live }
 
 enum VpnRefusal { cancelled, otherAlwaysOn, restricted }

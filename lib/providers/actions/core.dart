@@ -34,7 +34,11 @@ class CoreAction extends _$CoreAction {
       await ref.read(proxiesActionProvider.notifier).updateGroups();
       await ref.read(providersProvider.notifier).syncProviders();
     }
-    _core.setHostActive(ref.read(appVisibleProvider));
+    final visible = ref.read(appVisibleProvider);
+    _core.setHostActive(visible);
+    _core.setPowersave(
+      visible ? CorePowersave.active : CorePowersave.background,
+    );
     try {
       globalState.coreVersion = await _core.getCoreVersion();
     } catch (_) {}

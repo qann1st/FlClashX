@@ -397,6 +397,10 @@ class CoreController {
     _interface.setHostActive(active);
   }
 
+  void setPowersave(CorePowersave mode) {
+    _interface.setPowersave(mode);
+  }
+
   void stopLog() {
     _interface.stopLog();
   }

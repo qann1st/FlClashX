@@ -1,5 +1,5 @@
-tags: with_gvisor
-android_tags: with_gvisor,cmfa
+tags: with_gvisor,with_powersave
+android_tags: with_gvisor,cmfa,with_powersave
 go_ldflags: "-w -s"
 core_version: v1.19.34-r1
 # Windows builds the Elysium-Core fork from core/go.windows.mod; it carries the

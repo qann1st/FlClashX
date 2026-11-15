@@ -85,6 +85,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     ref.listenManual(coreStatusProvider, (prev, next) {
       if (next == CoreStatus.connected && prev != CoreStatus.connected) {
         _syncLogStream();
+        _syncHostState();
       }
     }, fireImmediately: true);
   }
@@ -98,6 +99,16 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     } else {
       _core.stopLog();
     }
+  }
+
+  // A freshly restarted Core has lost its runtime mode.  Put it back before
+  // its first scheduled health-check cycle can wake a background device.
+  void _syncHostState() {
+    final visible = ref.read(appVisibleProvider);
+    _core.setHostActive(visible);
+    _core.setPowersave(
+      visible ? CorePowersave.active : CorePowersave.background,
+    );
   }
 
   @override

@@ -45,6 +45,7 @@ enum CoreMethod {
   sideLoadExternalProvider,
   startLog,
   setHostActive,
+  setPowersave,
   stopLog,
   startListener,
   stopListener,
