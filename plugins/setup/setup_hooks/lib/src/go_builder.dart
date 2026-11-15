@@ -103,7 +103,8 @@ class GoBuilder {
     // Only Windows amd64 compiles the vendored release branch. Every other
     // target, including Windows arm64, keeps the original Prizrak-Core in
     // go.mod.
-    if (target.goos == 'windows' && target.goarch == 'amd64' &&
+    if (target.goos == 'windows' &&
+        target.goarch == 'amd64' &&
         File(p.join(_corePath, 'go.windows.mod')).existsSync())
       '-modfile=go.windows.mod',
     if (outFile != null) ...['-o', outFile],
