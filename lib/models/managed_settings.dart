@@ -93,7 +93,6 @@ const networkPageKeys = {
 };
 
 const themePageKeys = {
-  'view.app.board',
   'view.app.theme',
   'view.app.navbar',
   'view.app.tabs',
@@ -109,6 +108,7 @@ const proxiesPageKeys = {
   'view.proxies.layout',
   'view.proxies.icon',
   'view.proxies.card',
+  'view.proxies.hidetimeout',
 };
 
 /// The settings a `flclashx-view` header speaks for, by what it names.
@@ -122,7 +122,7 @@ Set<String> managedViewKeysOf(ViewRequest? view) {
     if (view.layout != null) 'view.proxies.layout',
     if (view.icon != null) 'view.proxies.icon',
     if (view.card != null) 'view.proxies.card',
-    if (view.board != null) 'view.app.board',
+    if (view.hideTimeout != null) 'view.proxies.hidetimeout',
     if (view.themeMode != null) 'view.app.theme',
     if (view.floatingNavigationBar != null) 'view.app.navbar',
     if (view.tabAnimation != null) 'view.app.tabs',
