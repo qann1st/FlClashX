@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.6.2 (2026-11-15)
+
+**Features**
+
+- **upstream** Adopt v0.5.6 (e7a2283)
+
+**Bug Fixes**
+
+- **updater** Show app after Windows install (bfe2968)
+
 ## v0.6.1 (2026-11-14)
 
 **Features**

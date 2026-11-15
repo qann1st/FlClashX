@@ -2,6 +2,34 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.2",
+      "tag": "v0.6.2",
+      "date": "2026-11-15",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "e7a2283",
+              "scope": "upstream",
+              "text": "Adopt v0.5.6"
+            }
+          ]
+        },
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "bfe2968",
+              "scope": "updater",
+              "text": "Show app after Windows install"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.1",
       "tag": "v0.6.1",
       "date": "2026-11-14",
