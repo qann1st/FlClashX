@@ -2,6 +2,29 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.3",
+      "tag": "v0.6.3",
+      "date": "2026-11-15",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "a0bb9b0",
+              "scope": "android",
+              "text": "Keep app update running in background"
+            },
+            {
+              "id": "6e0ba46",
+              "scope": "power",
+              "text": "Slow core work outside active app"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.2",
       "tag": "v0.6.2",
       "date": "2026-11-15",

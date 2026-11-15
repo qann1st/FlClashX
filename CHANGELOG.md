@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.3 (2026-11-15)
+
+**Bug Fixes**
+
+- **android** Keep app update running in background (a0bb9b0)
+- **power** Slow core work outside active app (6e0ba46)
+
 ## v0.6.2 (2026-11-15)
 
 **Features**
