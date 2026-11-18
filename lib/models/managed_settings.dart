@@ -3,9 +3,6 @@ import 'provider_headers.dart';
 
 /// Flags of `flclashx-settings` and the app switch each one drives.
 const appSwitchSettings = {
-  'autorun': 'app.autoLaunch',
-  'shadowstart': 'app.silentLaunch',
-  'autostart': 'app.autoRun',
   'autoupdate': 'app.autoCheckUpdate',
   'openlogs': 'app.openLogs',
   'closeconnections': 'app.closeConnections',
@@ -61,9 +58,6 @@ String clashSettingKey(String yamlKey) => 'clash.$yamlKey';
 
 /// The lockable keys of each settings page, for its hint.
 const generalPageKeys = {
-  'app.autoLaunch',
-  'app.silentLaunch',
-  'app.autoRun',
   'app.autoCheckUpdate',
   'app.openLogs',
   'app.closeConnections',
