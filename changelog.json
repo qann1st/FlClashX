@@ -21,6 +21,16 @@
               "text": "Adopt v0.5.8"
             }
           ]
+        },
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "9a1dd75",
+              "scope": "build",
+              "text": "Keep S3 updater and restart self-contained"
+            }
+          ]
         }
       ]
     },

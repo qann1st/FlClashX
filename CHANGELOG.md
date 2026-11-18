@@ -7,6 +7,10 @@
 - **upstream** Adopt v0.5.7 (7716f1e)
 - **upstream** Adopt v0.5.8 (b1ae944)
 
+**Bug Fixes**
+
+- **build** Keep S3 updater and restart self-contained (9a1dd75)
+
 ## v0.6.3 (2026-11-15)
 
 **Bug Fixes**
