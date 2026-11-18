@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.6.4 (2026-11-18)
+
+**Features**
+
+- **upstream** Adopt v0.5.7 (7716f1e)
+- **upstream** Adopt v0.5.8 (b1ae944)
+
 ## v0.6.3 (2026-11-15)
 
 **Bug Fixes**
