@@ -47,7 +47,44 @@ class SystemAction extends _$SystemAction {
   }
 
   @protected
-  Future<void> relaunchSelf() => relaunchSelfAfterExit();
+  Future<void> relaunchSelf() async {
+    if (!system.isDesktop) return;
+    final executable = Platform.resolvedExecutable;
+    if (Platform.isWindows) {
+      await Process.start(
+        'powershell',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-WindowStyle',
+          'Hidden',
+          '-Command',
+          'Wait-Process -Id $pid -ErrorAction SilentlyContinue; '
+              'Start-Process -FilePath \$env:FLCLASHX_RESTART_EXE',
+        ],
+        environment: {'FLCLASHX_RESTART_EXE': executable},
+        mode: ProcessStartMode.detached,
+      );
+      return;
+    }
+    final command = Platform.isMacOS ? '/usr/bin/open' : executable;
+    final arguments = Platform.isMacOS
+        ? [File(executable).parent.parent.parent.path]
+        : [Platform.environment['APPIMAGE'] ?? executable];
+    await Process.start(
+      '/bin/sh',
+      [
+        '-c',
+        'while kill -0 "\$1" 2>/dev/null; do sleep 0.2; done; '
+            'shift; exec "\$@"',
+        'sh',
+        '$pid',
+        command,
+        ...arguments,
+      ],
+      mode: ProcessStartMode.detached,
+    );
+  }
 
   @protected
   Duration get exitWatchdogDuration => const Duration(seconds: 3);

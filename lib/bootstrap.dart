@@ -183,11 +183,10 @@ class Bootstrap {
     await profiles.noticeSubscriptionExpiries();
   }
 
-  /// The cache is cleared first, so a check that offers an update never
-  /// races the cleanup for the download it reuses.
+  /// FlClashX's S3 updater replaces its temporary download on each attempt,
+  /// so it does not use upstream's retained-download cleanup.
   Future<void> _checkUpdate() async {
     final common = _container.read(commonActionProvider.notifier);
-    await common.removeInstalledUpdates();
     await common.autoCheckUpdate();
   }
 
