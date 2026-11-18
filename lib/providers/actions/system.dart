@@ -71,19 +71,15 @@ class SystemAction extends _$SystemAction {
     final arguments = Platform.isMacOS
         ? [File(executable).parent.parent.parent.path]
         : [Platform.environment['APPIMAGE'] ?? executable];
-    await Process.start(
-      '/bin/sh',
-      [
-        '-c',
-        'while kill -0 "\$1" 2>/dev/null; do sleep 0.2; done; '
-            'shift; exec "\$@"',
-        'sh',
-        '$pid',
-        command,
-        ...arguments,
-      ],
-      mode: ProcessStartMode.detached,
-    );
+    await Process.start('/bin/sh', [
+      '-c',
+      'while kill -0 "\$1" 2>/dev/null; do sleep 0.2; done; '
+          'shift; exec "\$@"',
+      'sh',
+      '$pid',
+      command,
+      ...arguments,
+    ], mode: ProcessStartMode.detached);
   }
 
   @protected
