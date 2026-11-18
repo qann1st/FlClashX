@@ -29,6 +29,11 @@
               "id": "9a1dd75",
               "scope": "build",
               "text": "Keep S3 updater and restart self-contained"
+            },
+            {
+              "id": "b872e06",
+              "scope": "build",
+              "text": "Format restart launcher"
             }
           ]
         }
