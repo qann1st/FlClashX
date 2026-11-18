@@ -36,9 +36,9 @@
               "text": "Format restart launcher"
             },
             {
-              "id": "18497c1",
+              "id": "3cea2e2",
               "scope": "settings",
-              "text": "Restore managed startup switches"
+              "text": "Preserve startup switches from profiles"
             }
           ]
         }
