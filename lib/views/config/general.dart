@@ -391,7 +391,10 @@ ConfigToggleItem _appSettingToggle({
 class GeneralView extends ConsumerWidget {
   const GeneralView({super.key});
 
-  List<Widget> _startupItems(AppLocalizations appLocalizations) {
+  List<Widget> _startupItems(
+    AppLocalizations appLocalizations, {
+    required bool simple,
+  }) {
     return [
       if (system.isMacOS)
         _appSettingToggle(
@@ -399,16 +402,17 @@ class GeneralView extends ConsumerWidget {
           select: (state) => state.menuBarMode,
           update: (state, value) => state.copyWith(menuBarMode: value),
         ),
-      if (!system.isDesktop)
-        _appSettingToggle(
-          title: (l) => l.autoRun,
-          select: (state) => state.autoRun,
-          update: (state, value) => state.copyWith(autoRun: value),
-        ),
-      ListItem.open(
-        title: Text(appLocalizations.onDemand),
-        widget: const OnDemandView(),
+      _appSettingToggle(
+        title: (l) => l.autoRun,
+        managedKey: 'app.autoRun',
+        select: (state) => state.autoRun,
+        update: (state, value) => state.copyWith(autoRun: value),
       ),
+      if (!simple)
+        ListItem.open(
+          title: Text(appLocalizations.onDemand),
+          widget: const OnDemandView(),
+        ),
       if (system.isAndroid) ...[
         _appSettingToggle(
           title: (l) => l.exclude,
@@ -539,9 +543,9 @@ class GeneralView extends ConsumerWidget {
     ];
   }
 
-  List<Widget> _logItems() {
+  List<Widget> _logItems({required bool simple}) {
     return [
-      const LogLevelItem(),
+      if (!simple) const LogLevelItem(),
       _appSettingToggle(
         title: (l) => l.logcat,
         managedKey: 'app.openLogs',
@@ -566,6 +570,7 @@ class GeneralView extends ConsumerWidget {
     );
     final externalController = controllerAddress.isNotEmpty;
     final androidSecure = ref.watch(androidSecureProvider);
+    final simple = ref.watch(simpleModeProvider);
     return BaseScaffold(
       title: appLocalizations.general,
       body: ListView(
@@ -577,46 +582,48 @@ class GeneralView extends ConsumerWidget {
           const ManagedSettingsHint(keys: generalPageKeys),
           generateSection(
             title: appLocalizations.startupAndBackground,
-            items: _startupItems(appLocalizations),
+            items: _startupItems(appLocalizations, simple: simple),
             footer: [
               if (system.isMacOS) appLocalizations.menuBarModeDesc,
-              if (!system.isDesktop) appLocalizations.autoRunDesc,
-              appLocalizations.onDemandDesc,
+              appLocalizations.autoRunDesc,
+              if (!simple) appLocalizations.onDemandDesc,
             ].join('\n'),
           ),
           generateSection(
             title: appLocalizations.requestsAndUpdates,
             items: _requestItems(),
           ),
-          generateSection(
-            title: appLocalizations.inbound,
-            items: _inboundItems(
-              authentication: authentication,
-              externalController: externalController,
-              androidSecure: androidSecure,
-            ),
-            footer: [
-              appLocalizations.externalControllerDesc(
-                externalController
-                    ? controllerAddress
-                    : defaultExternalController,
+          if (!simple) ...[
+            generateSection(
+              title: appLocalizations.inbound,
+              items: _inboundItems(
+                authentication: authentication,
+                externalController: externalController,
+                androidSecure: androidSecure,
               ),
-              appLocalizations.authenticationDesc,
-            ].join('\n'),
-          ),
-          generateSection(
-            title: appLocalizations.connection,
-            items: _connectionItems(),
-            footer: appLocalizations.autoCloseConnectionsDesc,
-          ),
-          generateSection(
-            title: appLocalizations.core,
-            items: _coreItems(),
-            footer: appLocalizations.ipv6Desc,
-          ),
+              footer: [
+                appLocalizations.externalControllerDesc(
+                  externalController
+                      ? controllerAddress
+                      : defaultExternalController,
+                ),
+                appLocalizations.authenticationDesc,
+              ].join('\n'),
+            ),
+            generateSection(
+              title: appLocalizations.connection,
+              items: _connectionItems(),
+              footer: appLocalizations.autoCloseConnectionsDesc,
+            ),
+            generateSection(
+              title: appLocalizations.core,
+              items: _coreItems(),
+              footer: appLocalizations.ipv6Desc,
+            ),
+          ],
           generateSection(
             title: appLocalizations.logsAndDiagnostics,
-            items: _logItems(),
+            items: _logItems(simple: simple),
             footer: appLocalizations.logcatDesc,
           ),
         ],

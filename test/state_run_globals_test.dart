@@ -60,6 +60,13 @@ void main() {
         'FlClashX/v1.2.3 core/$coreDisplayName/v1.19.32 Platform/${Platform.operatingSystem}',
       );
     });
+
+    test('an Android TV names itself androidtv', () {
+      expect(
+        _packageInfo.uaWith('v1.19.32', tv: true),
+        'FlClashX/v1.2.3 core/$coreDisplayName/v1.19.32 Platform/androidtv',
+      );
+    });
   });
 
   group('attach', () {

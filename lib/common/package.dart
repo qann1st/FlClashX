@@ -9,11 +9,12 @@ extension PackageInfoExtension on PackageInfo {
       appVersionDefine.isNotEmpty ? appVersionDefine : version;
 
   /// `FlClashX/v<app> core/Prizrak-Core/v<core> Platform/<os>`; the core token
-  /// is left out until a version is known.
-  String uaWith(String coreVersion) => [
+  /// is left out until a version is known. Android TV identifies as
+  /// `androidtv`, which still matches panel rules for Android.
+  String uaWith(String coreVersion, {bool tv = false}) => [
     '$appName/v$displayVersion',
     if (coreVersion.isNotEmpty) 'core/$coreDisplayName/$coreVersion',
-    'Platform/${Platform.operatingSystem}',
+    'Platform/${tv ? 'androidtv' : Platform.operatingSystem}',
   ].join(' ');
 }
 

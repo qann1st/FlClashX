@@ -95,6 +95,10 @@ class ProviderHeaders {
   /// `flclashx-special: noglobal` takes the Global outbound mode away.
   bool get globalModeAllowed => !(specials?.contains('noglobal') ?? false);
 
+  /// `flclashx-special: onlytun` leaves TUN as the only takeover: the system
+  /// proxy is off and locked.
+  bool get onlyTun => specials?.contains('onlytun') ?? false;
+
   bool get hideIp => specials?.contains('hideip') ?? false;
 
   /// `flclashx-closeconnections`: what a proxy switch drops.
@@ -108,6 +112,10 @@ class ProviderHeaders {
         'all' => CloseConnectionsScope.all,
         _ => null,
       };
+
+  /// `flclashx-special: simple` hides the fine settings while the profile is
+  /// selected.
+  bool get simpleMode => specials?.contains('simple') ?? false;
 
   bool get noVibration => specials?.contains('novibrate') ?? false;
 
