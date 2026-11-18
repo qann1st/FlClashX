@@ -34,6 +34,11 @@
               "id": "b872e06",
               "scope": "build",
               "text": "Format restart launcher"
+            },
+            {
+              "id": "18497c1",
+              "scope": "settings",
+              "text": "Restore managed startup switches"
             }
           ]
         }

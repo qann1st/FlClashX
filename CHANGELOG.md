@@ -11,6 +11,7 @@
 
 - **build** Keep S3 updater and restart self-contained (9a1dd75)
 - **build** Format restart launcher (b872e06)
+- **settings** Restore managed startup switches (18497c1)
 
 ## v0.6.3 (2026-11-15)
 
