@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.6 (2026-11-20)
+
+**Bug Fixes**
+
+- **proxies** Avoid blocking group fold animation (417e783)
+
 ## v0.6.5 (2026-11-19)
 
 **Features**

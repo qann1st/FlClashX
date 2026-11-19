@@ -2,6 +2,24 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.6",
+      "tag": "v0.6.6",
+      "date": "2026-11-20",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "417e783",
+              "scope": "proxies",
+              "text": "Avoid blocking group fold animation"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.5",
       "tag": "v0.6.5",
       "date": "2026-11-19",
