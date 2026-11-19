@@ -2,6 +2,24 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.5",
+      "tag": "v0.6.5",
+      "date": "2026-11-19",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "deb779f",
+              "scope": "upstream",
+              "text": "Adopt FlClashX v0.5.9-pre.1 and Prizrak-Core r4 / Elysium-Core r5"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.4",
       "tag": "v0.6.4",
       "date": "2026-11-18",

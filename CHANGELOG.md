@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.5 (2026-11-19)
+
+**Features**
+
+- **upstream** Adopt FlClashX v0.5.9-pre.1 and Prizrak-Core r4 / Elysium-Core r5 (deb779f)
+
 ## v0.6.4 (2026-11-18)
 
 **Features**
