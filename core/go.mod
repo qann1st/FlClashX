@@ -5,7 +5,11 @@ go 1.27.0
 // The browser fingerprints mihomo names (Firefox 148, Safari 26.3 and up)
 // live on utls' `v1.9.0-mod-meta` branch, which has no tag. Prizrak-Core also
 // needs the ML-DSA-65 Reality bits from legiz-ru's branch of that release.
-replace github.com/metacubex/utls => github.com/legiz-ru/prizrak-utls v0.0.0-20261111074409-d32f4d9296cf
+replace github.com/metacubex/utls => github.com/legiz-ru/prizrak-utls v0.0.0-20261115193325-827c5267ec58
+
+replace github.com/metacubex/quic-go => github.com/legiz-ru/prizrak-quic-go v0.61.1-0.20261115185305-1bee6927e56b
+
+replace google.golang.org/protobuf => github.com/metacubex/protobuf-go v0.0.0-20260306035419-7ceee0674686
 
 // v0.4.28 plus the darwin dscacheutil reap, see third_party/README.md.
 replace github.com/metacubex/sing-tun => ./third_party/sing-tun
@@ -13,7 +17,7 @@ replace github.com/metacubex/sing-tun => ./third_party/sing-tun
 // Windows builds swap this file for go.windows.mod, which replaces the same
 // module with the Elysium-Core fork vendored in third_party. Every other
 // platform builds this original Prizrak-Core release.
-replace github.com/metacubex/mihomo => github.com/legiz-ru/Prizrak-Core v1.19.34-r1
+replace github.com/metacubex/mihomo => github.com/legiz-ru/Prizrak-Core v1.19.34-r4
 
 // Elysium-Core's http2 tuning, from the fork's own go.mod.
 replace github.com/metacubex/http => github.com/legiz-ru/prizrak-http v0.0.0-20260930180911-da5b4c1e0882
@@ -21,9 +25,13 @@ replace github.com/metacubex/http => github.com/legiz-ru/prizrak-http v0.0.0-202
 require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/dlclark/regexp2 v1.12.0
+	github.com/klauspost/compress v1.17.9
+	github.com/metacubex/chi v0.1.1
 	github.com/metacubex/http v0.1.8
 	github.com/metacubex/mihomo v1.19.33
+	github.com/metacubex/tls v0.1.9
 	github.com/miekg/dns v1.1.63
+	github.com/oschwald/maxminddb-golang v1.12.0
 	go.yaml.in/yaml/v3 v3.0.5
 )
 
@@ -62,7 +70,6 @@ require (
 	github.com/insomniacslk/dhcp v0.0.0-20250109001534-8abf58130905 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/jsimonetti/rtnetlink v1.4.0 // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
 	github.com/klauspost/reedsolomon v1.12.3 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
@@ -74,7 +81,6 @@ require (
 	github.com/metacubex/bbolt v0.0.0-20260706163408-d4ec34ad7c48 // indirect
 	github.com/metacubex/blake3 v0.1.0 // indirect
 	github.com/metacubex/chacha v0.1.5 // indirect
-	github.com/metacubex/chi v0.1.1 // indirect
 	github.com/metacubex/connect-ip-go v0.0.0-20260727083417-67ccdb0cf771 // indirect
 	github.com/metacubex/cpu v0.1.2 // indirect
 	github.com/metacubex/edwards25519 v1.2.0 // indirect
@@ -109,7 +115,6 @@ require (
 	github.com/metacubex/tailscale v0.0.0-20260821153257-ff0ecd818181 // indirect
 	github.com/metacubex/tailscale-wireguard-go v0.0.0-20260725073821-e61ab99cede2 // indirect
 	github.com/metacubex/tfo-go v0.0.0-20261026151606-08d83ec08c84 // indirect
-	github.com/metacubex/tls v0.1.9 // indirect
 	github.com/metacubex/utls v1.9.0-alpha.1 // indirect
 	github.com/metacubex/wazero v0.0.0-20260628025728-9ae6bdcf2a7d // indirect
 	github.com/metacubex/wireguard-go v0.0.0-20250820062549-a6cecdd7f57f // indirect
@@ -119,7 +124,6 @@ require (
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
 	github.com/oasisprotocol/deoxysii v0.0.0-20220228165953-2091330c22b7 // indirect
 	github.com/openacid/low v0.1.21 // indirect
-	github.com/oschwald/maxminddb-golang v1.12.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.27 // indirect
 	github.com/pires/go-proxyproto v0.8.0 // indirect
 	github.com/rasky/go-lzo v0.0.0-20200203143853-96a758eda86e // indirect

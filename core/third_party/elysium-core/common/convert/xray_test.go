@@ -105,6 +105,7 @@ func TestConvertsXrayJSONRemnawave(t *testing.T) {
 	assert.Equal(t, "obfs-pw", ee["obfs-password"])
 	assert.Equal(t, "209715200 bps", ee["down"])
 	assert.NotContains(t, ee, "up")
+	assert.NotContains(t, ee, "disable-chrome-parrot") // the browser handshake, Xray's default
 
 	x := byName["XHTTP"]
 	assert.Equal(t, "xhttp", x["network"])
@@ -269,6 +270,76 @@ func TestConvertsXrayJSONResilience(t *testing.T) {
 	}
 	assert.False(t, IsXrayJSON([]byte("vless://x@y:1#z")))
 	assert.False(t, IsXrayJSON([]byte(base64.StdEncoding.EncodeToString([]byte("vless://x@y:1#z")))))
+}
+
+// Xray parrots Chrome's QUIC handshake in its hysteria outbound unless
+// finalmask.quicParams.disableChromeParrot is set, which becomes
+// disable-chrome-parrot.
+func TestConvertsXrayJSONHysteria2DisableChromeParrot(t *testing.T) {
+	sub := `[
+{"remarks":"default","outbounds":[{"tag":"proxy","protocol":"hysteria","settings":{"address":"a.example.com","port":443,"version":2},
+  "streamSettings":{"network":"hysteria","hysteriaSettings":{"version":2,"auth":"pw"},"security":"tls","tlsSettings":{"serverName":"a.example.com"}}}]},
+{"remarks":"enabled","outbounds":[{"tag":"proxy","protocol":"hysteria","settings":{"address":"b.example.com","port":443,"version":2},
+  "streamSettings":{"network":"hysteria","hysteriaSettings":{"version":2,"auth":"pw"},"security":"tls","tlsSettings":{"serverName":"b.example.com"},
+   "finalmask":{"quicParams":{"congestion":"bbr","disableChromeParrot":false}}}}]},
+{"remarks":"disabled","outbounds":[{"tag":"proxy","protocol":"hysteria","settings":{"address":"c.example.com","port":443,"version":2},
+  "streamSettings":{"network":"hysteria","hysteriaSettings":{"version":2,"auth":"pw"},"security":"tls","tlsSettings":{"serverName":"c.example.com"},
+   "finalmask":{"quicParams":{"disableChromeParrot":true}}}}]}
+]`
+	proxies, err := ConvertsXrayJSON([]byte(sub))
+	require.NoError(t, err)
+	require.Len(t, proxies, 3)
+	want := map[string]any{"default": nil, "enabled": nil, "disabled": true}
+	for _, p := range proxies {
+		assert.Equal(t, want[p["name"].(string)], p["disable-chrome-parrot"], p["name"])
+		_, err := adapter.ParseProxy(p)
+		require.NoError(t, err, p["name"])
+	}
+}
+
+// tlsSettings.enableSessionResumption becomes enable-session-resumption where
+// it is read: hysteria and vless xhttp or xdrive over HTTP/3.
+func TestConvertsXrayJSONSessionResumption(t *testing.T) {
+	sub := `[
+{"remarks":"hy","outbounds":[{"tag":"proxy","protocol":"hysteria","settings":{"address":"a.example.com","port":443,"version":2},
+  "streamSettings":{"network":"hysteria","hysteriaSettings":{"version":2,"auth":"pw"},"security":"tls","tlsSettings":{"serverName":"a.example.com","enableSessionResumption":true}}}]},
+{"remarks":"hy-off","outbounds":[{"tag":"proxy","protocol":"hysteria","settings":{"address":"b.example.com","port":443,"version":2},
+  "streamSettings":{"network":"hysteria","hysteriaSettings":{"version":2,"auth":"pw"},"security":"tls","tlsSettings":{"serverName":"b.example.com","enableSessionResumption":false}}}]},
+{"remarks":"xhttp-h3","outbounds":[{"tag":"proxy","protocol":"vless","settings":{"vnext":[{"address":"c.example.com","port":443,"users":[{"id":"b831381d-6324-4d53-ad4f-8cda48b30811","encryption":"none"}]}]},
+  "streamSettings":{"network":"xhttp","xhttpSettings":{"path":"/x"},"security":"tls","tlsSettings":{"serverName":"c.example.com","alpn":["h3"],"enableSessionResumption":true}}}]},
+{"remarks":"xhttp-h2","outbounds":[{"tag":"proxy","protocol":"vless","settings":{"vnext":[{"address":"d.example.com","port":443,"users":[{"id":"b831381d-6324-4d53-ad4f-8cda48b30811","encryption":"none"}]}]},
+  "streamSettings":{"network":"xhttp","xhttpSettings":{"path":"/x"},"security":"tls","tlsSettings":{"serverName":"d.example.com","alpn":["h2"],"enableSessionResumption":true}}}]},
+{"remarks":"ws","outbounds":[{"tag":"proxy","protocol":"vless","settings":{"vnext":[{"address":"e.example.com","port":443,"users":[{"id":"b831381d-6324-4d53-ad4f-8cda48b30811","encryption":"none"}]}]},
+  "streamSettings":{"network":"ws","wsSettings":{"path":"/w"},"security":"tls","tlsSettings":{"serverName":"e.example.com","enableSessionResumption":true}}}]}
+]`
+	proxies, err := ConvertsXrayJSON([]byte(sub))
+	require.NoError(t, err)
+	require.Len(t, proxies, 5)
+	want := map[string]bool{"hy": true, "xhttp-h3": true}
+	for _, p := range proxies {
+		name := p["name"].(string)
+		if want[name] {
+			assert.Equal(t, true, p["enable-session-resumption"], name)
+		} else {
+			assert.NotContains(t, p, "enable-session-resumption", name)
+		}
+		_, err := adapter.ParseProxy(p)
+		require.NoError(t, err, name)
+	}
+
+	// xdrive over HTTP/3 reads it too, over h2 it does not.
+	for alpn, want := range map[string]bool{"h3": true, "h2": false} {
+		xdrive := strings.Replace(xdriveXrayJSON, `"alpn":["h2"]`, `"alpn":["`+alpn+`"],"enableSessionResumption":true`, 1)
+		proxies, err := ConvertsXrayJSON([]byte(xdrive))
+		require.NoError(t, err)
+		if want {
+			assert.Equal(t, true, proxies[0]["enable-session-resumption"], alpn)
+		} else {
+			assert.NotContains(t, proxies[0], "enable-session-resumption", alpn)
+		}
+		_, err = adapter.ParseProxy(proxies[0])
+		require.NoError(t, err, alpn)
+	}
 }
 
 const xdriveXrayJSON = `{"remarks":"XD","outbounds":[

@@ -61,6 +61,9 @@ type Vless struct {
 	jlsConfig       *jls.Config
 	realityConfig   *tlsC.RealityConfig
 	xdriveClient    *xdrive.Client
+	// quicSessions keeps the TLS session tickets of the HTTP/3 connections of
+	// xhttp and xdrive, with enable-session-resumption.
+	quicSessions *quicSessionCaches
 }
 
 type VlessOption struct {
@@ -99,6 +102,18 @@ type VlessOption struct {
 	PrivateKey        string            `proxy:"private-key,omitempty"`
 	ServerName        string            `proxy:"servername,omitempty"`
 	ClientFingerprint string            `proxy:"client-fingerprint,omitempty"`
+	// DisableChromeParrot turns off the browser QUIC handshakes of xhttp and
+	// xdrive over HTTP/3 (alpn: [h3]): by default they look like the
+	// browser's of client-fingerprint (quic-go's Config.Parrot, see
+	// common.QUICParrot), as Xray's XHTTP/3 and XDRIVE clients do; with it,
+	// quic-go's own, as Xray's finalmask.quicParams.disableChromeParrot.
+	// Prizrak-Core.
+	DisableChromeParrot bool `proxy:"disable-chrome-parrot,omitempty"`
+	// EnableSessionResumption resumes the TLS sessions of the QUIC
+	// connections of xhttp (upload and download) and xdrive over HTTP/3
+	// (alpn: [h3]), as Xray's tlsSettings.enableSessionResumption; see
+	// quicSessionCaches. Prizrak-Core.
+	EnableSessionResumption bool `proxy:"enable-session-resumption,omitempty"`
 }
 
 type XHTTPOptions struct {
@@ -424,7 +439,7 @@ func (v *Vless) xdriveDialer() *xdrive.Dialer {
 			if err := v.echConfig.ClientHandle(ctx, tlsConfig); err != nil {
 				return nil, err
 			}
-			return v.dialQUIC(ctx, addr, tlsConfig, cfg)
+			return v.dialH3QUIC(ctx, addr, tlsConfig, cfg, v.quicParrot(tlsOpts.ClientFingerprint, v.echConfig))
 		},
 	}
 }
@@ -490,9 +505,38 @@ func (v *Vless) dialTCP(ctx context.Context, addr string) (net.Conn, error) {
 	return finalMaskDialTCP(ctx, v.finalMask, v.dialer, v.finalMaskDialer, addr)
 }
 
+// quicParrot is the browser the QUIC handshakes of the proxy parrot with the
+// client-fingerprint and the ECH of their TLS.
+func (v *Vless) quicParrot(clientFingerprint string, echConfig *ech.Config) quic.Parrot {
+	return common.QUICParrot(v.option.DisableChromeParrot, clientFingerprint, echConfig != nil)
+}
+
+// dialH3QUIC opens a QUIC connection of xhttp or xdrive over HTTP/3,
+// parroting the browser parrot and resuming the TLS session with
+// enable-session-resumption.
+func (v *Vless) dialH3QUIC(ctx context.Context, addr string, tlsConfig *tls.Config, cfg *quic.Config, parrot quic.Parrot) (*quic.Conn, error) {
+	if v.quicSessions != nil {
+		tlsConfig.ClientSessionCache = v.quicSessions.get(addr)
+	}
+	quicConn, err := v.dialQUIC(ctx, addr, tlsConfig, cfg, parrot)
+	if err == nil && v.quicSessions != nil {
+		logQUICResumption(v.Name(), quicConn)
+	}
+	return quicConn, err
+}
+
 // dialQUIC opens the QUIC connection of xhttp over HTTP/3, through the
-// finalmask UDP chain when there is one.
-func (v *Vless) dialQUIC(ctx context.Context, addr string, tlsConfig *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
+// finalmask UDP chain when there is one, parroting the browser parrot.
+func (v *Vless) dialQUIC(ctx context.Context, addr string, tlsConfig *tls.Config, cfg *quic.Config, parrot quic.Parrot) (*quic.Conn, error) {
+	if parrot != quic.ParrotNone {
+		// http3 hands every dial the same config.
+		if cfg == nil {
+			cfg = &quic.Config{}
+		} else {
+			cfg = cfg.Clone()
+		}
+		cfg.Parrot = parrot
+	}
 	option := common.DialQuicOption{Early: true}
 	if v.finalMask.HasUDP() {
 		return finalMaskDialQUIC(ctx, v.finalMask, v.finalMaskDialer, addr, tlsConfig, cfg, option)
@@ -679,6 +723,9 @@ func NewVless(option VlessOption) (*Vless, error) {
 		option: &option,
 	}
 	v.dialer = option.NewDialer(v.DialOptions())
+	if option.EnableSessionResumption {
+		v.quicSessions = &quicSessionCaches{}
+	}
 
 	v.finalMask, err = option.FinalMask.Parse()
 	if err != nil {
@@ -937,7 +984,7 @@ func NewVless(option VlessOption) (*Vless, error) {
 					if err != nil {
 						return nil, err
 					}
-					return v.dialQUIC(ctx, v.addr, tlsConfig, cfg)
+					return v.dialH3QUIC(ctx, v.addr, tlsConfig, cfg, v.quicParrot(v.option.ClientFingerprint, v.echConfig))
 				},
 				v.option.ALPN,
 				hKeepAlivePeriod,
@@ -1125,7 +1172,7 @@ func NewVless(option VlessOption) (*Vless, error) {
 						if err != nil {
 							return nil, err
 						}
-						return v.dialQUIC(ctx, downloadAddr, tlsConfig, cfg)
+						return v.dialH3QUIC(ctx, downloadAddr, tlsConfig, cfg, v.quicParrot(downloadClientFingerprint, downloadEchConfig))
 					},
 					downloadALPN,
 					downloadHKeepAlivePeriod,

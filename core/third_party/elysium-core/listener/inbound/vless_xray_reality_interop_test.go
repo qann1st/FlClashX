@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -104,6 +105,75 @@ func TestVLESSRealityXrayInterop(t *testing.T) {
 	}
 }
 
+// Our client sends REALITY version 26.11.10: an Xray server with
+// minClientVer 26.11.10 accepts it and one with maxClientVer 26.11.9 turns it
+// away.
+func TestVLESSRealityXrayServerClientVersion(t *testing.T) {
+	xrayBinary := os.Getenv("XRAY_BINARY")
+	if xrayBinary == "" {
+		t.Skip("XRAY_BINARY is not set; point it at a current Xray-core executable")
+	}
+	origin := startTLSMirrorInteropCarrierTLS(t, padRealityCarrierCertificate)
+	echoAddr := startVMessInteropEcho(t)
+	privateKey, err := ecdh.X25519().GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	mldsa65Seed := make([]byte, 32)
+	mldsa65Seed[0] = 3
+
+	testCases := []struct {
+		name     string
+		settings map[string]any
+		accepted bool
+	}{
+		{name: "minClientVer 26.11.10", settings: map[string]any{"minClientVer": "26.11.10"}, accepted: true},
+		{name: "maxClientVer 26.11.10", settings: map[string]any{"maxClientVer": "26.11.10"}, accepted: true},
+		{name: "minClientVer 26.11.11", settings: map[string]any{"minClientVer": "26.11.11"}},
+		{name: "maxClientVer 26.11.9", settings: map[string]any{"maxClientVer": "26.11.9"}},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			xrayPort := vmessInteropReserveTCPPort(t)
+			config := xrayRealityServerConfigWithSettings(t, xrayPort.Port(), origin.addr, privateKey, mldsa65Seed, testCase.settings)
+			startXrayRealityServer(t, xrayBinary, config, xrayPort)
+
+			out, err := outbound.NewVless(outbound.VlessOption{
+				Name:              "vless_reality_xray_version",
+				Server:            "127.0.0.1",
+				Port:              xrayPort.Port(),
+				UUID:              xrayRealityPlainUUID,
+				TLS:               true,
+				ServerName:        "localhost",
+				ClientFingerprint: "chrome",
+				RealityOpts: outbound.RealityOptions{
+					PublicKey: base64.RawURLEncoding.EncodeToString(privateKey.PublicKey().Bytes()),
+					ShortID:   xrayRealityShortID,
+				},
+			})
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = out.Close() })
+
+			dial := func() (net.Conn, error) {
+				return out.DialContext(context.Background(), vmessInteropMetadata(t, echoAddr))
+			}
+			if testCase.accepted {
+				vmessInteropRoundTripWithRetry(t, dial, 128*1024)
+				return
+			}
+			conn, err := dial()
+			if err == nil {
+				_ = conn.Close()
+				t.Fatal("the Xray REALITY server authenticated our client")
+			}
+			if message := err.Error(); !strings.Contains(message, "REALITY authentication failed") && !strings.Contains(message, "x509:") {
+				t.Fatalf("dial error = %v, want one from a client the server forwarded to the target", err)
+			}
+		})
+	}
+}
+
+// An Xray client reaches our REALITY server by default and with
+// require-mlkem when its fingerprint sends X25519MLKEM768 (Xray's default,
+// chrome); without it (ios) only by default.
 func TestVLESSRealityXrayClientToMihomoServer(t *testing.T) {
 	xrayBinary := os.Getenv("XRAY_BINARY")
 	if xrayBinary == "" {
@@ -118,33 +188,61 @@ func TestVLESSRealityXrayClientToMihomoServer(t *testing.T) {
 	_, mldsa65Verify, err := utls.RealityMldsa65KeyFromSeed(mldsa65Seed)
 	require.NoError(t, err)
 
-	in, err := inbound.NewVless(&inbound.VlessOption{
-		BaseOption: inbound.BaseOption{NameStr: "vless_reality_xray_client", Listen: "127.0.0.1", Port: "0"},
-		Users:      []inbound.VlessUser{{Username: "xray", UUID: xrayRealityPlainUUID}},
-		RealityConfig: inbound.RealityConfig{
-			Dest:        origin.addr,
-			PrivateKey:  base64.RawURLEncoding.EncodeToString(privateKey.Bytes()),
-			ShortID:     []string{xrayRealityShortID},
-			ServerNames: []string{"localhost"},
-			Mldsa65Seed: base64.RawURLEncoding.EncodeToString(mldsa65Seed),
-			Show:        true,
-		},
-	})
-	require.NoError(t, err)
-	require.NoError(t, in.Listen(vmessInteropDirectTunnel(t)))
-	t.Cleanup(func() { _ = in.Close() })
-	mihomoPort := vmessInteropParsePort(t, vmessInteropPort(in.Address()))
+	testCases := []struct {
+		name         string
+		fingerprint  string
+		requireMLKEM bool
+		accepted     bool
+	}{
+		{name: "chrome", fingerprint: "chrome", accepted: true},
+		{name: "chrome require-mlkem", fingerprint: "chrome", requireMLKEM: true, accepted: true},
+		{name: "ios", fingerprint: "ios", accepted: true},
+		{name: "ios require-mlkem", fingerprint: "ios", requireMLKEM: true},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			in, err := inbound.NewVless(&inbound.VlessOption{
+				BaseOption: inbound.BaseOption{NameStr: "vless_reality_xray_client", Listen: "127.0.0.1", Port: "0"},
+				Users:      []inbound.VlessUser{{Username: "xray", UUID: xrayRealityPlainUUID}},
+				RealityConfig: inbound.RealityConfig{
+					Dest:         origin.addr,
+					PrivateKey:   base64.RawURLEncoding.EncodeToString(privateKey.Bytes()),
+					ShortID:      []string{xrayRealityShortID},
+					ServerNames:  []string{"localhost"},
+					Mldsa65Seed:  base64.RawURLEncoding.EncodeToString(mldsa65Seed),
+					RequireMLKEM: testCase.requireMLKEM,
+					Show:         true,
+				},
+			})
+			require.NoError(t, err)
+			require.NoError(t, in.Listen(vmessInteropDirectTunnel(t)))
+			t.Cleanup(func() { _ = in.Close() })
+			mihomoPort := vmessInteropParsePort(t, vmessInteropPort(in.Address()))
 
-	xrayPort := vmessInteropReserveTCPPort(t)
-	config := xrayRealityClientConfig(t, xrayPort.Port(), mihomoPort, echoAddr, privateKey.PublicKey().Bytes(), mldsa65Verify)
-	startXrayRealityServer(t, xrayBinary, config, xrayPort)
+			xrayPort := vmessInteropReserveTCPPort(t)
+			config := xrayRealityClientConfigWithFingerprint(t, xrayPort.Port(), mihomoPort, echoAddr, privateKey.PublicKey().Bytes(), mldsa65Verify, testCase.fingerprint)
+			startXrayRealityServer(t, xrayBinary, config, xrayPort)
 
-	vmessInteropRoundTripWithRetry(t, func() (net.Conn, error) {
-		return net.Dial("tcp", net.JoinHostPort("127.0.0.1", fmt.Sprint(xrayPort.Port())))
-	}, 128*1024)
+			dial := func() (net.Conn, error) {
+				return net.Dial("tcp", net.JoinHostPort("127.0.0.1", fmt.Sprint(xrayPort.Port())))
+			}
+			if testCase.accepted {
+				vmessInteropRoundTripWithRetry(t, dial, 128*1024)
+				return
+			}
+			conn, err := dial()
+			require.NoError(t, err)
+			require.Error(t, vmessInteropRoundTripConn(conn, 1024), "the Xray client reached the echo server through a REALITY server that should have turned it away")
+		})
+	}
 }
 
 func xrayRealityClientConfig(t *testing.T, listenPort, serverPort int, targetAddr string, publicKey, mldsa65Verify []byte) []byte {
+	t.Helper()
+	return xrayRealityClientConfigWithFingerprint(t, listenPort, serverPort, targetAddr, publicKey, mldsa65Verify, "chrome")
+}
+
+func xrayRealityClientConfigWithFingerprint(t *testing.T, listenPort, serverPort int, targetAddr string, publicKey, mldsa65Verify []byte, fingerprint string) []byte {
 	t.Helper()
 	targetHost, targetPort, err := net.SplitHostPort(targetAddr)
 	require.NoError(t, err)
@@ -170,7 +268,7 @@ func xrayRealityClientConfig(t *testing.T, listenPort, serverPort int, targetAdd
 				"security": "reality",
 				"realitySettings": map[string]any{
 					"show":          true,
-					"fingerprint":   "chrome",
+					"fingerprint":   fingerprint,
 					"serverName":    "localhost",
 					"publicKey":     base64.RawURLEncoding.EncodeToString(publicKey),
 					"shortId":       xrayRealityShortID,
@@ -186,6 +284,25 @@ func xrayRealityClientConfig(t *testing.T, listenPort, serverPort int, targetAdd
 
 func xrayRealityServerConfig(t *testing.T, port int, originAddr string, privateKey *ecdh.PrivateKey, mldsa65Seed []byte) []byte {
 	t.Helper()
+	return xrayRealityServerConfigWithSettings(t, port, originAddr, privateKey, mldsa65Seed, nil)
+}
+
+// xrayRealityServerConfigWithSettings adds extra to realitySettings.
+func xrayRealityServerConfigWithSettings(t *testing.T, port int, originAddr string, privateKey *ecdh.PrivateKey, mldsa65Seed []byte, extra map[string]any) []byte {
+	t.Helper()
+	realitySettings := map[string]any{
+		"show":        true,
+		"target":      originAddr,
+		"serverNames": []string{"localhost"},
+		"privateKey":  base64.RawURLEncoding.EncodeToString(privateKey.Bytes()),
+		"shortIds":    []string{xrayRealityShortID},
+		"mldsa65Seed": base64.RawURLEncoding.EncodeToString(mldsa65Seed),
+		// Without minClientVer in extra, the JSON builder applies
+		// Xray-core's default minimum (currently 26.3.27).
+	}
+	for key, value := range extra {
+		realitySettings[key] = value
+	}
 	config := map[string]any{
 		"log": map[string]any{
 			"loglevel": "debug",
@@ -202,18 +319,9 @@ func xrayRealityServerConfig(t *testing.T, port int, originAddr string, privateK
 				"decryption": "none",
 			},
 			"streamSettings": map[string]any{
-				"network":  "tcp",
-				"security": "reality",
-				"realitySettings": map[string]any{
-					"show":        true,
-					"target":      originAddr,
-					"serverNames": []string{"localhost"},
-					"privateKey":  base64.RawURLEncoding.EncodeToString(privateKey.Bytes()),
-					"shortIds":    []string{xrayRealityShortID},
-					"mldsa65Seed": base64.RawURLEncoding.EncodeToString(mldsa65Seed),
-					// Deliberately omit minClientVer. The JSON builder must apply
-					// Xray-core's default minimum (currently 26.3.27).
-				},
+				"network":         "tcp",
+				"security":        "reality",
+				"realitySettings": realitySettings,
 			},
 		}},
 		"outbounds": []any{map[string]any{

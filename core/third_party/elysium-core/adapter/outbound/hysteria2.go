@@ -70,6 +70,20 @@ type Hysteria2Option struct {
 	BBRProfile        string     `proxy:"bbr-profile,omitempty"`
 	UdpMTU            int        `proxy:"udp-mtu,omitempty"`
 	HandshakeTimeout  int        `proxy:"handshake-timeout,omitempty"`
+	// DisableChromeParrot turns off the browser QUIC handshake: by default
+	// the handshake looks like a browser's (quic-go's Config.Parrot), as with
+	// the official Hysteria client and Xray; with it, quic-go's own, as
+	// Xray's finalmask.quicParams.disableChromeParrot. Prizrak-Core.
+	DisableChromeParrot bool `proxy:"disable-chrome-parrot,omitempty"`
+	// ClientFingerprint picks the browser of the QUIC handshake, as Xray's
+	// tlsSettings.fingerprint does; see common.QUICParrot.
+	ClientFingerprint string `proxy:"client-fingerprint,omitempty"`
+	// EnableSessionResumption keeps the TLS session tickets of the server
+	// and resumes the next QUIC connection with one, as Xray's
+	// tlsSettings.enableSessionResumption; with a ticket that allows it the
+	// HTTP/3 SETTINGS go in 0-RTT, the auth request and the proxied streams
+	// wait for the handshake. Prizrak-Core.
+	EnableSessionResumption bool `proxy:"enable-session-resumption,omitempty"`
 
 	RealmOpts Hysteria2RealmOption `proxy:"realm-opts,omitempty"`
 
@@ -216,6 +230,10 @@ func NewHysteria2(option Hysteria2Option) (*Hysteria2, error) {
 	}
 
 	tlsClientConfig := tlsConfig
+	if option.EnableSessionResumption {
+		// One server: port hopping changes the port, not the server.
+		tlsClientConfig.ClientSessionCache = tls.NewLRUClientSessionCache(quicSessionCacheSize)
+	}
 	echConfig, err := option.ECHOpts.Parse()
 	if err != nil {
 		return nil, err
@@ -232,6 +250,10 @@ func NewHysteria2(option Hysteria2Option) (*Hysteria2, error) {
 		MaxStreamReceiveWindow:         option.MaxStreamReceiveWindow,
 		InitialConnectionReceiveWindow: option.InitialConnectionReceiveWindow,
 		MaxConnectionReceiveWindow:     option.MaxConnectionReceiveWindow,
+		// Pins the browser's flow control windows, stream limits, idle
+		// timeout and packet size over the values above; DialQuic gives the
+		// Transport the browser's connection IDs.
+		Parrot: common.QUICParrot(option.DisableChromeParrot, option.ClientFingerprint, echConfig != nil),
 	}
 
 	clientOptions := hysteria2.ClientOptions{
@@ -255,7 +277,11 @@ func NewHysteria2(option Hysteria2Option) (*Hysteria2, error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			return common.DialQuic(ctx, addr, outbound.DialOptions(), dialer, tlsCfg, cfg, common.DialQuicOption{Early: early})
+			pc, quicConn, err := common.DialQuic(ctx, addr, outbound.DialOptions(), dialer, tlsCfg, cfg, common.DialQuicOption{Early: early})
+			if err == nil && option.EnableSessionResumption {
+				logQUICResumption(option.Name, quicConn)
+			}
+			return pc, quicConn, err
 		}),
 		SetBBRCongestion: func(quicConn *quic.Conn) {
 			common.SetCongestionController(quicConn, "bbr", option.CWND, option.BBRProfile)
