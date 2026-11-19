@@ -1,3 +1,4 @@
+import 'package:fl_clash/common/system.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -133,6 +134,31 @@ void main() {
       'Disclaimer',
     ]) {
       expect(find.text(hidden), findsNothing, reason: hidden);
+    }
+
+    await tester.tap(find.text('General'));
+    await tester.pumpAndSettle();
+
+    final autoRun = find.text('Auto run');
+    final updateCheck = find.text('Auto check for updates');
+    expect(autoRun, findsOneWidget);
+    expect(
+      tester.getTopLeft(autoRun).dy,
+      lessThan(tester.getTopLeft(updateCheck).dy),
+    );
+    if (system.isDesktop) {
+      final autoLaunch = find.text('Auto launch');
+      final silentLaunch = find.text('Silent launch');
+      expect(autoLaunch, findsOneWidget);
+      expect(silentLaunch, findsOneWidget);
+      expect(
+        tester.getTopLeft(autoLaunch).dy,
+        lessThan(tester.getTopLeft(silentLaunch).dy),
+      );
+      expect(
+        tester.getTopLeft(silentLaunch).dy,
+        lessThan(tester.getTopLeft(autoRun).dy),
+      );
     }
     expect(tester.takeException(), null);
   });

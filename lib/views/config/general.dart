@@ -396,18 +396,30 @@ class GeneralView extends ConsumerWidget {
     required bool simple,
   }) {
     return [
-      if (system.isMacOS)
+      if (system.isDesktop) ...[
         _appSettingToggle(
-          title: (l) => l.menuBarMode,
-          select: (state) => state.menuBarMode,
-          update: (state, value) => state.copyWith(menuBarMode: value),
+          title: (l) => l.autoLaunch,
+          select: (state) => state.autoLaunch,
+          update: (state, value) => state.copyWith(autoLaunch: value),
         ),
+        _appSettingToggle(
+          title: (l) => l.silentLaunch,
+          select: (state) => state.silentLaunch,
+          update: (state, value) => state.copyWith(silentLaunch: value),
+        ),
+      ],
       _appSettingToggle(
         title: (l) => l.autoRun,
         managedKey: 'app.autoRun',
         select: (state) => state.autoRun,
         update: (state, value) => state.copyWith(autoRun: value),
       ),
+      if (system.isMacOS)
+        _appSettingToggle(
+          title: (l) => l.menuBarMode,
+          select: (state) => state.menuBarMode,
+          update: (state, value) => state.copyWith(menuBarMode: value),
+        ),
       if (!simple)
         ListItem.open(
           title: Text(appLocalizations.onDemand),
@@ -584,8 +596,9 @@ class GeneralView extends ConsumerWidget {
             title: appLocalizations.startupAndBackground,
             items: _startupItems(appLocalizations, simple: simple),
             footer: [
-              if (system.isMacOS) appLocalizations.menuBarModeDesc,
+              if (system.isDesktop) appLocalizations.silentLaunchDesc,
               appLocalizations.autoRunDesc,
+              if (system.isMacOS) appLocalizations.menuBarModeDesc,
               if (!simple) appLocalizations.onDemandDesc,
             ].join('\n'),
           ),
