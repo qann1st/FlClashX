@@ -2,6 +2,24 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.7",
+      "tag": "v0.6.7",
+      "date": "2026-11-20",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "8506157",
+              "scope": "settings",
+              "text": "Restore startup controls in General"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.6",
       "tag": "v0.6.6",
       "date": "2026-11-20",
@@ -31,7 +49,7 @@
             {
               "id": "deb779f",
               "scope": "upstream",
-              "text": "Adopt FlClashX v0.5.9-pre.1 and Prizrak-Core r4 / Elysium-Core r5"
+              "text": "Adopt v0.5.9-pre.1 and core r4/r5"
             }
           ]
         },
@@ -50,21 +68,21 @@
     {
       "version": "0.6.4",
       "tag": "v0.6.4",
-      "date": "2026-11-18",
+      "date": "2026-11-19",
       "prerelease": false,
       "groups": [
         {
           "type": "feat",
           "entries": [
             {
-              "id": "7716f1e",
-              "scope": "upstream",
-              "text": "Adopt v0.5.7"
-            },
-            {
               "id": "b1ae944",
               "scope": "upstream",
               "text": "Adopt v0.5.8"
+            },
+            {
+              "id": "7716f1e",
+              "scope": "upstream",
+              "text": "Adopt v0.5.7"
             }
           ]
         },
@@ -72,14 +90,9 @@
           "type": "fix",
           "entries": [
             {
-              "id": "9a1dd75",
-              "scope": "build",
-              "text": "Keep S3 updater and restart self-contained"
-            },
-            {
-              "id": "b872e06",
-              "scope": "build",
-              "text": "Format restart launcher"
+              "id": "3cea2e2",
+              "scope": "settings",
+              "text": "Preserve startup switches from profiles"
             },
             {
               "id": "18497c1",
@@ -87,9 +100,14 @@
               "text": "Restore managed startup switches"
             },
             {
-              "id": "3cea2e2",
-              "scope": "settings",
-              "text": "Preserve startup switches from profiles"
+              "id": "b872e06",
+              "scope": "build",
+              "text": "Format restart launcher"
+            },
+            {
+              "id": "9a1dd75",
+              "scope": "build",
+              "text": "Keep S3 updater and restart self-contained"
             }
           ]
         }

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.7 (2026-11-20)
+
+**Bug Fixes**
+
+- **settings** Restore startup controls in General (8506157)
+
 ## v0.6.6 (2026-11-20)
 
 **Bug Fixes**
@@ -10,25 +16,25 @@
 
 **Features**
 
-- **upstream** Adopt FlClashX v0.5.9-pre.1 and Prizrak-Core r4 / Elysium-Core r5 (deb779f)
+- **upstream** Adopt v0.5.9-pre.1 and core r4/r5 (deb779f)
 
 **Bug Fixes**
 
 - **tests** Ignore disabled core option stubs (9bfd0c4)
 
-## v0.6.4 (2026-11-18)
+## v0.6.4 (2026-11-19)
 
 **Features**
 
-- **upstream** Adopt v0.5.7 (7716f1e)
 - **upstream** Adopt v0.5.8 (b1ae944)
+- **upstream** Adopt v0.5.7 (7716f1e)
 
 **Bug Fixes**
 
-- **build** Keep S3 updater and restart self-contained (9a1dd75)
-- **build** Format restart launcher (b872e06)
-- **settings** Restore managed startup switches (18497c1)
 - **settings** Preserve startup switches from profiles (3cea2e2)
+- **settings** Restore managed startup switches (18497c1)
+- **build** Format restart launcher (b872e06)
+- **build** Keep S3 updater and restart self-contained (9a1dd75)
 
 ## v0.6.3 (2026-11-15)
 
