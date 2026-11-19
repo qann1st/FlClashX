@@ -904,7 +904,11 @@ void main() {
       for (final file in Directory(
         '$root/outbound',
       ).listSync().whereType<File>())
-        if (!file.path.endsWith('_test.go'))
+        // The fallback implementations are guarded by `no_*` build tags. The
+        // release core uses the regular implementations, so letting a stub
+        // overwrite its matching option struct makes this check depend on the
+        // filesystem enumeration order.
+        if (!file.path.endsWith('_test.go') && !file.path.endsWith('_stub.go'))
           for (final match in RegExp(
             r'^type (\w+) struct \{\n([\s\S]*?)\n\}',
             multiLine: true,
