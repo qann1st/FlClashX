@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:ui';
 
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -33,7 +32,7 @@ class _CommonExpandIconState extends State<CommonExpandIcon>
     );
     _iconTurns = _animationController.drive(_iconTurnTween);
     if (widget.expand) {
-      _animationController.value = pi;
+      _animationController.value = 1;
     }
   }
 

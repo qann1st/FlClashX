@@ -326,10 +326,12 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
   // A delay sort reorders the cards, and a card keyed by its proxy keeps its
   // focus and state instead of handing them to whichever lands in its place.
   // mihomo lets a group list a proxy twice, so a key counts the name's repeats.
-  List<(Proxy, ValueKey<(String, int)>)> _keyedProxies() {
+  List<(Proxy, ValueKey<(String, int)>)> _keyedProxies({int? limit}) {
     final seen = <String, int>{};
     return [
-      for (final proxy in widget.group.all)
+      for (final proxy in widget.group.all.take(
+        limit ?? widget.group.all.length,
+      ))
         (
           proxy,
           ValueKey((
@@ -419,12 +421,19 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
   /// The card reaches up behind the header's rounded bottom corners, so the
   /// two read as one while the rows unfold or fold.
   Widget _buildUnfoldingRows(double extent, ShapeDecoration decoration) {
-    final rows = _keyedProxies().chunks(widget.columns).toList();
+    // This temporary layout exists only for the animation. Building keys and
+    // rows for every proxy here blocks the UI for a large subscription even
+    // though the transition can show at most one screenful.
+    final rowCount =
+        (widget.group.all.length + widget.columns - 1) ~/ widget.columns;
     final visible = min(
-      rows.length.toDouble(),
+      rowCount.toDouble(),
       MediaQuery.sizeOf(context).height / extent,
     );
-    final count = min(rows.length, visible.floor() + 1);
+    final count = min(rowCount, visible.floor() + 1);
+    final rows = _keyedProxies(
+      limit: count * widget.columns,
+    ).chunks(widget.columns).toList();
     return Stack(
       clipBehavior: Clip.none,
       children: [

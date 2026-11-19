@@ -581,6 +581,55 @@ void proxiesBarTests() {
 }
 
 void oneGroupTests() {
+  testWidgets('folding a large group builds only the rows that can animate', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(500, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final profile = Profile.normal();
+    final group = Group(
+      name: 'Selector',
+      type: GroupType.Selector,
+      hidden: false,
+      all: List.generate(500, (index) => Proxy(name: 'P$index', type: 'ss')),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        profilesProvider.overrideWith(() => TestProfiles([profile])),
+        currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+        currentGroupsStateProvider.overrideWithValue(
+          GroupsState(value: [group]),
+        ),
+        groupsProvider.overrideWithValue([group]),
+      ],
+    );
+    addTearDown(container.dispose);
+    globalState.container = container;
+    container
+        .read(viewSizeProvider.notifier)
+        .update((_) => const Size(500, 1000));
+    container
+        .read(proxiesStyleSettingProvider.notifier)
+        .update((state) => state.copyWith(type: ProxiesType.list));
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TestApp(child: ProxiesView()),
+      ),
+    );
+    await tester.tap(find.text('Selector'));
+    await tester.pump();
+
+    expect(
+      find.byType(ProxyCard, skipOffstage: false).evaluate().length,
+      lessThan(100),
+    );
+  });
+
   testWidgets('onegroup shows the proxies of the server group alone', (
     tester,
   ) async {
