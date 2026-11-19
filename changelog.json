@@ -16,6 +16,16 @@
               "text": "Adopt FlClashX v0.5.9-pre.1 and Prizrak-Core r4 / Elysium-Core r5"
             }
           ]
+        },
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "9bfd0c4",
+              "scope": "tests",
+              "text": "Ignore disabled core option stubs"
+            }
+          ]
         }
       ]
     },
