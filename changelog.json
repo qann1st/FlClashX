@@ -2,6 +2,24 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.9",
+      "tag": "v0.6.9",
+      "date": "2026-11-23",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "b7143d7",
+              "scope": "windows",
+              "text": "Start the bundled Zapret2 worker"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.8",
       "tag": "v0.6.8",
       "date": "2026-11-23",

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.9 (2026-11-23)
+
+**Bug Fixes**
+
+- **windows** Start the bundled Zapret2 worker (b7143d7)
+
 ## v0.6.8 (2026-11-23)
 
 **Breaking Changes**
