@@ -62,6 +62,7 @@
   "openLogsFolder": "Ouvrir le dossier des journaux",
   "resetApp": "Réinitialiser l’application",
   "resetAppTip": "Tous les profils, les réglages et le dossier de travail de l’application seront supprimés, puis l’application se fermera. Continuer ?",
+  "simpleMode": "Mode simplifié",
   "managedByProvider": "Géré par votre fournisseur",
   "managedByProviderTip": "Cette valeur vient de votre abonnement. Si vous la changez vous-même, les mises à jour de l’abonnement ne la toucheront plus. Clic droit ou appui long sur la ligne pour la rendre au fournisseur.",
   "takeOver": "Modifier",

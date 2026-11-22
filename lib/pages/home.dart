@@ -397,11 +397,14 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
     final itemCount = ref.watch(
       currentNavigationItemsStateProvider.select((state) => state.value.length),
     );
-    final fade = ref.watch(
-      appSettingProvider.select(
-        (state) => state.tabAnimation == TabAnimation.fade,
-      ),
-    );
+    // Desktop switches jump directly, before the new scroll bounds are known.
+    final fade =
+        ref.watch(isMobileViewProvider) &&
+        ref.watch(
+          appSettingProvider.select(
+            (state) => state.tabAnimation == TabAnimation.fade,
+          ),
+        );
     return PageView.builder(
       controller: _pageController,
       physics: const NeverScrollableScrollPhysics(),

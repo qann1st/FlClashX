@@ -1809,6 +1809,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage(
       "Silent launch starts without showing the window.",
     ),
+    "simpleMode": MessageLookupByLibrary.simpleMessage("Simple mode"),
     "singleAdd": MessageLookupByLibrary.simpleMessage("Single add"),
     "singleImport": MessageLookupByLibrary.simpleMessage("Single import"),
     "singleShareLinkOnly": MessageLookupByLibrary.simpleMessage(

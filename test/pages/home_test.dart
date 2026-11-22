@@ -507,6 +507,56 @@ void main() {
   );
 
   testWidgets(
+    'turning off provider simple mode updates the open General screen',
+    (tester) async {
+      const size = Size(1400, 1000);
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      const profile = Profile(
+        id: 1,
+        autoUpdateDuration: Duration.zero,
+        providerHeaders: {'flclashx-special': 'simple'},
+      );
+      final container = ProviderContainer(
+        overrides: [
+          profilesProvider.overrideWith(() => _HomeTestProfiles([profile])),
+          currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+        ],
+      );
+      addTearDown(container.dispose);
+      globalState.container = container;
+      container.read(viewSizeProvider.notifier).value = size;
+      container.read(currentPageLabelProvider.notifier).toPage(PageLabel.tools);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const TestApp(child: HomePage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('General'));
+      await tester.pumpAndSettle();
+      final general = find.byType(GeneralView);
+      final route = ModalRoute.of(tester.element(general));
+      expect(find.text('On demand'), findsNothing);
+
+      await tester.tapAt(tester.getCenter(find.text('Simple mode')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Change'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(simpleModeProvider), isFalse);
+      expect(ModalRoute.of(tester.element(general)), same(route));
+      expect(find.text('On demand').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'desktop navigation keeps arrow traversal after keyboard page changes',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 800);

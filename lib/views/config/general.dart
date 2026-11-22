@@ -555,9 +555,9 @@ class GeneralView extends ConsumerWidget {
     ];
   }
 
-  List<Widget> _logItems({required bool simple}) {
+  List<Widget> _logItems() {
     return [
-      if (!simple) const LogLevelItem(),
+      const LogLevelItem(),
       _appSettingToggle(
         title: (l) => l.logcat,
         managedKey: 'app.openLogs',
@@ -583,6 +583,11 @@ class GeneralView extends ConsumerWidget {
     final externalController = controllerAddress.isNotEmpty;
     final androidSecure = ref.watch(androidSecureProvider);
     final simple = ref.watch(simpleModeProvider);
+    final providerSimple = ref.watch(
+      managedSettingsProvider.select(
+        (keys) => keys.contains(simpleModeSetting),
+      ),
+    );
     return BaseScaffold(
       title: appLocalizations.general,
       body: ListView(
@@ -592,6 +597,25 @@ class GeneralView extends ConsumerWidget {
         ),
         children: [
           const ManagedSettingsHint(keys: generalPageKeys),
+          if (providerSimple)
+            generateSection(
+              items: [
+                ConfigToggleItem(
+                  title: (l) => l.simpleMode,
+                  managedKey: simpleModeSetting,
+                  selector: settingLockedProvider(simpleModeSetting),
+                  onChanged: (ref, enabled) {
+                    ref.read(fullSettingsUnlockedProvider.notifier).value =
+                        false;
+                    if (enabled) {
+                      ref
+                          .read(managedSettingsActionProvider.notifier)
+                          .release(simpleModeSetting);
+                    }
+                  },
+                ),
+              ],
+            ),
           generateSection(
             title: appLocalizations.startupAndBackground,
             items: _startupItems(appLocalizations, simple: simple),
@@ -636,7 +660,7 @@ class GeneralView extends ConsumerWidget {
           ],
           generateSection(
             title: appLocalizations.logsAndDiagnostics,
-            items: _logItems(simple: simple),
+            items: _logItems(),
             footer: appLocalizations.logcatDesc,
           ),
         ],

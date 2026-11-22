@@ -62,6 +62,7 @@
   "openLogsFolder": "Open logs folder",
   "resetApp": "Reset app",
   "resetAppTip": "Every profile, setting and the app's working folder will be deleted, then the app closes. Continue?",
+  "simpleMode": "Simple mode",
   "managedByProvider": "Managed by your provider",
   "managedByProviderTip": "This value comes from your subscription. If you change it yourself, subscription updates will leave it alone. Right-click or long-press the row to hand it back to the provider.",
   "takeOver": "Change",

@@ -62,6 +62,7 @@
   "openLogsFolder": "打开日志文件夹",
   "resetApp": "重置应用",
   "resetAppTip": "将删除所有配置文件、设置和应用工作目录，然后应用关闭。继续吗？",
+  "simpleMode": "简洁模式",
   "managedByProvider": "由提供商管理",
   "managedByProviderTip": "该值来自订阅。若自行修改，订阅更新将不再改动它。右键或长按该行可交还给提供商。",
   "takeOver": "修改",

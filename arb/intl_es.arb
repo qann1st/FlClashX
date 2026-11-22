@@ -62,6 +62,7 @@
   "openLogsFolder": "Abrir carpeta de registros",
   "resetApp": "Restablecer la aplicación",
   "resetAppTip": "Se eliminarán todos los perfiles, los ajustes y la carpeta de trabajo de la aplicación, y después la aplicación se cerrará. ¿Continuar?",
+  "simpleMode": "Modo simple",
   "managedByProvider": "Gestionado por tu proveedor",
   "managedByProviderTip": "Este valor viene de tu suscripción. Si lo cambias tú, las actualizaciones de la suscripción dejarán de tocarlo. Clic derecho o pulsación larga en la fila para devolverlo al proveedor.",
   "takeOver": "Cambiar",

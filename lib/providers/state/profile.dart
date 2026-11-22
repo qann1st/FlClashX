@@ -134,7 +134,8 @@ Future<String?> panelLogoPath(Ref ref, String url) async {
 
 @riverpod
 bool simpleMode(Ref ref) {
-  if (ref.watch(fullSettingsUnlockedProvider)) {
+  if (ref.watch(fullSettingsUnlockedProvider) ||
+      ref.watch(settingOwnedProvider(simpleModeSetting))) {
     return false;
   }
   return ref.watch(

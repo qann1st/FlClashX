@@ -44,15 +44,18 @@ void main() {
     providerHeaders: {'flclashx-settings': 'autoupdate'},
   );
 
-  Future<void> pumpGeneral(WidgetTester tester) async {
+  Future<void> pumpGeneral(
+    WidgetTester tester, [
+    Profile activeProfile = profile,
+  ]) async {
     tester.view.physicalSize = const Size(1000, 3000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     container = ProviderContainer(
       overrides: [
-        profilesProvider.overrideWith(() => TestProfiles([profile])),
-        currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
+        profilesProvider.overrideWith(() => TestProfiles([activeProfile])),
+        currentProfileIdProvider.overrideWithBuild((_, _) => activeProfile.id),
         noCore(),
       ],
     );
@@ -280,6 +283,66 @@ void main() {
   Finder lock({required bool locked}) => find.byWidgetPredicate(
     (widget) => widget is SettingLock && widget.locked == locked,
   );
+
+  testWidgets('simple mode and its log level can be taken over separately', (
+    tester,
+  ) async {
+    await pumpGeneral(
+      tester,
+      profile.copyWith(providerHeaders: {'flclashx-special': 'simple'}),
+    );
+    final mode = find.widgetWithText(ListTile, 'Simple mode');
+    final level = find.widgetWithText(ListTile, 'Log level');
+    expect(
+      find.descendant(of: mode, matching: lock(locked: true)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: level, matching: lock(locked: true)),
+      findsOneWidget,
+    );
+
+    await tester.tapAt(tester.getCenter(mode));
+    await tester.pumpAndSettle();
+    expect(find.text('Managed by your provider'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(container.read(simpleModeProvider), isTrue);
+
+    await tester.tapAt(tester.getCenter(level));
+    await tester.pumpAndSettle();
+    expect(find.text('Managed by your provider'), findsOneWidget);
+    await tester.tap(find.text('Change'));
+    await tester.pumpAndSettle();
+    await tester.tap(level);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('debug').last);
+    await tester.pumpAndSettle();
+    expect(container.read(patchClashConfigProvider).logLevel, LogLevel.debug);
+    expect(container.read(simpleModeProvider), isTrue);
+
+    await tester.tapAt(tester.getCenter(mode));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Change'));
+    await tester.pumpAndSettle();
+    expect(container.read(simpleModeProvider), isFalse);
+    expect(
+      find.descendant(of: mode, matching: lock(locked: false)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: level, matching: find.byType(SettingLock)),
+      findsNothing,
+    );
+
+    await tester.tap(mode);
+    await tester.pumpAndSettle();
+    expect(container.read(simpleModeProvider), isTrue);
+    expect(
+      find.descendant(of: level, matching: lock(locked: false)),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
     'a provider row shows a closed lock, a taken-over one an open lock',

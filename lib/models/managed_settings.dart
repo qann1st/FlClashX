@@ -14,6 +14,8 @@ const hideIpSetting = 'app.hideIp';
 /// Driven by `flclashx-special: novibrate`.
 const vibrationSetting = 'app.vibration';
 
+const simpleModeSetting = 'app.simpleMode';
+
 /// Cards the user arranged; `flclashx-widgets` replaces them only under
 /// `denywidgets`.
 const dashboardWidgetsSetting = 'app.dashboardWidgets';
@@ -58,6 +60,7 @@ String clashSettingKey(String yamlKey) => 'clash.$yamlKey';
 
 /// The lockable keys of each settings page, for its hint.
 const generalPageKeys = {
+  simpleModeSetting,
   'app.autoCheckUpdate',
   'app.openLogs',
   'app.closeConnections',

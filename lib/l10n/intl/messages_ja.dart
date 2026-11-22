@@ -1549,6 +1549,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage(
       "サイレント起動ではウィンドウを表示しません。",
     ),
+    "simpleMode": MessageLookupByLibrary.simpleMessage("シンプルモード"),
     "singleAdd": MessageLookupByLibrary.simpleMessage("個別追加"),
     "singleImport": MessageLookupByLibrary.simpleMessage("個別インポート"),
     "singleShareLinkOnly": MessageLookupByLibrary.simpleMessage(

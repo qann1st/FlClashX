@@ -31,10 +31,17 @@ Set<String> managedSettings(Ref ref) {
       (profile) => profile?.headers.noVibration ?? false,
     ),
   );
+  final providerSimple = ref.watch(
+    currentProfileProvider.select(
+      (profile) => profile?.headers.simpleMode ?? false,
+    ),
+  );
   return {
     if (switches != null) ...appSwitchSettings.values,
     if (hideIp) hideIpSetting,
     if (noVibration) vibrationSetting,
+    if (providerSimple) simpleModeSetting,
+    if (ref.watch(simpleModeProvider)) 'clash.log-level',
     ...managedViewKeysOf(view),
     ...ref.watch(managedClashKeysProvider),
   };

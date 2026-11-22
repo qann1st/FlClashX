@@ -1890,6 +1890,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage(
       "При тихом запуске окно не показывается.",
     ),
+    "simpleMode": MessageLookupByLibrary.simpleMessage("Простой режим"),
     "singleAdd": MessageLookupByLibrary.simpleMessage("По одному"),
     "singleImport": MessageLookupByLibrary.simpleMessage("По одному"),
     "singleShareLinkOnly": MessageLookupByLibrary.simpleMessage(

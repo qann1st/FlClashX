@@ -910,7 +910,7 @@ final class ManagedSettingsProvider
   }
 }
 
-String _$managedSettingsHash() => r'd02135e4338443f4bcf446eeee0949500f70fa35';
+String _$managedSettingsHash() => r'f95fc253ec7736829e4cee0b6430b7841b4358c9';
 
 @ProviderFor(settingOwned)
 final settingOwnedProvider = SettingOwnedFamily._();
@@ -3981,7 +3981,7 @@ final class SimpleModeProvider extends $FunctionalProvider<bool, bool, bool>
   }
 }
 
-String _$simpleModeHash() => r'c09669e9cc4bb612e595c717678b0def5999331d';
+String _$simpleModeHash() => r'7f0c0ecc1be49fb2748587a2675c98b3375f360c';
 
 @ProviderFor(widgetEditingDenied)
 final widgetEditingDeniedProvider = WidgetEditingDeniedProvider._();

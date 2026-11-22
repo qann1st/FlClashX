@@ -515,6 +515,11 @@ class AppLocalizations {
     );
   }
 
+  /// `Simple mode`
+  String get simpleMode {
+    return Intl.message('Simple mode', name: 'simpleMode', desc: '', args: []);
+  }
+
   /// `Managed by your provider`
   String get managedByProvider {
     return Intl.message(

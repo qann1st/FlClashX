@@ -1522,6 +1522,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage(
       "백그라운드 실행은 창을 표시하지 않고 시작합니다.",
     ),
+    "simpleMode": MessageLookupByLibrary.simpleMessage("간편 모드"),
     "singleAdd": MessageLookupByLibrary.simpleMessage("개별 추가"),
     "singleImport": MessageLookupByLibrary.simpleMessage("개별 가져오기"),
     "singleShareLinkOnly": MessageLookupByLibrary.simpleMessage(

@@ -62,6 +62,7 @@
   "openLogsFolder": "로그 폴더 열기",
   "resetApp": "앱 초기화",
   "resetAppTip": "모든 프로필, 설정, 앱 작업 폴더를 삭제한 뒤 앱이 종료됩니다. 계속할까요?",
+  "simpleMode": "간편 모드",
   "managedByProvider": "제공자가 관리",
   "managedByProviderTip": "이 값은 구독에서 옵니다. 직접 변경하면 구독 업데이트가 더 이상 건드리지 않습니다. 행을 우클릭하거나 길게 눌러 제공자에게 돌려줄 수 있습니다.",
   "takeOver": "변경",
