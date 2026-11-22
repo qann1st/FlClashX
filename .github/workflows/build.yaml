@@ -237,6 +237,7 @@ jobs:
             exit 1
           }
           go test -count=1 . ./platform
+          go test -count=1 -modfile=go.windows.mod -tags=elysium_core ./cmd/core
           go vet . ./cmd/...
           GOOS=linux go vet ./platform
 

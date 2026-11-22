@@ -25,8 +25,9 @@ How it works:
 - `core/go.windows.mod` (and its own `core/go.windows.sum`) replaces the same
   module with `./third_party/elysium-core`.
 - `plugins/setup/setup_hooks/lib/src/go_builder.dart` passes
-  `-modfile=go.windows.mod` only for `GOOS=windows GOARCH=amd64`; every other
-  target, including Windows arm64, builds `core/go.mod`.
+  `-modfile=go.windows.mod` and the `elysium_core` worker build tag only for
+  `GOOS=windows GOARCH=amd64`. Every other target, including Windows arm64,
+  builds `core/go.mod`.
 - Android's `android/core` Gradle module runs `gomobile bind` against `core`,
   so it builds `core/go.mod` (the original core) with `with_gvisor,cmfa`.
 - Versions live in `build_config.yaml`:
@@ -183,7 +184,8 @@ PATH=.../flutter/bin:$PATH dart run tool/test.dart
 
 cd core
 go build -tags with_gvisor ./cmd/core
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -modfile=go.windows.mod -tags with_gvisor ./cmd/core
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -modfile=go.windows.mod -tags with_gvisor,elysium_core ./cmd/core
+go test -modfile=go.windows.mod -tags elysium_core ./cmd/core
 go test ./...
 ```
 

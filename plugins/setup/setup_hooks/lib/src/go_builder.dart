@@ -96,17 +96,19 @@ class GoBuilder {
     ].join(' ');
   }
 
+  bool _usesElysium(Target target) =>
+      target.goos == 'windows' &&
+      target.goarch == 'amd64' &&
+      File(p.join(_corePath, 'go.windows.mod')).existsSync();
+
+  List<String> _goOptions(Target target) => _usesElysium(target)
+      ? ['-modfile=go.windows.mod', '-tags=${config.tags},elysium_core']
+      : ['-tags=${config.tags}'];
+
   List<String> _buildArguments(Target target, {String? outFile}) => [
     'build',
     '-ldflags=${_ldflags(target)}',
-    '-tags=${config.tags}',
-    // Only Windows amd64 compiles the vendored release branch. Every other
-    // target, including Windows arm64, keeps the original Prizrak-Core in
-    // go.mod.
-    if (target.goos == 'windows' &&
-        target.goarch == 'amd64' &&
-        File(p.join(_corePath, 'go.windows.mod')).existsSync())
-      '-modfile=go.windows.mod',
+    ..._goOptions(target),
     if (outFile != null) ...['-o', outFile],
     _mainPackage,
   ];
@@ -148,7 +150,7 @@ class GoBuilder {
     final goEnv = jsonDecode((goEnvResult.stdout as String).trim());
     builder.addValue('go_env', goEnv);
 
-    final inputs = _resolveGoInputs(env);
+    final inputs = _resolveGoInputs(target, env);
     final goWork = (goEnv as Map<String, dynamic>)['GOWORK'];
     if (goWork is String && goWork.isNotEmpty && goWork != 'off') {
       inputs.add(goWork);
@@ -161,12 +163,12 @@ class GoBuilder {
     return builder.finishWithInputs();
   }
 
-  Set<String> _resolveGoInputs(Map<String, String> environment) {
+  Set<String> _resolveGoInputs(Target target, Map<String, String> environment) {
     const template =
         r'''{{range .GoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CgoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CXXFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .MFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .HFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .FFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SwigFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SwigCXXFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SysoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .EmbedFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{with .Module}}{{if .GoMod}}{{.GoMod}}{{"\n"}}{{end}}{{end}}''';
     final result = runCommand(
       'go',
-      ['list', '-deps', '-tags=${config.tags}', '-f', template, _mainPackage],
+      ['list', '-deps', ..._goOptions(target), '-f', template, _mainPackage],
       workingDirectory: _corePath,
       environment: environment,
     );
@@ -189,7 +191,10 @@ class GoBuilder {
       }
     }
 
-    for (final name in const ['go.mod', 'go.sum']) {
+    final moduleFiles = _usesElysium(target)
+        ? const ['go.windows.mod', 'go.windows.sum']
+        : const ['go.mod', 'go.sum'];
+    for (final name in moduleFiles) {
       final filePath = p.join(_corePath, name);
       if (File(filePath).existsSync()) inputs.add(filePath);
     }

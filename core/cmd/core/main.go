@@ -14,6 +14,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Arguments error")
 		os.Exit(1)
 	}
+	if runWorkerMode(args[1:]) {
+		return
+	}
 	go core.ExitOnTermination()
 	core.StartServer(args[1])
 }
