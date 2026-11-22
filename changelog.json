@@ -2,6 +2,49 @@
   "schemaVersion": 2,
   "versions": [
     {
+      "version": "0.6.8",
+      "tag": "v0.6.8",
+      "date": "2026-11-23",
+      "prerelease": false,
+      "groups": [
+        {
+          "type": "breaking",
+          "entries": [
+            {
+              "id": "970602a",
+              "scope": "core",
+              "text": "Windows x64 ignores the legacy zapret block in freedom. Use a separate zapret2 outbound for packet processing."
+            }
+          ]
+        },
+        {
+          "type": "feat",
+          "entries": [
+            {
+              "id": "970602a",
+              "scope": "core",
+              "text": "Update Windows x64 to Elysium-Core v1.19.34-r6"
+            },
+            {
+              "id": "a0c84cb",
+              "scope": "settings",
+              "text": "Allow taking over provider simple mode"
+            }
+          ]
+        },
+        {
+          "type": "fix",
+          "entries": [
+            {
+              "id": "4805e08",
+              "scope": "windows",
+              "text": "Handle locked WinDivert driver during setup and uninstall"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "0.6.7",
       "tag": "v0.6.7",
       "date": "2026-11-20",

@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.6.8 (2026-11-23)
+
+**Breaking Changes**
+
+- **core** Windows x64 ignores the legacy zapret block in freedom. Use a separate zapret2 outbound for packet processing. (970602a)
+
+**Features**
+
+- **core** Update Windows x64 to Elysium-Core v1.19.34-r6 (970602a)
+- **settings** Allow taking over provider simple mode (a0c84cb)
+
+**Bug Fixes**
+
+- **windows** Handle locked WinDivert driver during setup and uninstall (4805e08)
+
 ## v0.6.7 (2026-11-20)
 
 **Bug Fixes**
