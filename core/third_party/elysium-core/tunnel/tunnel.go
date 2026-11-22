@@ -51,6 +51,8 @@ var (
 	ruleProviders map[string]P.RuleProvider
 	configMux     sync.RWMutex
 
+	udpRoute atomic.Pointer[udpRouting]
+
 	// for compatibility, lazy init
 	tcpQueue  chan C.ConnContext
 	tcpInOnce sync.Once
@@ -58,7 +60,7 @@ var (
 	udpInOnce sync.Once
 
 	// Outbound Rule
-	mode = Rule
+	mode = atomic.NewInt32Enum(Rule)
 
 	// default timeout for UDP session
 	udpTimeout = 60 * time.Second
@@ -120,15 +122,15 @@ func (t tunnel) NatTable() C.NatTable {
 }
 
 func (t tunnel) Proxies() map[string]C.Proxy {
-	return proxies
+	return Proxies()
 }
 
 func (t tunnel) Providers() map[string]P.ProxyProvider {
-	return providers
+	return Providers()
 }
 
 func (t tunnel) RuleProviders() map[string]P.RuleProvider {
-	return ruleProviders
+	return RuleProviders()
 }
 
 func (t tunnel) RuleUpdateCallback() *utils.Callback[P.RuleProvider] {
@@ -152,15 +154,24 @@ func Status() TunnelStatus {
 }
 
 func SetSniffing(b bool) {
+	configMux.Lock()
+	defer configMux.Unlock()
 	if snifferDispatcher.Enable() {
-		configMux.Lock()
 		sniffingEnable = b
-		configMux.Unlock()
 	}
 }
 
 func IsSniffing() bool {
-	return sniffingEnable
+	return activeSniffer() != nil
+}
+
+func activeSniffer() *sniffer.Dispatcher {
+	configMux.RLock()
+	defer configMux.RUnlock()
+	if sniffingEnable {
+		return snifferDispatcher
+	}
+	return nil
 }
 
 // TCPIn return fan-in queue
@@ -198,6 +209,8 @@ func NatTable() C.NatTable {
 
 // Rules return all rules
 func Rules() []C.Rule {
+	configMux.RLock()
+	defer configMux.RUnlock()
 	return rules
 }
 
@@ -208,24 +221,35 @@ func Listeners() map[string]C.InboundListener {
 // UpdateRules handle update rules
 func UpdateRules(newRules []C.Rule, newSubRule map[string][]C.Rule, rp map[string]P.RuleProvider) {
 	configMux.Lock()
+	setRules(newRules, newSubRule, rp)
+	refreshUDPRouting()
+	configMux.Unlock()
+}
+
+func setRules(newRules []C.Rule, newSubRule map[string][]C.Rule, rp map[string]P.RuleProvider) {
 	rules = newRules
 	ruleProviders = rp
 	subRules = newSubRule
-	configMux.Unlock()
 }
 
 // Proxies return all proxies
 func Proxies() map[string]C.Proxy {
+	configMux.RLock()
+	defer configMux.RUnlock()
 	return proxies
 }
 
 // Providers return all compatible providers
 func Providers() map[string]P.ProxyProvider {
+	configMux.RLock()
+	defer configMux.RUnlock()
 	return providers
 }
 
 // RuleProviders return all loaded rule providers
 func RuleProviders() map[string]P.RuleProvider {
+	configMux.RLock()
+	defer configMux.RUnlock()
 	return ruleProviders
 }
 
@@ -234,7 +258,46 @@ func UpdateProxies(newProxies map[string]C.Proxy, newProviders map[string]P.Prox
 	configMux.Lock()
 	proxies = newProxies
 	providers = newProviders
+	refreshUDPRouting()
 	configMux.Unlock()
+}
+
+// UpdateRouting publishes rule targets and their proxies in one transaction.
+func UpdateRouting(newProxies map[string]C.Proxy, newProviders map[string]P.ProxyProvider,
+	newRules []C.Rule, newSubRules map[string][]C.Rule, newRuleProviders map[string]P.RuleProvider) map[string]C.Proxy {
+	configMux.Lock()
+	defer configMux.Unlock()
+	previous := proxies
+	proxies = newProxies
+	providers = newProviders
+	setRules(newRules, newSubRules, newRuleProviders)
+	refreshUDPRouting()
+	return previous
+}
+
+type udpRouting struct {
+	generation uint64
+	split      bool
+}
+
+var errRoutingChanged = errors.New("routing changed during connection setup")
+
+// Call only while holding configMux.
+func refreshUDPRouting() {
+	var split bool
+	for _, proxy := range proxies {
+		if proxy.Type() == C.Zapret2 {
+			split = true
+			break
+		}
+	}
+	old := udpRoute.Load()
+	switch {
+	case old != nil:
+		udpRoute.Store(&udpRouting{generation: old.generation + 1, split: split})
+	case split:
+		udpRoute.Store(&udpRouting{generation: 1, split: true})
+	}
 }
 
 func UpdateListeners(newListeners map[string]C.InboundListener) {
@@ -252,12 +315,17 @@ func UpdateSniffer(dispatcher *sniffer.Dispatcher) {
 
 // Mode return current mode
 func Mode() TunnelMode {
-	return mode
+	return mode.Load()
 }
 
 // SetMode change the mode of tunnel
 func SetMode(m TunnelMode) {
-	mode = m
+	configMux.Lock()
+	defer configMux.Unlock()
+	if mode.Load() != m {
+		mode.Store(m)
+		refreshUDPRouting()
+	}
 }
 
 func FindProcessMode() process.FindProcessMode {
@@ -318,9 +386,20 @@ func preHandleMetadata(metadata *C.Metadata) error {
 }
 
 func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err error) {
+	configMux.RLock()
+	outbounds, primaryRules, namedRules, routingMode := proxies, rules, subRules, Mode()
+	routing := udpRoute.Load()
+	configMux.RUnlock()
+	defer func() {
+		// Rule providers and proxy groups can look up the current configuration
+		// while matching. Discard the decision if a Zapret2 generation changed.
+		if err == nil && routing != udpRoute.Load() {
+			proxy, rule, err = nil, nil, errRoutingChanged
+		}
+	}()
 	if metadata.SpecialProxy != "" {
 		var exist bool
-		proxy, exist = proxies[metadata.SpecialProxy]
+		proxy, exist = outbounds[metadata.SpecialProxy]
 		if !exist {
 			err = fmt.Errorf("proxy %s not found", metadata.SpecialProxy)
 		}
@@ -380,7 +459,7 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
 			}
 		},
 		CheckPassRule: func(adapterName string) bool {
-			adapter, ok := proxies[adapterName]
+			adapter, ok := outbounds[adapterName]
 			if !ok {
 				return false
 			}
@@ -401,14 +480,14 @@ func resolveMetadata(metadata *C.Metadata) (proxy C.Proxy, rule C.Rule, err erro
 		helper.FindProcess = nil
 	}
 
-	switch mode {
+	switch routingMode {
 	case Direct:
-		proxy = proxies["DIRECT"]
+		proxy = outbounds["DIRECT"]
 	case Global:
-		proxy = proxies["GLOBAL"]
+		proxy = outbounds["GLOBAL"]
 	// Rule
 	default:
-		proxy, rule, err = match(metadata, helper)
+		proxy, rule, err = match(metadata, helper, outbounds, primaryRules, namedRules)
 	}
 	return
 }
@@ -440,11 +519,12 @@ func handleUDPConn(packet C.PacketAdapter) {
 		return
 	}
 
-	key := packet.Key()
+	routing := udpRoute.Load()
+	key := udpSessionKey(packet.Key(), metadata, routing)
 	sender, loaded := natTable.GetOrCreate(key, func() C.PacketSender {
 		sender := newPacketSender()
-		if sniffingEnable && snifferDispatcher.Enable() {
-			return snifferDispatcher.UDPSniff(packet, sender)
+		if dispatcher := activeSniffer(); dispatcher != nil {
+			return dispatcher.UDPSniff(packet, sender)
 		}
 		return sender
 	})
@@ -464,6 +544,9 @@ func handleUDPConn(packet C.PacketAdapter) {
 			if err != nil {
 				log.Warnln("[UDP] Parse metadata failed: %s", err.Error())
 				return nil, nil, err
+			}
+			if routing != udpRoute.Load() {
+				return nil, nil, errRoutingChanged
 			}
 
 			dialMetadata := metadata.Pure()
@@ -505,6 +588,18 @@ func handleUDPConn(packet C.PacketAdapter) {
 	sender.Send(packet) // nonblocking
 }
 
+func udpSessionKey(source string, metadata *C.Metadata, routing *udpRouting) string {
+	if routing == nil {
+		return source
+	}
+	if !routing.split {
+		return fmt.Sprintf("%d/%s", routing.generation, source)
+	}
+	// A connected Zapret2 socket belongs to a single routing decision.
+	return fmt.Sprintf("%d/%q/%d/%q/%q/%q/%q/%q/%s", routing.generation, source, metadata.Type,
+		metadata.InName, metadata.InUser, metadata.SpecialProxy, metadata.SpecialRules, metadata.RemoteAddress(), metadata.DstIP)
+}
+
 func handleTCPConn(connCtx C.ConnContext) {
 	if !isHandle(connCtx.Metadata().Type) {
 		_ = connCtx.Conn().Close()
@@ -530,10 +625,10 @@ func handleTCPConn(connCtx C.ConnContext) {
 
 	conn := connCtx.Conn()
 	conn.ResetPeeked() // reset before sniffer
-	if sniffingEnable && snifferDispatcher.Enable() {
+	if dispatcher := activeSniffer(); dispatcher != nil {
 		// Try to sniff a domain when `preHandleMetadata` failed, this is usually
 		// caused by a "Fake DNS record missing" error when enhanced-mode is fake-ip.
-		if snifferDispatcher.TCPSniff(conn, metadata) {
+		if dispatcher.TCPSniff(conn, metadata) {
 			// we now have a domain name
 			preHandleFailed = false
 		}
@@ -651,27 +746,25 @@ func logMetadata(metadata *C.Metadata, rule C.Rule, remoteConn C.Connection) {
 		} else {
 			log.Infoln("[%s] %s --> %s match %s using %s", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress(), rule.RuleType().String(), remoteConn.Chains().String())
 		}
-	case mode == Global:
+	case Mode() == Global:
 		log.Infoln("[%s] %s --> %s using GLOBAL", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress())
-	case mode == Direct:
+	case Mode() == Direct:
 		log.Infoln("[%s] %s --> %s using DIRECT", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress())
 	default:
 		log.Infoln("[%s] %s --> %s doesn't match any rule using %s", strings.ToUpper(metadata.NetWork.String()), metadata.SourceDetail(), metadata.RemoteAddress(), remoteConn.Chains().String())
 	}
 }
 
-func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, error) {
-	configMux.RLock()
-	defer configMux.RUnlock()
-
+func match(metadata *C.Metadata, helper C.RuleMatchHelper, outbounds map[string]C.Proxy,
+	primaryRules []C.Rule, namedRules map[string][]C.Rule) (C.Proxy, C.Rule, error) {
 	var rematchChain []string
 	for {
 		var rematchProxy C.Proxy
 		var rematchRule C.Rule
 	GetRules:
-		for _, rule := range getRules(metadata) {
+		for _, rule := range getRules(metadata, primaryRules, namedRules) {
 			if matched, ada := rule.Match(metadata, helper); matched {
-				adapter, ok := proxies[ada]
+				adapter, ok := outbounds[ada]
 				if !ok {
 					continue
 				}
@@ -733,17 +826,17 @@ func match(metadata *C.Metadata, helper C.RuleMatchHelper) (C.Proxy, C.Rule, err
 			log.Debugln("[Rule] rematch proxy %s update metadata to rematch-name=%q sub-rule=%q", rematchProxy.Name(), metadata.InName, metadata.SpecialRules)
 			continue
 		}
-		return proxies["DIRECT"], nil, nil
+		return outbounds["DIRECT"], nil, nil
 	}
 }
 
-func getRules(metadata *C.Metadata) []C.Rule {
-	if sr, ok := subRules[metadata.SpecialRules]; ok {
+func getRules(metadata *C.Metadata, primaryRules []C.Rule, namedRules map[string][]C.Rule) []C.Rule {
+	if sr, ok := namedRules[metadata.SpecialRules]; ok {
 		log.Debugln("[Rule] use %s rules", metadata.SpecialRules)
 		return sr
 	} else {
 		log.Debugln("[Rule] use default rules")
-		return rules
+		return primaryRules
 	}
 }
 

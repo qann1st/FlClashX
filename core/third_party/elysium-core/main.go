@@ -27,6 +27,7 @@ import (
 	"github.com/metacubex/mihomo/hub/executor"
 	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/rules/provider"
+	"github.com/metacubex/mihomo/transport/zapret2"
 
 	"go.uber.org/automaxprocs/maxprocs"
 )
@@ -74,10 +75,23 @@ func init() {
 	flag.BoolVar(&geodataMode, "m", false, "set geodata mode")
 	flag.BoolVar(&version, "v", false, "show current version of mihomo")
 	flag.BoolVar(&testConfig, "t", false, "test configuration and exit")
-	flag.Parse()
+	if len(os.Args) != 2 || os.Args[1] != "--"+zapret2.WorkerFlag {
+		flag.Parse()
+	}
 }
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--"+zapret2.WorkerFlag {
+		if runtime.GOOS != "windows" || runtime.GOARCH != "amd64" {
+			fmt.Fprintln(os.Stderr, zapret2.ErrUnsupported)
+			os.Exit(1)
+		}
+		if err := zapret2.RunWorker(os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	// Defensive programming: panic when code mistakenly calls net.DefaultResolver
 	net.DefaultResolver.PreferGo = true
 	net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {

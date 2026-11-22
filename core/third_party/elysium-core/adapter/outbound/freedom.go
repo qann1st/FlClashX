@@ -2,7 +2,6 @@ package outbound
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 
@@ -11,10 +10,8 @@ import (
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/component/sockopt"
 	C "github.com/metacubex/mihomo/constant"
-	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/transport/finalmask"
 	"github.com/metacubex/mihomo/transport/fragment"
-	"github.com/metacubex/mihomo/transport/zapret"
 )
 
 // Freedom is DIRECT with the fragment and sockopt settings of Xray-core's
@@ -28,7 +25,6 @@ type Freedom struct {
 	sockopt         *sockopt.Options
 	finalMask       *finalmask.FinalMask
 	finalMaskDialer *finalmask.Dialer
-	zapret          *zapret.Engine
 }
 
 type FreedomOption struct {
@@ -37,7 +33,6 @@ type FreedomOption struct {
 	Fragment  *FreedomFragmentOption `proxy:"fragment,omitempty"`
 	Sockopt   *FreedomSockoptOption  `proxy:"sockopt,omitempty"`
 	FinalMask *FinalMaskOption       `proxy:"finalmask,omitempty"`
-	Zapret    *zapret.Option         `proxy:"zapret,omitempty"`
 }
 
 type FreedomFragmentOption struct {
@@ -84,17 +79,10 @@ func (f *Freedom) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn
 	if f.sockopt != nil {
 		f.sockopt.AfterDial(c)
 	}
-	if f.zapret != nil {
-		var zerr error
-		c, zerr = f.zapret.RegisterTCP(c)
-		if zerr != nil {
-			log.Warnln("[zapret] %s: %v", f.Name(), zerr)
-		}
-	}
-	if f.zapret == nil && f.fragment != nil {
+	if f.fragment != nil {
 		c = fragment.NewConn(c, f.fragment)
 	}
-	if f.zapret == nil && f.finalMask != nil && f.finalMask.HasTCP() {
+	if f.finalMask != nil && f.finalMask.HasTCP() {
 		dest, err := finalmask.ParseDestination(metadata.RemoteAddress())
 		if err != nil {
 			_ = c.Close()
@@ -115,17 +103,6 @@ func (f *Freedom) ListenPacketContext(ctx context.Context, metadata *C.Metadata)
 	}
 	if err := f.ResolveUDP(ctx, metadata); err != nil {
 		return nil, err
-	}
-	if f.zapret != nil {
-		pc, err := dialer.NewDialer(f.DialOptions()...).ListenPacket(ctx, "udp", "", metadata.AddrPort())
-		if err != nil {
-			return nil, err
-		}
-		pc, zerr := f.zapret.RegisterUDP(pc, metadata.AddrPort())
-		if zerr != nil {
-			log.Warnln("[zapret] %s: %v", f.Name(), zerr)
-		}
-		return f.loopBack.NewPacketConn(NewPacketConn(pc, f)), nil
 	}
 	if f.finalMask != nil && f.finalMask.HasUDP() {
 		// ResolveUDP above guarantees an IP, so the masks see the address the
@@ -222,27 +199,6 @@ func NewFreedom(option FreedomOption) (*Freedom, error) {
 		}
 		f.finalMask = fm
 		f.finalMaskDialer = f.newFinalMaskDialer()
-	}
-	if o := option.Zapret; o != nil {
-		cfg, err := zapret.Parse(o)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", option.Name, err)
-		}
-		eng, err := zapret.New(cfg)
-		if err != nil {
-			if errors.Is(err, zapret.ErrUnsupported) {
-				// zapret is Windows-only. Everywhere else freedom keeps
-				// its original fragment/finalmask behaviour.
-				log.Warnln("[zapret] %s: %v; using the original fragment/finalmask path", option.Name, err)
-			} else {
-				return nil, fmt.Errorf("%s: %w", option.Name, err)
-			}
-		} else {
-			if option.Fragment != nil || option.FinalMask != nil {
-				log.Warnln("[zapret] %s: zapret overrides fragment/finalmask on Windows", option.Name)
-			}
-			f.zapret = eng
-		}
 	}
 	return f, nil
 }

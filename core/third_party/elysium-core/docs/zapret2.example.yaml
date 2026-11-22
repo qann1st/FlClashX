@@ -1,0 +1,35 @@
+mixed-port: 7890
+mode: rule
+
+proxies:
+  - name: ZAPRET2
+    type: zapret2
+    options:
+      - "--name=TLS"
+      - "--filter-tcp=443,2053,2083,2087,2096,8443"
+      - "--filter-l7=tls"
+      - "--payload=tls_client_hello"
+      - "--lua-desync=fake:blob=fake_default_tls:repeats=6"
+      - "--lua-desync=multisplit:pos=2"
+      - "--new=QUIC"
+      - "--filter-udp=443"
+      - "--filter-l7=quic"
+      - "--payload=quic_initial"
+      - "--lua-desync=fake:blob=fake_default_quic"
+      - "--new=Discord voice"
+      - "--filter-udp=19294-19344,50000-50100"
+      - "--filter-l7=discord,stun"
+      - "--payload=discord_ip_discovery,stun"
+      - "--lua-desync=fake:blob=fake_default_quic:repeats=6"
+
+rules:
+  - DOMAIN-SUFFIX,youtube.com,ZAPRET2
+  - DOMAIN-SUFFIX,youtu.be,ZAPRET2
+  - DOMAIN-SUFFIX,googlevideo.com,ZAPRET2
+  - DOMAIN-SUFFIX,ytimg.com,ZAPRET2
+  - DOMAIN-SUFFIX,discord.com,ZAPRET2
+  - DOMAIN-SUFFIX,discord.gg,ZAPRET2
+  - DOMAIN-SUFFIX,discord.media,ZAPRET2
+  - DOMAIN-SUFFIX,discordapp.com,ZAPRET2
+  - DOMAIN-SUFFIX,discordapp.net,ZAPRET2
+  - MATCH,DIRECT

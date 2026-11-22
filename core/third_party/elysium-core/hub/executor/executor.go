@@ -41,6 +41,7 @@ import (
 	"github.com/metacubex/mihomo/listener/tproxy"
 	"github.com/metacubex/mihomo/log"
 	"github.com/metacubex/mihomo/ntp/ntp"
+	"github.com/metacubex/mihomo/transport/zapret2"
 	"github.com/metacubex/mihomo/tunnel"
 )
 
@@ -102,8 +103,8 @@ func ApplyConfig(cfg *config.Config, force bool) {
 	updateUsers(cfg.Users)
 	// before the providers start: their checks look the profiles up
 	pingconfig.SetActive(cfg.PingProfiles)
-	updateProxies(cfg.Proxies, cfg.Providers)
-	updateRules(cfg.Rules, cfg.SubRules, cfg.RuleProviders)
+	previousProxies := tunnel.UpdateRouting(cfg.Proxies, cfg.Providers, cfg.Rules, cfg.SubRules, cfg.RuleProviders)
+	retireZapret2(previousProxies, cfg.Proxies)
 	updateSniffer(cfg.Sniffer)
 	updateHosts(cfg.Hosts)
 	updateGeneral(cfg.General, true)
@@ -313,14 +314,6 @@ func updateDNS(c *config.DNS, generalIPv6 bool) {
 
 func updateHosts(tree *trie.DomainTrie[resolver.HostValue]) {
 	resolver.DefaultHosts = resolver.NewHosts(tree)
-}
-
-func updateProxies(proxies map[string]C.Proxy, providers map[string]P.ProxyProvider) {
-	tunnel.UpdateProxies(proxies, providers)
-}
-
-func updateRules(rules []C.Rule, subRules map[string][]C.Rule, ruleProviders map[string]P.RuleProvider) {
-	tunnel.UpdateRules(rules, subRules, ruleProviders)
 }
 
 func loadProvider[T P.Provider](providers map[string]T) {
@@ -553,7 +546,22 @@ func closeSmart() {
 	}
 }
 
+func retireZapret2(previous, current map[string]C.Proxy) {
+	for name, proxy := range previous {
+		if proxy.Type() == C.Zapret2 && proxy != current[name] {
+			if err := proxy.Close(); err != nil {
+				log.Warnln("[zapret2] close %s: %v", name, err)
+			}
+		}
+	}
+}
+
 func Shutdown() {
+	mux.Lock()
+	defer mux.Unlock()
+	tunnel.OnSuspend()
+	retireZapret2(tunnel.Proxies(), nil)
+	zapret2.Shutdown()
 	listener.Cleanup()
 	tproxy.CleanupTProxyIPTables()
 	resolver.StoreFakePoolState()

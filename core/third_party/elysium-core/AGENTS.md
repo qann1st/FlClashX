@@ -2,30 +2,16 @@
 
 Этот репозиторий — форк `legiz-ru/Prizrak-Core`, который сам тянет upstream
 `MetaCubeX/mihomo` (ветка `Alpha`). Часть кода пришла из форка/upstream, а часть
-(`zapret` и UDP `fake`) — наша. При апстримах и рефакторингах нижеперечисленное
+(`zapret2` и UDP `fake`) — наша. При апстримах и рефакторингах нижеперечисленное
 удалять, переименовывать и «упрощать» нельзя.
 
 ## Наши изменения (не из upstream и не из форка)
 
-### 1. `transport/zapret/` — пакетный TCP/UDP-десинк как в zapret
+### 1. `transport/zapret2/` — пакетная обработка TCP/UDP
 
-- `config.go` — разбор блока `zapret:` (`tcp`/`udp`, `ports`, `desync`,
-  `split-pos`, `seqovl`, `repeats`, `cutoff`, `ttl`, `fooling`, `fake-tls`,
-  `fake`). Поддерживаются `fake`, `split`, `multisplit`; `disorder`, `oob`,
-  `ipfrag`, `badsum`, `badseq` — нет.
-- `packet.go` — сборка/разбор IPv4/IPv6 TCP/UDP через
-  `github.com/metacubex/gopacket`; `layers.Init()` вызывается через
-  `ensureLayers()`.
-- `strategy.go` — fake, split, multisplit, `seqovl` (pattern перед сегментом,
-  как `--dpi-desync-split-seqovl`), TTL-фулинг.
-- `engine.go` — `Engine`, `RegisterTCP`, `RegisterUDP`, `zapretConn`,
-  `zapretPacketConn`, `ErrUnsupported`.
-- `engine_windows.go` — Windows amd64: WinDivert, один handle на поток,
-  `QUEUE_SIZE=256 KiB`, `QUEUE_LENGTH=512`, fallback на `fragment/finalmask`
-  на Windows ARM64.
-- `windivert_windows.go` — загрузка `WinDivert.dll` через `syscall`
-  (без cgo), `WinDivertOpen/Recv/Send/Shutdown/Close`, `WINDIVERT_ADDRESS`.
-- `engine_stub.go` — не-Windows: `newBackend()` возвращает `ErrUnsupported`.
+- `type: zapret2` — отдельный outbound на Windows x64. WinDivert захватывает
+  только точный кортеж сокета, выбранного правилами или группой прокси.
+- Устройство и пример YAML описаны в [документации](docs/zapret2-architecture.md).
 
 ### 2. `transport/finalmask/fake/` — UDP-маска `fake`
 
@@ -40,16 +26,8 @@
 
 ### 3. `adapter/outbound/freedom.go`
 
-- `FinalMask *FinalMaskOption` (`finalmask`) и `Zapret *zapret.Option`
-  (`zapret`) — отдельные поля.
-- `freedom` обязан сохранять старое поведение `fragment`/`finalmask`, когда
-  `zapret` не активен.
-- `zapret` активен только на Windows amd64. Если движок создан, он заменяет
-  `fragment`/`finalmask` (в лог пишется warning).
-- На не-Windows и на Windows ARM64 `zapret` игнорируется с warning, и
-  используются `fragment`/`finalmask`. Конфиг при этом **не должен падать**.
-- На Windows amd64 отсутствие `WinDivert.dll`/`WinDivert64.sys` или прав
-  администратора — это ошибка конфига, а не тихий fallback.
+- `freedom` сохраняет поведение `fragment`/`finalmask`. После удаления
+  движка Zapret v1 в r6 старый YAML-блок `zapret:` игнорируется с предупреждением.
 
 ### 4. Регистрация маски
 
@@ -58,34 +36,27 @@
 
 ### 5. Документация и тесты
 
-- `docs/config.yaml` — секция `zapret:` и встроенные payload’ы.
-- Тесты: `transport/zapret/*_test.go`, `transport/finalmask/fake/fake_test.go`,
-  `adapter/outbound/freedom_udp_test.go`,
-  `adapter/outbound/freedom_zapret_test.go`.
+- `docs/config.yaml` — примеры `zapret2` и встроенные payload’ы UDP `fake`.
+- Тесты: `transport/zapret2/*_test.go`, `transport/finalmask/fake/fake_test.go`,
+  `adapter/outbound/freedom_udp_test.go`, `adapter/parser_freedom_legacy_test.go`.
 
 ## Жёсткие правила при апстриме
 
-1. **Не удалять и не переименовывать** `transport/zapret/`,
-   `transport/finalmask/fake/`, поля `zapret`/`finalmask` в `freedom`,
+1. **Не удалять и не переименовывать** `transport/zapret2/`,
+   `transport/finalmask/fake/`, поле `finalmask` в `freedom` и
    регистрацию `fake` в `finalmask/option`.
-2. **Не убирать fallback** `ErrUnsupported` → `fragment`/`finalmask`
-   на не-Windows и Windows ARM64. Ошибка `WinDivert has no ARM64 driver`
-   должна оставаться обёрнутой в `ErrUnsupported`.
-3. **Не делать `zapret` обязательным** для конфигов: старые конфиги с
-   `fragment`/`finalmask` должны работать без изменений.
-4. **Не совмещать** `zapret` и `fragment`/`finalmask` на Windows amd64:
-   zapret имеет приоритет, остальное игнорируется с warning.
-5. `go.mod` содержит критичный replace:
+2. **Не расширять перехват Zapret2** за пределы сокетов выбранного outbound.
+3. `go.mod` содержит критичный replace:
    `github.com/metacubex/utls => github.com/legiz-ru/prizrak-utls ...`.
    При конфликтах `go.sum` оставлять хеши `legiz-ru/prizrak-utls`, а не
    оригинального `metacubex/utls`.
-6. `common/convert`: `vmess`/`vless` `httpupgrade` должен давать
+4. `common/convert`: `vmess`/`vless` `httpupgrade` должен давать
    `network: ws` и `v2ray-http-upgrade: true`. `ed`:
    - `ws` → `max-early-data` + `early-data-header-name`;
    - `httpupgrade` → `v2ray-http-upgrade-fast-open`.
    Это правило уже ломалось при мерджах — проверять тестами
    `common/convert`.
-7. WinDivert-код не должен требовать cgo: сборка идёт с `CGO_ENABLED=0`.
+5. WinDivert-код не должен требовать cgo: сборка идёт с `CGO_ENABLED=0`.
 
 ## Проверка после апстрима
 
@@ -94,10 +65,10 @@ go build ./...
 GOOS=windows GOARCH=amd64 go build ./...
 GOOS=windows GOARCH=arm64 go build ./...
 
-go test ./transport/zapret/ ./transport/finalmask/... ./adapter/outbound/ ./common/convert/
+go test ./transport/zapret2/ ./transport/finalmask/... ./adapter/ ./adapter/outbound/ ./common/convert/
 ```
 
-Проверка конфига (не-Windows: `zapret` должен дать warning и не упасть):
+Проверка старого конфига (блок Zapret v1 игнорируется с предупреждением):
 
 ```bash
 go run . -t -f path/to/config.yaml
@@ -107,8 +78,7 @@ go run . -t -f path/to/config.yaml
 
 ```bash
 grep -R "case \"fake\"" transport/finalmask/option/option.go
-grep -R "zapret" adapter/outbound/freedom.go
-ls transport/zapret transport/finalmask/fake
+ls transport/zapret2 transport/finalmask/fake
 ```
 
 ## Сборка Windows
@@ -117,10 +87,9 @@ ls transport/zapret transport/finalmask/fake
 make windows-amd64-v3 windows-amd64-compatible windows-arm64
 ```
 
-- x64: `zapret` работает, нужны `WinDivert.dll` + `WinDivert64.sys` рядом с
+- x64: для Zapret2 нужны `WinDivert.dll` + `WinDivert64.sys` рядом с
   exe и запуск от администратора.
-- ARM64: WinDivert не имеет ARM64-драйвера, `zapret` автоматически
-  игнорируется, работают `fragment`/`finalmask`.
+- ARM64: `type: zapret2` недоступен, `freedom` с `fragment`/`finalmask` работает.
 - Сборки `with_low_memory`/`with_powersave` сейчас не требуются.
 
 ## Git
@@ -129,3 +98,14 @@ make windows-amd64-v3 windows-amd64-compatible windows-arm64
 - `upstream` — `MetaCubeX/mihomo`, синхронизация обычно через `upstream/Alpha`
   или тег `v1.19.34-rX`.
 - Не делать force-push и не переписывать общую ветку без явной просьбы.
+
+## graphify
+
+- Перед изменением кода используй `graphify query "<вопрос>"`, если нужно найти
+  зависимости, вызывающий код или связанные компоненты и уже есть
+  `graphify-out/graph.json`. Для связи между двумя узлами используй
+  `graphify path "<A>" "<B>"`. Найденные связи сверяй с исходниками.
+- Для простых задач, при отсутствии графа или если граф не дал нужного
+  контекста, используй обычный поиск по репозиторию.
+- Используй существующий граф без автоматической перестройки при запросах
+  и правках. Явные команды `/graphify` выполняй по инструкции навыка.

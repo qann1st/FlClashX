@@ -6,6 +6,7 @@ import (
 	"github.com/metacubex/mihomo/adapter/outbound"
 	"github.com/metacubex/mihomo/common/structure"
 	C "github.com/metacubex/mihomo/constant"
+	"github.com/metacubex/mihomo/log"
 )
 
 // The mux of Xray-core v26.11.9 for every outbound
@@ -146,7 +147,16 @@ func ParseProxy(mapping map[string]any, options ...ProxyOption) (C.Proxy, error)
 		if err != nil {
 			break
 		}
+		if mapping["zapret"] != nil {
+			log.Warnln("[freedom] %s: ignoring removed zapret v1 block; migrate to type: zapret2 for packet processing", freedomOption.Name)
+		}
 		proxy, err = outbound.NewFreedom(*freedomOption)
+	case "zapret2":
+		zapret2Option := &outbound.Zapret2Option{BasicOption: basicOption}
+		if err := decoder.Decode(mapping, zapret2Option); err != nil {
+			return nil, err
+		}
+		proxy, err = outbound.NewZapret2(*zapret2Option)
 	case "dns":
 		dnsOptions := &outbound.DnsOption{BasicOption: basicOption}
 		err = decoder.Decode(mapping, dnsOptions)
@@ -263,6 +273,9 @@ func ParseProxy(mapping map[string]any, options ...ProxyOption) (C.Proxy, error)
 	}
 	if muxOption.Enabled && muxCoolOption.Enabled {
 		return nil, fmt.Errorf("smux and mux.cool cannot be enabled together")
+	}
+	if proxyType == "zapret2" && (muxOption.Enabled || muxCoolOption.Enabled) {
+		return nil, fmt.Errorf("zapret2 does not support multiplexing")
 	}
 	if proxyType == "vless" && mapping["network"] == "xdrive" {
 		// As Xray-core refuses it: every connection would be a session of its

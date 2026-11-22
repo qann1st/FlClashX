@@ -2079,32 +2079,8 @@ proxies: # socks5
             # - text: "hello"            # 文本 / literal text
             # - packet: [1, 2, 3]        # 字节列表，或配合 type: str|hex|base64 / byte list, or with type: str|hex|base64
             - random: "64-120"           # 每次随机长度的新字节 / fresh random bytes of a random length
-    # zapret: 包级 TCP/UDP десинк как в zapret (только Windows, WinDivert)
-    # zapret: packet-level TCP/UDP desync as zapret (Windows only, WinDivert)
-    #   Требует WinDivert.dll и WinDivert64.sys рядом с exe, запуск от администратора.
-    #   Requires WinDivert.dll and WinDivert64.sys next to the exe and Administrator rights.
-    #   На других ОС блок игнорируется, работает обычный fragment/finalmask.
-    #   On other OSes the block is ignored and fragment/finalmask keep working.
-    #   На Windows zapret заменяет fragment/finalmask, если они заданы вместе.
-    #   On Windows zapret overrides fragment/finalmask when both are set.
-    # zapret:
-    #   tcp:
-    #     - ports: "443,2053,2083,2087,2096,8443"
-    #       desync: "fake,multisplit"   # zapret ALT11 TCP
-    #       split-pos: "1"
-    #       seqovl: 681
-    #       repeats: 8
-    #       cutoff: 1
-    #       ttl: 3
-    #       fooling: ts                  # ts/ttl -> низкий TTL фейка; none -> не менять
-    #       fake-tls: builtin:tls-google
-    #   udp:
-    #     - ports: "19294-19344,50000-50100"
-    #       desync: "fake"
-    #       repeats: 6
-    #       cutoff: 4
-    #       ttl: 3
-    #       fake: builtin:discord-udp
+    # Since v1.19.34-r6 the legacy zapret block is ignored with a warning.
+    # For packet processing on Windows x64 use a separate type: zapret2 outbound.
     sockopt:
       # 不支持的选项会跳过并在日志中警告 / an unsupported option is skipped with a warning in the log
       tcp-congestion: bbr          # 仅 Linux/Android / Linux and Android only
@@ -2120,6 +2096,17 @@ proxies: # socks5
           # level: "6"
           # system: linux
           # network: tcp
+  # Zapret2 on Windows amd64. Requires WinDivert.dll, WinDivert64.sys and Administrator rights.
+  # Uncomment this outbound and route traffic to ZAPRET2 in rules. Options keep their upstream order.
+  # - name: ZAPRET2
+  #   type: zapret2
+  #   options:
+  #     - "--filter-tcp=443"
+  #     - "--filter-l7=tls"
+  #     - "--payload=tls_client_hello"
+  #     - "--lua-desync=fake:blob=fake_default_tls:repeats=6"
+  #   # assets-dir: zapret2    # Files are visible to Lua under /custom.
+
 proxy-groups:
   # url-test 将按照 url 测试结果使用延迟最低节点
   - name: "auto"

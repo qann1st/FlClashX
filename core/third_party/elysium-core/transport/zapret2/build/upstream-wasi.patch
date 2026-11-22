@@ -1,0 +1,342 @@
+--- a/conntrack.c
++++ b/conntrack.c
+@@ -253,7 +253,7 @@
+ 	return ConntrackPoolDoubleSearchPool(&p->pool, dis, ctrack, bReverse);
+ }
+ 
+-static bool ConntrackPoolFeedPool(t_conntrack_pool **pp, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse)
++static bool ConntrackPoolFeedPool(t_conntrack_pool **pp, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse, const bool *embedded_reverse)
+ {
+ 	t_conn conn, connswp;
+ 	t_conntrack_pool *ctr;
+@@ -276,10 +276,27 @@
+ 		}
+ 	}
+ 	b_rev = dis->tcp && tcp_synack_segment(dis->tcp);
+-	if ((dis->tcp && tcp_syn_segment(dis->tcp)) || b_rev || dis->udp)
++	// Prizrak attaches capture to an established socket and knows its
++	// direction even when the SYN and SYN-ACK were never captured.
++	bool established = embedded_reverse && dis->tcp &&
++		(dis->tcp->th_flags & (TH_SYN | TH_ACK | TH_FIN | TH_RST)) == TH_ACK;
++	if (established) b_rev = *embedded_reverse;
++	if ((dis->tcp && tcp_syn_segment(dis->tcp)) || b_rev || dis->udp || established)
+ 	{
+ 		if ((ctr = ConntrackNew(pp, b_rev ? &connswp : &conn)))
+ 		{
++			if (established)
++			{
++				t_ctrack_positions *pos = &ctr->track.pos;
++				t_ctrack_position *sender = b_rev ? &pos->server : &pos->client;
++				t_ctrack_position *peer = b_rev ? &pos->client : &pos->server;
++				uint32_t seq = ntohl(dis->tcp->th_seq), ack = ntohl(dis->tcp->th_ack);
++				pos->state = ESTABLISHED;
++				sender->seq0 = seq - 1;
++				peer->seq0 = ack - 1;
++				sender->uppos = sender->uppos_prev = seq;
++				peer->uppos = peer->uppos_prev = ack;
++			}
+ 			ConntrackFeedPacket(&ctr->track, b_rev, dis);
+ 			goto ok;
+ 		}
+@@ -293,8 +310,14 @@
+ }
+ bool ConntrackPoolFeed(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse)
+ {
+-	return ConntrackPoolFeedPool(&p->pool, dis, ctrack, bReverse);
++	return ConntrackPoolFeedPool(&p->pool, dis, ctrack, bReverse, NULL);
+ }
++#ifdef __wasi__
++bool ConntrackPoolFeedEmbedded(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse, bool incoming)
++{
++	return ConntrackPoolFeedPool(&p->pool, dis, ctrack, bReverse, &incoming);
++}
++#endif
+ 
+ static bool ConntrackPoolDropPool(t_conntrack_pool **pp, const struct dissect *dis)
+ {
+--- a/conntrack.h
++++ b/conntrack.h
+@@ -104,6 +104,9 @@
+ void ConntrackPoolInit(t_conntrack *p, time_t purge_interval, uint32_t timeout_syn, uint32_t timeout_established, uint32_t timeout_fin, uint32_t timeout_udp);
+ void ConntrackPoolDestroy(t_conntrack *p);
+ bool ConntrackPoolFeed(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse);
++#ifdef __wasi__
++bool ConntrackPoolFeedEmbedded(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse, bool incoming);
++#endif
+ // do not create, do not update. only find existing
+ bool ConntrackPoolDoubleSearch(t_conntrack *p, const struct dissect *dis, t_ctrack **ctrack, bool *bReverse);
+ bool ConntrackPoolDrop(t_conntrack *p, const struct dissect *dis);
+--- a/desync.c
++++ b/desync.c
+@@ -1281,7 +1281,11 @@
+ 		if (!params.ctrack_disable)
+ 		{
+ 			ConntrackPoolPurge(&params.conntrack);
++#ifdef __wasi__
++			if (ConntrackPoolFeedEmbedded(&params.conntrack, dis, &ps->ctrack, &ps->bReverse, ifin && *ifin))
++#else
+ 			if (ConntrackPoolFeed(&params.conntrack, dis, &ps->ctrack, &ps->bReverse))
++#endif
+ 			{
+ 				ps->dp = ps->ctrack->dp;
+ 				ps->ctrack_replay = ps->ctrack;
+--- a/darkmagic.c
++++ b/darkmagic.c
+@@ -652,6 +652,10 @@
+ }
+ 
+ 
++#ifdef __wasi__
++bool get_source_ip4(const struct in_addr *target, struct in_addr *source) { return false; }
++bool get_source_ip6(const struct in6_addr *target, struct in6_addr *source) { return false; }
++#else
+ bool get_source_ip4(const struct in_addr *target, struct in_addr *source)
+ {
+ 	int sock = socket(AF_INET, SOCK_DGRAM, 0);
+@@ -708,6 +712,7 @@
+ 	return false;
+ }
+ 
++#endif
+ 
+ #ifdef __CYGWIN__
+ 
+@@ -1774,6 +1779,18 @@
+ 	return true;
+ }
+ 
++#elif defined(__wasi__)
++
++__attribute__((import_module("prizrak"), import_name("send")))
++extern int embedded_send(const void *data, size_t len);
++
++bool rawsend(const struct sockaddr *dst, uint32_t mark, const char *ifout, const void *data, size_t len)
++{
++	return embedded_send(data, len) != 0;
++}
++
++bool ensure_file_access(const char *filename) { return false; }
++
+ #else // *nix
+ 
+ bool ensure_file_access(const char *filename)
+@@ -2458,6 +2475,7 @@
+ #endif
+ }
+ 
++#ifndef __wasi__
+ void dbgprint_socket_buffers(int fd)
+ {
+ 	if (params.debug)
+@@ -2488,7 +2506,11 @@
+ 	dbgprint_socket_buffers(fd);
+ 	return true;
+ }
++#endif
+ 
++#ifdef __wasi__
++bool make_writable_dir(void) { return false; }
++#else
+ bool make_writable_dir()
+ {
+ 	char wdir[PATH_MAX], *wrdir;
+@@ -2530,3 +2552,4 @@
+ 	if (b) setenv("WRITABLE",wrdir,1);
+ 	return b;
+ }
++#endif
+--- a/helpers.c
++++ b/helpers.c
+@@ -673,6 +673,14 @@
+ // works for existing and new files
+ bool realpath_any(const char *file, char *pabs)
+ {
++#ifdef __wasi__
++	// File names stay within the guest filesystem. WASI realpath cannot
++	// resolve paths on an abstract read-only host filesystem.
++	const size_t n = strlen(file);
++	if (!n || n >= PATH_MAX) return false;
++	memcpy(pabs, file, n + 1);
++	return true;
++#else
+ 	bool b = true;
+ 	char *s1=NULL, *s2=NULL;
+ 	int res;
+@@ -715,6 +723,7 @@
+ err:
+ 	b = false;
+ 	goto ex;
++#endif
+ }
+ 
+ bool parse_int16(const char *p, int16_t *v)
+--- a/lua.c
++++ b/lua.c
+@@ -784,7 +784,9 @@
+ static int luacall_gettid(lua_State *L)
+ {
+ 	lua_check_argc(L,"gettid", 0);
+-#ifdef __OpenBSD__
++#ifdef __wasi__
++	lua_pushinteger(L, getpid());
++#elif defined(__OpenBSD__)
+ 	lua_pushinteger(L, getthrid());
+ #elif defined(__FreeBSD__)
+ 	long tid;
+@@ -3202,6 +3204,12 @@
+ ok:
+ 	LUA_STACK_GUARD_RETURN(L,1)
+ }
++#elif defined(__wasi__)
++static int lua_get_ifaddrs(lua_State *L)
++{
++	lua_pushnil(L);
++	return 1;
++}
+ #else
+ // in cygwin this does not work with low intergity level because of cygwin objects in NT directory tree
+ static int lua_get_ifaddrs(lua_State *L)
+--- a/nfqws.c
++++ b/nfqws.c
+@@ -130,6 +130,7 @@
+ 	lua_req_quit();
+ }
+ 
++#ifndef __wasi__
+ static void catch_signals(void)
+ {
+ 	struct sigaction sa;
+@@ -149,6 +150,7 @@
+ 	sa.sa_handler = onterm;
+ 	sigaction(SIGTERM, &sa, NULL);
+ }
++#endif
+ 
+ 
+ static uint8_t processPacketData(uint32_t *mark, const char *ifin, const char *ifout, const uint8_t *data_pkt, size_t len_pkt, uint8_t *mod_pkt, size_t *len_mod_pkt)
+@@ -1940,7 +1942,7 @@
+ 	exithelp();
+ }
+ 
+-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
++#if !defined( __OpenBSD__) && !defined(__ANDROID__) && !defined(__wasi__)
+ // no static to not allow optimizer to inline this func (save stack)
+ void config_from_file(const char *filename)
+ {
+@@ -2240,7 +2242,30 @@
+ #endif
+ 
+ enum {WF_TCP_IN, WF_UDP_IN, WF_TCP_OUT, WF_UDP_OUT, WF_ICMP_IN, WF_ICMP_OUT, WF_IPP_IN, WF_IPP_OUT, WF_RAW, WF_RAWF_PART, WF_RAWF_FILTER, GLOBAL_SSID_FILTER, GLOBAL_SSID_FILTER_NEG, GLOBAL_NLM_FILTER, GLOBAL_NLM_FILTER_NEG, WF_RAWF, WF_COUNT} t_wf_index;
++#ifdef __wasi__
++static uint8_t embedded_input[65535], embedded_output[RECONSTRUCT_MAX_SIZE];
++static size_t embedded_output_len;
++
++uint8_t *zapret_input(void) { return embedded_input; }
++uint8_t *zapret_output(void) { return embedded_output; }
++size_t zapret_output_length(void) { return embedded_output_len; }
++
++uint32_t zapret_process(size_t len, bool outbound)
++{
++	if (!params.L || len > sizeof(embedded_input)) return VERDICT_PASS;
++	uint32_t mark = 0;
++	const char *iface = "prizrak";
++	embedded_output_len = sizeof(embedded_output);
++	if (params.timers) TimerPoolRun(&params.timers, &params.timers_dirty, boottime_ms());
++	lua_do_gc();
++	return processPacketData(&mark, outbound ? "" : iface, outbound ? iface : "",
++		embedded_input, len, embedded_output, &embedded_output_len) & VERDICT_MASK;
++}
++
++int zapret_init(int argc, char **argv)
++#else
+ int main(int argc, char **argv)
++#endif
+ {
+ #ifdef __CYGWIN__
+ 	if (service_run(argc, argv))
+@@ -2296,7 +2321,7 @@
+ 	dp = &dpl->dp;
+ 	dp->n = ++desync_profile_count;
+ 
+-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
++#if !defined( __OpenBSD__) && !defined(__ANDROID__) && !defined(__wasi__)
+ 	if (argc >= 2 && (argv[1][0] == '@' || argv[1][0] == '$'))
+ 	{
+ 		config_from_file(argv[1] + 1);
+@@ -3181,7 +3206,7 @@
+ 	}
+ 
+ 	// do not need args from file anymore
+-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
++#if !defined( __OpenBSD__) && !defined(__ANDROID__) && !defined(__wasi__)
+ 	cleanup_args(&params);
+ #endif
+ 	argv = NULL; argc = 0;
+@@ -3397,6 +3422,9 @@
+ 	result = dvt_main();
+ #elif defined(__CYGWIN__)
+ 	result = win_main();
++#elif defined(__wasi__)
++	if (lua_init()) return 0;
++	result = 1;
+ #else
+ #error unsupported OS
+ #endif
+--- a/params.c
++++ b/params.c
+@@ -16,6 +16,8 @@
+ const char *progname = "winws2";
+ #elif defined(__linux__)
+ const char *progname = "nfqws2";
++#elif defined(__wasi__)
++const char *progname = "zapret2";
+ #else
+ #error UNKNOWN_SYSTEM_TIME
+ #endif
+@@ -500,7 +502,7 @@
+ 	return false;
+ }
+ 
+-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
++#if !defined( __OpenBSD__) && !defined(__ANDROID__) && !defined(__wasi__)
+ void cleanup_args(struct params_s *params)
+ {
+ 	wordfree(&params->wexp);
+@@ -547,7 +549,7 @@
+ {
+ 	lua_shutdown();
+ 
+-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
++#if !defined( __OpenBSD__) && !defined(__ANDROID__) && !defined(__wasi__)
+ 	cleanup_args(params);
+ #endif
+ 
+--- a/params.h
++++ b/params.h
+@@ -18,7 +18,7 @@
+ #include <time.h>
+ #include <sys/queue.h>
+ #include <lua.h>
+-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
++#if !defined( __OpenBSD__) && !defined(__ANDROID__) && !defined(__wasi__)
+ #include <wordexp.h>
+ #endif
+ 
+@@ -129,7 +129,7 @@
+ 
+ struct params_s
+ {
+-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
++#if !defined( __OpenBSD__) && !defined(__ANDROID__) && !defined(__wasi__)
+ 	wordexp_t wexp; // for file based config
+ #endif
+ 	char verstr[128];
+@@ -211,7 +211,7 @@
+ extern const char *progname;
+ 
+ void init_params(struct params_s *params);
+-#if !defined( __OpenBSD__) && !defined(__ANDROID__)
++#if !defined( __OpenBSD__) && !defined(__ANDROID__) && !defined(__wasi__)
+ void cleanup_args(struct params_s *params);
+ #endif
+ #ifdef __CYGWIN__
