@@ -282,6 +282,21 @@ hooks:
       );
     });
 
+    test('the installer can replace or delete a locked WinDivert driver', () {
+      final script = File(
+        'windows/packaging/exe/inno_setup.iss',
+      ).readAsStringSync();
+
+      expect(script, contains('Excludes: "WinDivert64.sys"'));
+      expect(
+        script,
+        contains(
+          r'Source: "{{SOURCE_DIR}}\WinDivert64.sys"; DestDir: "{app}"; '
+          'Flags: ignoreversion skipifsourcedoesntexist restartreplace uninsrestartdelete',
+        ),
+      );
+    });
+
     test('the installer takes over a 0.4 FlClashX registration in place', () {
       final script = File(
         'windows/packaging/exe/inno_setup.iss',

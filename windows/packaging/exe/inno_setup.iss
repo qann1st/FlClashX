@@ -108,7 +108,7 @@ begin
   RunHidden('sc.exe', 'start "' + HelperService + '"');
 end;
 
-// zapret leaves the WinDivert driver running, which locks WinDivert64.sys and
+// WinDivert can stay loaded, which locks WinDivert64.sys and
 // makes the next update fail. Stop and delete the service; the new pair
 // registers it again the first time it is used.
 procedure StopWinDivert;
@@ -347,7 +347,8 @@ chineseSimplified.RemoveUserData=是否删除应用程序的用户数据？
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce; Check: not IsUpgradeInstallation
 
 [Files]
-Source: "{{SOURCE_DIR}}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{{SOURCE_DIR}}\*"; DestDir: "{app}"; Excludes: "WinDivert64.sys"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{{SOURCE_DIR}}\WinDivert64.sys"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist restartreplace uninsrestartdelete
 Source: "{{CLEAR_PROXY_SCRIPT}}"; Flags: dontcopy
 
 [Icons]

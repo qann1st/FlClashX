@@ -549,6 +549,13 @@ Future<void> _packageWindows(_Build build, Set<String> targets) async {
         p.join(bundle, name),
       );
     }
+    final core = p.join(build.rootDir, 'core', 'third_party', 'elysium-core');
+    final licenses = p.join(bundle, 'Elysium-Core-LICENSES');
+    await build.copyTree(
+      p.join(core, 'transport', 'zapret2', 'build', 'licenses'),
+      licenses,
+    );
+    build.copy(p.join(core, 'LICENSE'), p.join(licenses, 'Prizrak-Core.txt'));
   }
   if (targets.contains('zip')) {
     final zip = build.dist(artifactName('windows', build.arch, '.zip'));
